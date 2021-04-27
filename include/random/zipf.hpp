@@ -81,8 +81,6 @@ class ZipfGenerator
   size_t
   Zipf()
   {
-    assert(bin_num_ > 0);
-
     const auto target_prob = prob_generator_(random_engine_);
 
     // find a target bin by using a binary search
