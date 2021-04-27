@@ -30,6 +30,24 @@ class ZipfGeneratorFixture : public ::testing::Test
     }
   }
 
+  bool
+  VecHaveSameElements(  //
+      const std::vector<size_t> &first_vec,
+      const std::vector<size_t> &second_vec)
+  {
+    if (first_vec.size() != second_vec.size()) {
+      return false;
+    }
+
+    for (size_t i = 0; i < first_vec.size(); ++i) {
+      if (first_vec[i] != second_vec[i]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
  protected:
   void
   SetUp() override
@@ -75,4 +93,68 @@ TEST_F(ZipfGeneratorFixture, Construct_WithArgs_ZipfGenerateCorrectSkewVal)
   }
 }
 
+TEST_F(ZipfGeneratorFixture, Construct_WithSameArgs_ZipfGenerateSameVal)
+{
+  ZipfGenerator zipf_gen{kBinNum, 1, 0};
+
+  std::vector<size_t> first_genrated_vals;
+  first_genrated_vals.reserve(kRepeatNum);
+  for (size_t i = 0; i < kRepeatNum; ++i) {
+    first_genrated_vals.emplace_back(zipf_gen());
+  }
+
+  zipf_gen = ZipfGenerator{kBinNum, 1, 0};
+
+  std::vector<size_t> second_genrated_vals;
+  second_genrated_vals.reserve(kRepeatNum);
+  for (size_t i = 0; i < kRepeatNum; ++i) {
+    second_genrated_vals.emplace_back(zipf_gen());
+  }
+
+  EXPECT_TRUE(VecHaveSameElements(first_genrated_vals, second_genrated_vals));
+}
+
+TEST_F(ZipfGeneratorFixture, Construct_WithDifferentSkew_ZipfGenerateDifferentVal)
+{
+  ZipfGenerator zipf_gen{kBinNum, 1, 0};
+
+  std::vector<size_t> first_genrated_vals;
+  first_genrated_vals.reserve(kRepeatNum);
+  for (size_t i = 0; i < kRepeatNum; ++i) {
+    first_genrated_vals.emplace_back(zipf_gen());
+  }
+
+  zipf_gen = ZipfGenerator{kBinNum, 2, 0};
+
+  std::vector<size_t> second_genrated_vals;
+  second_genrated_vals.reserve(kRepeatNum);
+  for (size_t i = 0; i < kRepeatNum; ++i) {
+    second_genrated_vals.emplace_back(zipf_gen());
+  }
+
+  EXPECT_FALSE(VecHaveSameElements(first_genrated_vals, second_genrated_vals));
+}
+
+TEST_F(ZipfGeneratorFixture, Construct_WithDifferentSeed_ZipfGenerateDifferentVal)
+{
+  ZipfGenerator zipf_gen{kBinNum, 1, 0};
+
+  std::vector<size_t> first_genrated_vals;
+  first_genrated_vals.reserve(kRepeatNum);
+  for (size_t i = 0; i < kRepeatNum; ++i) {
+    first_genrated_vals.emplace_back(zipf_gen());
+  }
+
+  zipf_gen = ZipfGenerator{kBinNum, 1, 1};
+
+  std::vector<size_t> second_genrated_vals;
+  second_genrated_vals.reserve(kRepeatNum);
+  for (size_t i = 0; i < kRepeatNum; ++i) {
+    second_genrated_vals.emplace_back(zipf_gen());
+  }
+
+  EXPECT_FALSE(VecHaveSameElements(first_genrated_vals, second_genrated_vals));
+}
+
+TEST_F(ZipfGeneratorFixture, SetZipfParameters_SetDifferentParams_ZipfGenerateDifferentVals)
 }  // namespace dbgroup::random::zipf
