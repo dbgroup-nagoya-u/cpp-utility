@@ -30,6 +30,8 @@
   "cSpell.words": [
     "DCMAKE",
     "DCPP",
+    "Wextra",
+    "gtest",
     "zipf"
   ],
   "files.associations": {

@@ -31,7 +31,7 @@ class ZipfGenerator
   std::uniform_real_distribution<double> prob_generator_{0, 1};
 
  public:
-  constexpr ZipfGenerator() : bin_num_{0}, alpha_{0} {}
+  ZipfGenerator() : bin_num_{0}, alpha_{0} { zipf_cdf_.emplace_back(1); }
 
   ZipfGenerator(  //
       const size_t bin_num,
@@ -64,6 +64,7 @@ class ZipfGenerator
     base_prob = 1.0 / base_prob;
 
     // create a CDF according to Zipf's law
+    zipf_cdf_.clear();
     zipf_cdf_.reserve(bin_num_);
     zipf_cdf_.emplace_back(base_prob);
     for (size_t i = 1; i < bin_num_ - 1; ++i) {
