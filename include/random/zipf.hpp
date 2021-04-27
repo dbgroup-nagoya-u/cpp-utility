@@ -12,6 +12,10 @@
 
 namespace dbgroup::random::zipf
 {
+/**
+ * @brief A class to generate random values according to Zipf's law.
+ *
+ */
 class ZipfGenerator
 {
  private:
@@ -38,6 +42,16 @@ class ZipfGenerator
 
   ZipfGenerator() : bin_num_{0} { zipf_cdf_.emplace_back(1); }
 
+  /**
+   * @brief Construct a new ZipfGenerator with given parameters.
+   *
+   * The generator will generate random values within [0, `bin_num`) according to Zipf's
+   * law with a skew paramter `alpha`.
+   *
+   * @param bin_num the total number of bins
+   * @param alpha a skew parameter (zero means uniform distribution)
+   * @param seed a random seed for reproducibility
+   */
   ZipfGenerator(  //
       const size_t bin_num,
       const double alpha,
@@ -58,6 +72,9 @@ class ZipfGenerator
    * Public utility operators
    *##############################################################################################*/
 
+  /**
+   * @return size_t a random value according to Zipf's law.
+   */
   size_t
   operator()()
   {
@@ -83,6 +100,15 @@ class ZipfGenerator
    * Public getters/setters
    *##############################################################################################*/
 
+  /**
+   * @brief Set new parameters for Zipf's law.
+   *
+   * This function recreates a CDF according to Zipf's law by using new paramters, and
+   * it may take some time.
+   *
+   * @param bin_num the total number of bins
+   * @param alpha skew parameter (zero means uniform distribution)
+   */
   void
   SetZipfParameters(  //
       const size_t bin_num,
@@ -111,6 +137,11 @@ class ZipfGenerator
     zipf_cdf_.emplace_back(1);
   }
 
+  /**
+   * @brief Set a new random seed.
+   *
+   * @param seed a random seed
+   */
   void
   SetRandomSeed(const size_t seed)
   {
