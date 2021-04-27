@@ -24,16 +24,23 @@ class ZipfGenerator
   /// a skew parameter (zero means uniform)
   double alpha_;
 
-  /// a random seed
-  size_t seed_;
-
   /// a random generator
   std::mt19937_64 random_engine_;
 
+  /// a probability generator with range [0, 1.0]
   std::uniform_real_distribution<double> prob_generator_{0, 1};
 
  public:
-  constexpr ZipfGenerator() : bin_num_{0}, alpha_{0}, seed_{0} {}
+  constexpr ZipfGenerator() : bin_num_{0}, alpha_{0} {}
+
+  ZipfGenerator(  //
+      const size_t bin_num,
+      const double alpha,
+      const size_t seed = std::random_device{}())
+  {
+    Update(bin_num, alpha);
+    SetRandomSeed(seed);
+  }
 
   ~ZipfGenerator() = default;
 
@@ -68,8 +75,7 @@ class ZipfGenerator
   void
   SetRandomSeed(const size_t seed)
   {
-    seed_ = seed;
-    random_engine_ = std::mt19937_64{seed_};
+    random_engine_ = std::mt19937_64{seed};
   }
 
   size_t
