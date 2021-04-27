@@ -55,6 +55,31 @@ class ZipfGenerator
   ZipfGenerator &operator=(ZipfGenerator &&) = default;
 
   /*################################################################################################
+   * Public utility operators
+   *##############################################################################################*/
+
+  size_t
+  operator()()
+  {
+    const auto target_prob = prob_generator_(random_engine_);
+
+    // find a target bin by using a binary search
+    int64_t begin_index = 0, end_index = bin_num_, index = end_index / 2;
+    while (begin_index < end_index) {
+      if (target_prob < zipf_cdf_[index]) {
+        end_index = index - 1;
+      } else if (target_prob > zipf_cdf_[index]) {
+        begin_index = index + 1;
+      } else {  // target_prob == zipf_cdf_[index]
+        return index;
+      }
+      index = (begin_index + end_index) / 2;
+    }
+
+    return (target_prob <= zipf_cdf_[index]) ? index : index + 1;
+  }
+
+  /*################################################################################################
    * Public getters/setters
    *##############################################################################################*/
 
@@ -90,31 +115,6 @@ class ZipfGenerator
   SetRandomSeed(const size_t seed)
   {
     random_engine_ = std::mt19937_64{seed};
-  }
-
-  /*################################################################################################
-   * Public utility functions
-   *##############################################################################################*/
-
-  size_t
-  Zipf()
-  {
-    const auto target_prob = prob_generator_(random_engine_);
-
-    // find a target bin by using a binary search
-    int64_t begin_index = 0, end_index = bin_num_, index = end_index / 2;
-    while (begin_index < end_index) {
-      if (target_prob < zipf_cdf_[index]) {
-        end_index = index - 1;
-      } else if (target_prob > zipf_cdf_[index]) {
-        begin_index = index + 1;
-      } else {  // target_prob == zipf_cdf_[index]
-        return index;
-      }
-      index = (begin_index + end_index) / 2;
-    }
-
-    return (target_prob <= zipf_cdf_[index]) ? index : index + 1;
   }
 };
 

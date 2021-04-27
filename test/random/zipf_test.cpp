@@ -51,7 +51,7 @@ TEST_F(ZipfGeneratorFixture, Construct_WithoutArgs_ZipfGenerateAlwaysZero)
   ZipfGenerator zipf_gen{};
 
   for (size_t i = 0; i < kRepeatNum; ++i) {
-    const auto zipf_val = zipf_gen.Zipf();
+    const auto zipf_val = zipf_gen();
     EXPECT_EQ(zipf_val, 0);
   }
 }
@@ -63,7 +63,7 @@ TEST_F(ZipfGeneratorFixture, Construct_WithArgs_ZipfGenerateCorrectSkewVal)
 
     std::vector<size_t> freq_dist(kBinNum, 0);
     for (size_t i = 0; i < kRepeatNum; ++i) {
-      const auto zipf_val = zipf_gen.Zipf();
+      const auto zipf_val = zipf_gen();
 
       ASSERT_GE(zipf_val, 0);
       ASSERT_LT(zipf_val, kBinNum);
