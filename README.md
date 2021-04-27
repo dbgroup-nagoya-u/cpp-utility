@@ -1,6 +1,6 @@
 # C++ Utility Library
 
-![Unit Tests](https://github.com/dbgroup-nagoya-u/cpp_utility/workflows/Unit%20Tests/badge.svg?branch=main)
+![Unit Tests](https://github.com/dbgroup-nagoya-u/cpp-utility/workflows/Unit%20Tests/badge.svg?branch=main)
 
 ## Build
 
@@ -14,7 +14,7 @@ sudo apt update && sudo apt install -y build-essential cmake
 
 ### Build Options
 
-- `CPP_UTILITY_BUILD_TESTS`: build unit tests for MwCAS if `on`: default `off`.
+- `CPP_UTILITY_BUILD_TESTS`: build unit tests if `on`: default `off`.
 
 ### Build and Run Unit Tests
 

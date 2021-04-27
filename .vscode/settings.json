@@ -29,7 +29,10 @@
   ],
   "cSpell.words": [
     "DCMAKE",
-    "DCPP"
+    "DCPP",
+    "Wextra",
+    "gtest",
+    "zipf"
   ],
   "files.associations": {
     "fstream": "cpp",
