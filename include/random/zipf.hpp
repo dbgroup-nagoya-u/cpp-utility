@@ -15,6 +15,10 @@ namespace dbgroup::random::zipf
 class ZipfGenerator
 {
  private:
+  /*################################################################################################
+   * Internal member variables
+   *##############################################################################################*/
+
   /// a cumulative distribution function according to Zipf's law
   std::vector<double> zipf_cdf_;
 
@@ -31,6 +35,10 @@ class ZipfGenerator
   std::uniform_real_distribution<double> prob_generator_{0, 1};
 
  public:
+  /*################################################################################################
+   * Public constructors/destructors
+   *##############################################################################################*/
+
   ZipfGenerator() : bin_num_{0}, alpha_{0} { zipf_cdf_.emplace_back(1); }
 
   ZipfGenerator(  //
@@ -38,14 +46,23 @@ class ZipfGenerator
       const double alpha,
       const size_t seed = std::random_device{}())
   {
-    Update(bin_num, alpha);
+    SetZipfParameters(bin_num, alpha);
     SetRandomSeed(seed);
   }
 
   ~ZipfGenerator() = default;
 
+  ZipfGenerator(const ZipfGenerator &) = default;
+  ZipfGenerator &operator=(const ZipfGenerator &obj) = default;
+  ZipfGenerator(ZipfGenerator &&) = default;
+  ZipfGenerator &operator=(ZipfGenerator &&) = default;
+
+  /*################################################################################################
+   * Public getters/setters
+   *##############################################################################################*/
+
   void
-  Update(  //
+  SetZipfParameters(  //
       const size_t bin_num,
       const double alpha)
   {
@@ -78,6 +95,10 @@ class ZipfGenerator
   {
     random_engine_ = std::mt19937_64{seed};
   }
+
+  /*################################################################################################
+   * Public utility functions
+   *##############################################################################################*/
 
   size_t
   Zipf()
