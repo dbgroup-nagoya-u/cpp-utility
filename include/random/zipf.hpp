@@ -81,7 +81,7 @@ class ZipfGenerator
     const auto target_prob = prob_generator_(random_engine_);
 
     // find a target bin by using a binary search
-    int64_t begin_index = 0, end_index = bin_num_, index = end_index / 2;
+    int64_t begin_index = 0, end_index = bin_num_ - 1, index = end_index / 2;
     while (begin_index < end_index) {
       if (target_prob < zipf_cdf_[index]) {
         end_index = index - 1;
@@ -131,10 +131,11 @@ class ZipfGenerator
     zipf_cdf_.clear();
     zipf_cdf_.reserve(bin_num_);
     zipf_cdf_.emplace_back(base_prob);
-    for (size_t i = 1; i < bin_num_ - 1; ++i) {
-      zipf_cdf_.emplace_back(zipf_cdf_[i - 1] + base_prob / pow(i + 1, alpha));
+    for (size_t i = 1; i < bin_num_; ++i) {
+      const auto ith_prob = zipf_cdf_[i - 1] + base_prob / pow(i + 1, alpha);
+      zipf_cdf_.emplace_back(ith_prob);
     }
-    zipf_cdf_.emplace_back(1);
+    zipf_cdf_[bin_num_ - 1] = 1.0;
   }
 
   /**
