@@ -48,6 +48,7 @@ function(ADD_CPP_UTILITY_TEST CPP_UTILITY_TARGET_DIR CPP_UTILITY_TEST_TARGET)
   )
   target_link_libraries(${CPP_UTILITY_TEST_TARGET} PRIVATE
     gtest_main
+    pthread
   )
   add_test(NAME ${CPP_UTILITY_TEST_TARGET} COMMAND $<TARGET_FILE:${CPP_UTILITY_TEST_TARGET}>)
 endfunction()

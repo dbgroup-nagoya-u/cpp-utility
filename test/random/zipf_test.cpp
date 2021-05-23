@@ -6,15 +6,18 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <thread>
+#include <vector>
 
 namespace dbgroup::random::zipf
 {
 class ZipfGeneratorFixture : public ::testing::Test
 {
  public:
-  static constexpr size_t kRepeatNum = 10000;
+  static constexpr size_t kRepeatNum = 100000;
   static constexpr size_t kBinNum = 100;
   static constexpr double kAllowableError = 0.01;
+  static constexpr size_t kThreadNum = 8;
 
   std::mt19937_64 rand_engine_;
   ZipfGenerator zipf_gen_;
@@ -22,7 +25,7 @@ class ZipfGeneratorFixture : public ::testing::Test
   void
   CheckProbsObeyZipfLaw(  //
       const std::vector<size_t> &freq_dist,
-      const double alpha)
+      const double alpha) const
   {
     const auto base_prob = static_cast<double>(freq_dist[0]) / kRepeatNum;
     for (size_t k = 2; k <= kBinNum; ++k) {
@@ -36,7 +39,7 @@ class ZipfGeneratorFixture : public ::testing::Test
   bool
   VecHaveSameElements(  //
       const std::vector<size_t> &first_vec,
-      const std::vector<size_t> &second_vec)
+      const std::vector<size_t> &second_vec) const
   {
     if (first_vec.size() != second_vec.size()) {
       return false;
@@ -49,6 +52,24 @@ class ZipfGeneratorFixture : public ::testing::Test
     }
 
     return true;
+  }
+
+  void
+  RunZipfEngine(const double alpha)
+  {
+    std::vector<size_t> freq_dist(kBinNum, 0);
+    std::mt19937_64 rand_engine{0};
+
+    for (size_t i = 0; i < kRepeatNum; ++i) {
+      const auto zipf_val = zipf_gen_(rand_engine);
+
+      ASSERT_GE(zipf_val, 0);
+      ASSERT_LT(zipf_val, kBinNum);
+
+      ++freq_dist[zipf_val];
+    }
+
+    CheckProbsObeyZipfLaw(freq_dist, alpha);
   }
 
  protected:
@@ -79,26 +100,16 @@ TEST_F(ZipfGeneratorFixture, Construct_WithoutArgs_ZipfGenerateAlwaysZero)
   }
 }
 
-TEST_F(ZipfGeneratorFixture, Construct_WithArgs_ZipfGenerateCorrectSkewVal)
+TEST_F(ZipfGeneratorFixture, ParenOps_WithArgs_ZipfGenerateCorrectSkewVal)
 {
   for (double alpha = 0; alpha < 2; alpha += 0.1) {
     zipf_gen_ = ZipfGenerator{kBinNum, alpha};
 
-    std::vector<size_t> freq_dist(kBinNum, 0);
-    for (size_t i = 0; i < kRepeatNum; ++i) {
-      const auto zipf_val = zipf_gen_(rand_engine_);
-
-      ASSERT_GE(zipf_val, 0);
-      ASSERT_LT(zipf_val, kBinNum);
-
-      ++freq_dist[zipf_val];
-    }
-
-    CheckProbsObeyZipfLaw(freq_dist, alpha);
+    std::thread{&ZipfGeneratorFixture::RunZipfEngine, this, alpha}.join();
   }
 }
 
-TEST_F(ZipfGeneratorFixture, Construct_WithDifferentSkew_ZipfGenerateDifferentVal)
+TEST_F(ZipfGeneratorFixture, ParenOps_WithDifferentSkew_ZipfGenerateDifferentVal)
 {
   std::vector<size_t> first_genrated_vals;
   first_genrated_vals.reserve(kRepeatNum);
@@ -116,6 +127,21 @@ TEST_F(ZipfGeneratorFixture, Construct_WithDifferentSkew_ZipfGenerateDifferentVa
   }
 
   EXPECT_FALSE(VecHaveSameElements(first_genrated_vals, second_genrated_vals));
+}
+
+TEST_F(ZipfGeneratorFixture, ParenOps_MultiThreads_ZipfGenerateCorrectSkewVal)
+{
+  for (double alpha = 0; alpha < 2; alpha += 0.1) {
+    zipf_gen_ = ZipfGenerator{kBinNum, alpha};
+
+    std::vector<std::thread> threads;
+    for (size_t i = 0; i < kThreadNum; ++i) {
+      threads.emplace_back(std::thread{&ZipfGeneratorFixture::RunZipfEngine, this, alpha});
+    }
+    for (auto &&thread : threads) {
+      thread.join();
+    }
+  }
 }
 
 TEST_F(ZipfGeneratorFixture, SetZipfParameters_SetDifferentSkew_ZipfGenerateDifferentVal)
