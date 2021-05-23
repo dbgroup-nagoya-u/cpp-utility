@@ -16,6 +16,7 @@ jobs:
 
     - name: Clone Main Repository
       uses: actions/checkout@v2
+      with:
         submodules: recursive
 
     - name: Create Build Environment
