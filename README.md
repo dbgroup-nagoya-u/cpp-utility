@@ -1,6 +1,6 @@
 # C++ Utility Library
 
-![Unit Tests](https://github.com/dbgroup-nagoya-u/cpp-utility/workflows/Unit%20Tests/badge.svg?branch=main)
+![Ubuntu-20.04](https://github.com/dbgroup-nagoya-u/cpp-utility/workflows/Ubuntu-20.04/badge.svg?branch=main)
 
 ## Build
 
