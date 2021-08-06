@@ -14,13 +14,13 @@ sudo apt update && sudo apt install -y build-essential cmake
 
 ### Build Options
 
-- `CPP_UTILITY_BUILD_TESTS`: build unit tests if `on`: default `off`.
+- `CPP_UTILITY_BUILD_TESTS`: build unit tests if `ON`: default `OFF`.
 
 ### Build and Run Unit Tests
 
 ```bash
 mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCPP_UTILITY_BUILD_TESTS=on ..
+cmake -DCMAKE_BUILD_TYPE=Release -DCPP_UTILITY_BUILD_TESTS=ON ..
 make -j
 ctest -C Release
 ```
