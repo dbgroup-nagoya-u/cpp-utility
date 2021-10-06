@@ -144,11 +144,11 @@ class ZipfGenerator
    * Internal member variables
    *##############################################################################################*/
 
+  /// a probability generator with range [0, 1.0]
+  static inline std::uniform_real_distribution<double> prob_generator_{0, 1};
+
   /// a cumulative distribution function according to Zipf's law
   std::vector<double> zipf_cdf_;
-
-  /// a probability generator with range [0, 1.0]
-  std::uniform_real_distribution<double> prob_generator_{0, 1};
 };
 
 }  // namespace dbgroup::random::zipf
