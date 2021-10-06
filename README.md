@@ -14,7 +14,10 @@ sudo apt update && sudo apt install -y build-essential cmake
 
 ### Build Options
 
+#### Parameters for Unit Testing
+
 - `CPP_UTILITY_BUILD_TESTS`: build unit tests if `ON`: default `OFF`.
+- `CPP_UTILITY_TEST_THREAD_NUM`: the number of threads to run unit tests: default `8`.
 
 ### Build and Run Unit Tests
 
