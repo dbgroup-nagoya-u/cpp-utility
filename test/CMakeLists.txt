@@ -32,24 +32,36 @@ add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/googletest-src
 
 # define function to add unit tests in the same format
 function(ADD_CPP_UTILITY_TEST CPP_UTILITY_TARGET_DIR CPP_UTILITY_TEST_TARGET)
-  add_executable(${CPP_UTILITY_TEST_TARGET}
+  add_executable(
+    ${CPP_UTILITY_TEST_TARGET}
     "${CMAKE_CURRENT_SOURCE_DIR}/${CPP_UTILITY_TARGET_DIR}/${CPP_UTILITY_TEST_TARGET}.cpp"
   )
-  target_compile_features(${CPP_UTILITY_TEST_TARGET} PRIVATE "cxx_std_17")
-  target_compile_options(${CPP_UTILITY_TEST_TARGET} PRIVATE
+  target_compile_features(
+    ${CPP_UTILITY_TEST_TARGET} PRIVATE
+    "cxx_std_17"
+  )
+  target_compile_options(
+    ${CPP_UTILITY_TEST_TARGET} PRIVATE
     -Wall
     -Wextra
     $<$<STREQUAL:${CMAKE_BUILD_TYPE},"Release">:"-O2 -march=native">
     $<$<STREQUAL:${CMAKE_BUILD_TYPE},"RelWithDebInfo">:"-g3 -Og -pg">
     $<$<STREQUAL:${CMAKE_BUILD_TYPE},"Debug">:"-g3 -O0 -pg">
   )
-  target_include_directories(${CPP_UTILITY_TEST_TARGET} PRIVATE
-    "${CPP_UTILITY_SOURCE_DIR}/include"
-  )
-  target_link_libraries(${CPP_UTILITY_TEST_TARGET} PRIVATE
+  target_link_libraries(
+    ${CPP_UTILITY_TEST_TARGET} PRIVATE
+    cpp_utility
     gtest_main
     pthread
   )
+
+  if(DEFINED CPP_UTILITY_TEST_THREAD_NUM)
+    target_compile_definitions(
+      ${CPP_UTILITY_TARGET} PRIVATE
+      CPP_UTILITY_TEST_THREAD_NUM=${CPP_UTILITY_TEST_THREAD_NUM}
+    )
+  endif()
+
   add_test(NAME ${CPP_UTILITY_TEST_TARGET} COMMAND $<TARGET_FILE:${CPP_UTILITY_TEST_TARGET}>)
 endfunction()
 
