@@ -40,7 +40,7 @@ class ZipfGenerator
    * @brief Construct an empty ZipfGenerator object.
    *
    */
-  ZipfGenerator() : bin_num_{0} { zipf_cdf_.emplace_back(1); }
+  ZipfGenerator() { zipf_cdf_.emplace_back(1); }
 
   /**
    * @brief Construct a new ZipfGenerator with given parameters.
@@ -84,7 +84,7 @@ class ZipfGenerator
     const auto target_prob = prob_generator_(g);
 
     // find a target bin by using a binary search
-    int64_t begin_index = 0, end_index = bin_num_ - 1, index = end_index >> 1;
+    int64_t begin_index = 0, end_index = zipf_cdf_.size() - 1, index = end_index >> 1;
     while (begin_index < end_index) {
       if (target_prob < zipf_cdf_[index]) {
         end_index = index - 1;
@@ -121,25 +121,22 @@ class ZipfGenerator
     assert(bin_num > 0);
     assert(alpha >= 0);
 
-    // update parameters
-    bin_num_ = bin_num;
-
     // compute a base probability
     double base_prob = 0;
-    for (size_t i = 1; i < bin_num_ + 1; ++i) {
+    for (size_t i = 1; i < bin_num + 1; ++i) {
       base_prob += 1.0 / pow(i, alpha);
     }
     base_prob = 1.0 / base_prob;
 
     // create a CDF according to Zipf's law
     zipf_cdf_.clear();
-    zipf_cdf_.reserve(bin_num_);
+    zipf_cdf_.reserve(bin_num);
     zipf_cdf_.emplace_back(base_prob);
-    for (size_t i = 1; i < bin_num_; ++i) {
+    for (size_t i = 1; i < bin_num; ++i) {
       const auto ith_prob = zipf_cdf_[i - 1] + base_prob / pow(i + 1, alpha);
       zipf_cdf_.emplace_back(ith_prob);
     }
-    zipf_cdf_[bin_num_ - 1] = 1.0;
+    zipf_cdf_[bin_num - 1] = 1.0;
   }
 
  private:
@@ -149,9 +146,6 @@ class ZipfGenerator
 
   /// a cumulative distribution function according to Zipf's law
   std::vector<double> zipf_cdf_;
-
-  /// the number of bins
-  size_t bin_num_;
 
   /// a probability generator with range [0, 1.0]
   std::uniform_real_distribution<double> prob_generator_{0, 1};
