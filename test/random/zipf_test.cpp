@@ -146,7 +146,7 @@ TEST_F(ZipfGeneratorFixture, Construct_WithoutArgs_AlwaysGenerateZero)
   }
 }
 
-TEST_F(ZipfGeneratorFixture, Construct_WithArgs_ZipfGenerateCorrectSkewVal)
+TEST_F(ZipfGeneratorFixture, Construct_WithDifferentSkews_GenerateCorrectSkewValues)
 {
   for (double alpha = 0; alpha < 2; alpha += 0.1) {
     ZipfGenerator zipf_gen{kBinNum, alpha};
@@ -204,6 +204,31 @@ TEST_F(ZipfGeneratorFixture, MoveAssignment_WithArgs_MovedInstanceGenerateSameID
  * Public utility tests
  *------------------------------------------------------------------------------------------------*/
 
+TEST_F(ZipfGeneratorFixture, SetZipfParameters_SetSameSkew_GenerateSameValues)
+{
+  ZipfGenerator zipf_gen{kBinNum, kSkew};
+  const auto first = RunZipfEngine(zipf_gen, kRandomSeed);
+
+  zipf_gen.SetZipfParameters(kBinNum, kSkew);
+  const auto second = RunZipfEngine(zipf_gen, kRandomSeed);
+
+  EXPECT_TRUE(std::equal(first.begin(), first.end(), second.begin(), second.end()));
+}
+
+TEST_F(ZipfGeneratorFixture, SetZipfParameters_SetDifferentSkew_GenerateDifferentValues)
+{
+  constexpr double kFirstSkew = 0;
+  constexpr double kSecondSkew = 1.0;
+
+  ZipfGenerator zipf_gen{kBinNum, kFirstSkew};
+  const auto first = RunZipfEngine(zipf_gen, kRandomSeed);
+
+  zipf_gen.SetZipfParameters(kBinNum, kSecondSkew);
+  const auto second = RunZipfEngine(zipf_gen, kRandomSeed);
+
+  EXPECT_FALSE(std::equal(first.begin(), first.end(), second.begin(), second.end()));
+}
+
 // TEST_F(ZipfGeneratorFixture, ParenOps_WithDifferentSkew_ZipfGenerateDifferentVal)
 // {
 //   std::vector<size_t> first_genrated_vals;
@@ -237,26 +262,6 @@ TEST_F(ZipfGeneratorFixture, MoveAssignment_WithArgs_MovedInstanceGenerateSameID
 //       thread.join();
 //     }
 //   }
-// }
-
-// TEST_F(ZipfGeneratorFixture, SetZipfParameters_SetDifferentSkew_ZipfGenerateDifferentVal)
-// {
-//   std::vector<size_t> first_genrated_vals;
-//   first_genrated_vals.reserve(kRepeatNum);
-//   for (size_t i = 0; i < kRepeatNum; ++i) {
-//     first_genrated_vals.emplace_back(zipf_gen_(rand_engine_));
-//   }
-
-//   zipf_gen_.SetZipfParameters(kBinNum, 2);
-//   rand_engine_ = std::mt19937_64{0};  // initialize a random seed
-
-//   std::vector<size_t> second_genrated_vals;
-//   second_genrated_vals.reserve(kRepeatNum);
-//   for (size_t i = 0; i < kRepeatNum; ++i) {
-//     second_genrated_vals.emplace_back(zipf_gen_(rand_engine_));
-//   }
-
-//   EXPECT_FALSE(VecHaveSameElements(first_genrated_vals, second_genrated_vals));
 // }
 
 }  // namespace dbgroup::random::zipf
