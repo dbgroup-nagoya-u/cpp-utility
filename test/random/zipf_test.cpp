@@ -35,6 +35,7 @@ class ZipfGeneratorFixture : public ::testing::Test
   static constexpr size_t kBinNum = 1000;
   static constexpr size_t kSkew = 0;
   static constexpr size_t kRandomSeed = 20;
+  static constexpr size_t kThreadNum = 8;
 
   /*################################################################################################
    * Setup/Teardown
@@ -43,8 +44,6 @@ class ZipfGeneratorFixture : public ::testing::Test
   void
   SetUp() override
   {
-    rand_engine_ = std::mt19937_64{0};
-    zipf_gen_ = ZipfGenerator{kBinNum, 1};
   }
 
   void
@@ -97,39 +96,13 @@ class ZipfGeneratorFixture : public ::testing::Test
     }
   }
 
-  //
-  //
-  //
-
-  static constexpr size_t kRepeatNum = 100000;
-  static constexpr double kAllowableError = 0.01;
-  static constexpr size_t kThreadNum = 8;
-
-  std::mt19937_64 rand_engine_;
-  ZipfGenerator zipf_gen_;
-
-  bool
-  VecHaveSameElements(  //
-      const std::vector<size_t> &first_vec,
-      const std::vector<size_t> &second_vec) const
-  {
-    if (first_vec.size() != second_vec.size()) {
-      return false;
-    }
-
-    for (size_t i = 0; i < first_vec.size(); ++i) {
-      if (first_vec[i] != second_vec[i]) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
  private:
   /*################################################################################################
-   * Internal member variables
+   * Internal constants
    *##############################################################################################*/
+
+  static constexpr size_t kRepeatNum = 1e6;
+  static constexpr double kAllowableError = 0.01;
 };
 
 /*--------------------------------------------------------------------------------------------------
@@ -204,6 +177,22 @@ TEST_F(ZipfGeneratorFixture, MoveAssignment_WithArgs_MovedInstanceGenerateSameID
  * Public utility tests
  *------------------------------------------------------------------------------------------------*/
 
+TEST_F(ZipfGeneratorFixture, ParenOps_WithMultiThreads_GenerateCorrectSkewValues)
+{
+  for (double alpha = 0; alpha < 2; alpha += 0.1) {
+    ZipfGenerator zipf_gen{kBinNum, alpha};
+
+    auto f = [&]() {
+      const auto generated_ids = RunZipfEngine(zipf_gen, kRandomSeed);
+      CheckGeneratedIDsObeyZipfLaw(generated_ids, alpha);
+    };
+
+    std::vector<std::thread> threads;
+    for (size_t i = 0; i < kThreadNum; ++i) threads.emplace_back(f);
+    for (auto &&thread : threads) thread.join();
+  }
+}
+
 TEST_F(ZipfGeneratorFixture, SetZipfParameters_SetSameSkew_GenerateSameValues)
 {
   ZipfGenerator zipf_gen{kBinNum, kSkew};
@@ -228,40 +217,5 @@ TEST_F(ZipfGeneratorFixture, SetZipfParameters_SetDifferentSkew_GenerateDifferen
 
   EXPECT_FALSE(std::equal(first.begin(), first.end(), second.begin(), second.end()));
 }
-
-// TEST_F(ZipfGeneratorFixture, ParenOps_WithDifferentSkew_ZipfGenerateDifferentVal)
-// {
-//   std::vector<size_t> first_genrated_vals;
-//   first_genrated_vals.reserve(kRepeatNum);
-//   for (size_t i = 0; i < kRepeatNum; ++i) {
-//     first_genrated_vals.emplace_back(zipf_gen_(rand_engine_));
-//   }
-
-//   zipf_gen_ = ZipfGenerator{kBinNum, 2};
-//   rand_engine_ = std::mt19937_64{0};  // initialize a random seed
-
-//   std::vector<size_t> second_genrated_vals;
-//   second_genrated_vals.reserve(kRepeatNum);
-//   for (size_t i = 0; i < kRepeatNum; ++i) {
-//     second_genrated_vals.emplace_back(zipf_gen_(rand_engine_));
-//   }
-
-//   EXPECT_FALSE(VecHaveSameElements(first_genrated_vals, second_genrated_vals));
-// }
-
-// TEST_F(ZipfGeneratorFixture, ParenOps_MultiThreads_ZipfGenerateCorrectSkewVal)
-// {
-//   for (double alpha = 0; alpha < 2; alpha += 0.1) {
-//     zipf_gen_ = ZipfGenerator{kBinNum, alpha};
-
-//     std::vector<std::thread> threads;
-//     for (size_t i = 0; i < kThreadNum; ++i) {
-//       threads.emplace_back(std::thread{&ZipfGeneratorFixture::RunZipfEngine, this, alpha});
-//     }
-//     for (auto &&thread : threads) {
-//       thread.join();
-//     }
-//   }
-// }
 
 }  // namespace dbgroup::random::zipf
