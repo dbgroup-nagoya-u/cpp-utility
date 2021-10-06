@@ -23,6 +23,8 @@
 #include <thread>
 #include <vector>
 
+#include "../common.hpp"
+
 namespace dbgroup::random::zipf
 {
 class ZipfGeneratorFixture : public ::testing::Test
@@ -35,7 +37,6 @@ class ZipfGeneratorFixture : public ::testing::Test
   static constexpr size_t kBinNum = 1000;
   static constexpr size_t kSkew = 0;
   static constexpr size_t kRandomSeed = 20;
-  static constexpr size_t kThreadNum = 8;
 
   /*################################################################################################
    * Setup/Teardown
