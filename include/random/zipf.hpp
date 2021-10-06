@@ -31,25 +31,15 @@ namespace dbgroup::random::zipf
  */
 class ZipfGenerator
 {
- private:
-  /*################################################################################################
-   * Internal member variables
-   *##############################################################################################*/
-
-  /// a cumulative distribution function according to Zipf's law
-  std::vector<double> zipf_cdf_;
-
-  /// the number of bins
-  size_t bin_num_;
-
-  /// a probability generator with range [0, 1.0]
-  std::uniform_real_distribution<double> prob_generator_{0, 1};
-
  public:
   /*################################################################################################
-   * Public constructors/destructors
+   * Public constructors and assignment operators
    *##############################################################################################*/
 
+  /**
+   * @brief Construct an empty ZipfGenerator object.
+   *
+   */
   ZipfGenerator() : bin_num_{0} { zipf_cdf_.emplace_back(1); }
 
   /**
@@ -69,12 +59,16 @@ class ZipfGenerator
     SetZipfParameters(bin_num, alpha);
   }
 
-  ~ZipfGenerator() = default;
-
   ZipfGenerator(const ZipfGenerator &) = default;
   ZipfGenerator &operator=(const ZipfGenerator &obj) = default;
   ZipfGenerator(ZipfGenerator &&) = default;
   ZipfGenerator &operator=(ZipfGenerator &&) = default;
+
+  /*################################################################################################
+   * Public destructors
+   *##############################################################################################*/
+
+  ~ZipfGenerator() = default;
 
   /*################################################################################################
    * Public utility operators
@@ -90,23 +84,24 @@ class ZipfGenerator
     const auto target_prob = prob_generator_(g);
 
     // find a target bin by using a binary search
-    int64_t begin_index = 0, end_index = bin_num_ - 1, index = end_index / 2;
+    int64_t begin_index = 0, end_index = bin_num_ - 1, index = end_index >> 1;
     while (begin_index < end_index) {
       if (target_prob < zipf_cdf_[index]) {
         end_index = index - 1;
       } else if (target_prob > zipf_cdf_[index]) {
         begin_index = index + 1;
       } else {  // target_prob == zipf_cdf_[index]
-        return index;
+        break;
       }
-      index = (begin_index + end_index) / 2;
+      index = (begin_index + end_index) >> 1;
     }
+    if (target_prob > zipf_cdf_[index]) ++index;
 
-    return (target_prob <= zipf_cdf_[index]) ? index : index + 1;
+    return index;
   }
 
   /*################################################################################################
-   * Public getters/setters
+   * Public utility functions
    *##############################################################################################*/
 
   /**
@@ -146,6 +141,20 @@ class ZipfGenerator
     }
     zipf_cdf_[bin_num_ - 1] = 1.0;
   }
+
+ private:
+  /*################################################################################################
+   * Internal member variables
+   *##############################################################################################*/
+
+  /// a cumulative distribution function according to Zipf's law
+  std::vector<double> zipf_cdf_;
+
+  /// the number of bins
+  size_t bin_num_;
+
+  /// a probability generator with range [0, 1.0]
+  std::uniform_real_distribution<double> prob_generator_{0, 1};
 };
 
 }  // namespace dbgroup::random::zipf
