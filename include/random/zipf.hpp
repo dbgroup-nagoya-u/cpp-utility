@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#pragma once
+#ifndef CPP_UTILITY_RANDOM_ZIPF_HPP
+#define CPP_UTILITY_RANDOM_ZIPF_HPP
 
 #include <cassert>
 #include <cmath>
@@ -60,9 +61,9 @@ class ZipfGenerator
   }
 
   ZipfGenerator(const ZipfGenerator &) = default;
-  ZipfGenerator &operator=(const ZipfGenerator &obj) = default;
+  auto operator=(const ZipfGenerator &obj) -> ZipfGenerator & = default;
   ZipfGenerator(ZipfGenerator &&) = default;
-  ZipfGenerator &operator=(ZipfGenerator &&) = default;
+  auto operator=(ZipfGenerator &&) -> ZipfGenerator & = default;
 
   /*################################################################################################
    * Public destructors
@@ -78,26 +79,31 @@ class ZipfGenerator
    * @return size_t a random value according to Zipf's law.
    */
   template <class RandEngine>
-  size_t
-  operator()(RandEngine &g)
+  auto
+  operator()(RandEngine &g)  //
+      -> size_t
   {
     const auto target_prob = prob_generator_(g);
 
     // find a target bin by using a binary search
-    int64_t begin_index = 0, end_index = zipf_cdf_.size() - 1, index = end_index >> 1;
+    int64_t begin_index = 0;
+    int64_t end_index = zipf_cdf_.size() - 1;
     while (begin_index < end_index) {
+      auto index = (begin_index + end_index) >> 1UL;  // NOLINT
       if (target_prob < zipf_cdf_[index]) {
         end_index = index - 1;
       } else if (target_prob > zipf_cdf_[index]) {
         begin_index = index + 1;
       } else {  // target_prob == zipf_cdf_[index]
+        begin_index = index;
         break;
       }
-      index = (begin_index + end_index) >> 1;
     }
-    if (target_prob > zipf_cdf_[index]) ++index;
+    if (target_prob > zipf_cdf_[begin_index]) {
+      ++begin_index;
+    }
 
-    return index;
+    return begin_index;
   }
 
   /*################################################################################################
@@ -118,8 +124,8 @@ class ZipfGenerator
       const size_t bin_num,
       const double alpha)
   {
-    assert(bin_num > 0);
-    assert(alpha >= 0);
+    assert(bin_num > 0);  // NOLINT
+    assert(alpha >= 0);   // NOLINT
 
     // compute a base probability
     double base_prob = 0;
@@ -133,7 +139,7 @@ class ZipfGenerator
     zipf_cdf_.reserve(bin_num);
     zipf_cdf_.emplace_back(base_prob);
     for (size_t i = 1; i < bin_num; ++i) {
-      const auto ith_prob = zipf_cdf_[i - 1] + base_prob / pow(i + 1, alpha);
+      const auto ith_prob = zipf_cdf_[i - 1] + base_prob / pow(i + 1, alpha);  // NOLINT
       zipf_cdf_.emplace_back(ith_prob);
     }
     zipf_cdf_[bin_num - 1] = 1.0;
@@ -145,10 +151,12 @@ class ZipfGenerator
    *##############################################################################################*/
 
   /// a probability generator with range [0, 1.0]
-  static inline std::uniform_real_distribution<double> prob_generator_{0, 1};
+  std::uniform_real_distribution<double> prob_generator_{0, 1};
 
   /// a cumulative distribution function according to Zipf's law
   std::vector<double> zipf_cdf_;
 };
 
 }  // namespace dbgroup::random::zipf
+
+#endif  // CPP_UTILITY_RANDOM_ZIPF_HPP

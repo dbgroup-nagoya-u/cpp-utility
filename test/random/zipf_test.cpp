@@ -16,14 +16,13 @@
 
 #include "random/zipf.hpp"
 
-#include <gtest/gtest.h>
-
 #include <algorithm>
 #include <cmath>
 #include <thread>
 #include <vector>
 
 #include "../common.hpp"
+#include "gtest/gtest.h"
 
 namespace dbgroup::random::zipf
 {
@@ -56,10 +55,11 @@ class ZipfGeneratorFixture : public ::testing::Test
    * Public utility functions
    *##############################################################################################*/
 
-  std::vector<size_t>
+  [[nodiscard]] static auto
   RunZipfEngine(  //
       ZipfGenerator zipf_gen,
-      const size_t seed) const
+      const size_t seed)  //
+      -> std::vector<size_t>
   {
     std::mt19937_64 rand_engine{seed};
 
@@ -76,10 +76,10 @@ class ZipfGeneratorFixture : public ::testing::Test
     return generated_ids;
   }
 
-  void
+  static void
   CheckGeneratedIDsObeyZipfLaw(  //
       const std::vector<size_t> &generated_ids,
-      const double alpha) const
+      const double alpha)
   {
     // count ID frequency
     std::vector<size_t> freq_dist(kBinNum, 0);
@@ -110,7 +110,7 @@ class ZipfGeneratorFixture : public ::testing::Test
  * Constructor tests
  *------------------------------------------------------------------------------------------------*/
 
-TEST_F(ZipfGeneratorFixture, Construct_WithoutArgs_AlwaysGenerateZero)
+TEST_F(ZipfGeneratorFixture, ConstructWithoutArgsAlwaysGenerateZero)
 {
   ZipfGenerator zipf_gen{};
 
@@ -120,9 +120,10 @@ TEST_F(ZipfGeneratorFixture, Construct_WithoutArgs_AlwaysGenerateZero)
   }
 }
 
-TEST_F(ZipfGeneratorFixture, Construct_WithDifferentSkews_GenerateCorrectSkewValues)
+TEST_F(ZipfGeneratorFixture, ConstructWithDifferentSkewsGenerateCorrectSkewValues)
 {
-  for (double alpha = 0; alpha < 2; alpha += 0.1) {
+  for (size_t alpha_ul = 0; alpha_ul < 2; ++alpha_ul) {
+    double alpha = alpha_ul / 10;  // NOLINT
     ZipfGenerator zipf_gen{kBinNum, alpha};
 
     const auto generated_ids = RunZipfEngine(zipf_gen, kRandomSeed);
@@ -130,29 +131,29 @@ TEST_F(ZipfGeneratorFixture, Construct_WithDifferentSkews_GenerateCorrectSkewVal
   }
 }
 
-TEST_F(ZipfGeneratorFixture, CopyConstruct_WithArgs_CopiedInstanceGenerateSameIDs)
+TEST_F(ZipfGeneratorFixture, CopyConstructCopyInstanceAndGenerateSameIDs)
 {
   ZipfGenerator orig_engine{kBinNum, kSkew};
   const auto orig = RunZipfEngine(orig_engine, kRandomSeed);
 
-  ZipfGenerator copied_engine{orig_engine};
+  ZipfGenerator copied_engine{orig_engine};  // NOLINT
   auto copied = RunZipfEngine(copied_engine, kRandomSeed);
 
   EXPECT_TRUE(std::equal(orig.begin(), orig.end(), copied.begin(), copied.end()));
 }
 
-TEST_F(ZipfGeneratorFixture, CopyAssignment_WithArgs_CopiedInstanceGenerateSameIDs)
+TEST_F(ZipfGeneratorFixture, CopyAssignmentCopyInstanceAndGenerateSameIDs)
 {
   ZipfGenerator orig_engine{kBinNum, kSkew};
   const auto orig = RunZipfEngine(orig_engine, kRandomSeed);
 
-  ZipfGenerator copied_engine = orig_engine;
+  ZipfGenerator copied_engine = orig_engine;  // NOLINT
   auto copied = RunZipfEngine(copied_engine, kRandomSeed);
 
   EXPECT_TRUE(std::equal(orig.begin(), orig.end(), copied.begin(), copied.end()));
 }
 
-TEST_F(ZipfGeneratorFixture, MoveConstruct_WithArgs_MovedInstanceGenerateSameIDs)
+TEST_F(ZipfGeneratorFixture, MoveConstructMoveInstanceAndGenerateSameIDs)
 {
   ZipfGenerator orig_engine{kBinNum, kSkew};
   const auto orig = RunZipfEngine(orig_engine, kRandomSeed);
@@ -163,7 +164,7 @@ TEST_F(ZipfGeneratorFixture, MoveConstruct_WithArgs_MovedInstanceGenerateSameIDs
   EXPECT_TRUE(std::equal(orig.begin(), orig.end(), moved.begin(), moved.end()));
 }
 
-TEST_F(ZipfGeneratorFixture, MoveAssignment_WithArgs_MovedInstanceGenerateSameIDs)
+TEST_F(ZipfGeneratorFixture, MoveAssignmentMoveInstanceAndGenerateSameIDs)
 {
   ZipfGenerator orig_engine{kBinNum, kSkew};
   const auto orig = RunZipfEngine(orig_engine, kRandomSeed);
@@ -178,9 +179,10 @@ TEST_F(ZipfGeneratorFixture, MoveAssignment_WithArgs_MovedInstanceGenerateSameID
  * Public utility tests
  *------------------------------------------------------------------------------------------------*/
 
-TEST_F(ZipfGeneratorFixture, ParenOps_WithMultiThreads_GenerateCorrectSkewValues)
+TEST_F(ZipfGeneratorFixture, ParenOpsWithMultiThreadsGenerateCorrectSkewValues)
 {
-  for (double alpha = 0; alpha < 2; alpha += 0.1) {
+  for (size_t alpha_ul = 0; alpha_ul < 2; ++alpha_ul) {
+    double alpha = alpha_ul / 10;  // NOLINT
     ZipfGenerator zipf_gen{kBinNum, alpha};
 
     auto f = [&]() {
@@ -189,12 +191,16 @@ TEST_F(ZipfGeneratorFixture, ParenOps_WithMultiThreads_GenerateCorrectSkewValues
     };
 
     std::vector<std::thread> threads;
-    for (size_t i = 0; i < kThreadNum; ++i) threads.emplace_back(f);
-    for (auto &&thread : threads) thread.join();
+    for (size_t i = 0; i < kThreadNum; ++i) {
+      threads.emplace_back(f);
+    }
+    for (auto &&thread : threads) {
+      thread.join();
+    }
   }
 }
 
-TEST_F(ZipfGeneratorFixture, SetZipfParameters_SetSameSkew_GenerateSameValues)
+TEST_F(ZipfGeneratorFixture, SetZipfParametersWithSameSkewGenerateSameValues)
 {
   ZipfGenerator zipf_gen{kBinNum, kSkew};
   const auto first = RunZipfEngine(zipf_gen, kRandomSeed);
@@ -205,7 +211,7 @@ TEST_F(ZipfGeneratorFixture, SetZipfParameters_SetSameSkew_GenerateSameValues)
   EXPECT_TRUE(std::equal(first.begin(), first.end(), second.begin(), second.end()));
 }
 
-TEST_F(ZipfGeneratorFixture, SetZipfParameters_SetDifferentSkew_GenerateDifferentValues)
+TEST_F(ZipfGeneratorFixture, SetZipfParametersWithDifferentSkewGenerateDifferentValues)
 {
   constexpr double kFirstSkew = 0;
   constexpr double kSecondSkew = 1.0;
