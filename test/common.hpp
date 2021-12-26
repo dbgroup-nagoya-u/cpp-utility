@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#pragma once
+#ifndef CPP_UTILITY_TEST_COMMON_HPP
+#define CPP_UTILITY_TEST_COMMON_HPP
 
 #include <cassert>
 #include <cstddef>
@@ -25,3 +26,5 @@ constexpr size_t kThreadNum = CPP_UTILITY_TEST_THREAD_NUM;
 #else
 constexpr size_t kThreadNum = 8;
 #endif
+
+#endif  // CPP_UTILITY_TEST_COMMON_HPP
