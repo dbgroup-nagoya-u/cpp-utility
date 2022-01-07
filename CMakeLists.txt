@@ -19,15 +19,17 @@ set(CPP_UTILITY_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 # Build targets
 #--------------------------------------------------------------------------------------#
 
-# build as a header-only library
-add_library(cpp_utility INTERFACE)
-add_library(cpp_utility::cpp_utility ALIAS cpp_utility)
-target_compile_features(cpp_utility INTERFACE
-  "cxx_std_17"
-)
-target_include_directories(cpp_utility INTERFACE
-  "${CPP_UTILITY_SOURCE_DIR}/include"
-)
+if(NOT TARGET cpp_utility::cpp_utility)
+  # build as a header-only library
+  add_library(cpp_utility INTERFACE)
+  add_library(cpp_utility::cpp_utility ALIAS cpp_utility)
+  target_compile_features(cpp_utility INTERFACE
+    "cxx_std_17"
+  )
+  target_include_directories(cpp_utility INTERFACE
+    "${CPP_UTILITY_SOURCE_DIR}/include"
+  )
+endif()
 
 #--------------------------------------------------------------------------------------#
 # Build Unit Tests
