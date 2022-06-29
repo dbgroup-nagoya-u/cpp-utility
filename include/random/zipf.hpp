@@ -54,28 +54,6 @@ class ZipfDistribution
   /**
    * @brief Construct a new Zipf distribution with given parameters.
    *
-   * This distribution will generate random values within [0, `bin_num`) according to
-   * Zipf's law with a skew paramter `alpha`.
-   *
-   * @param bin_num the total number of bins.
-   * @param alpha a skew parameter (zero means uniform distribution).
-   */
-  ZipfDistribution(  //
-      const IntType bin_num,
-      const double alpha)
-      : max_{bin_num}, alpha_{alpha}
-  {
-    if (bin_num < 1) {
-      std::string err_msg = "ERROR: the number of bins for Zipf's law must be greater than zero.";
-      throw std::runtime_error{err_msg};
-    }
-
-    UpdateCDF();
-  }
-
-  /**
-   * @brief Construct a new Zipf distribution with given parameters.
-   *
    * This distribution will generate random values within [`min`, `max`) according to
    * Zipf's law with a skew paramter `alpha`.
    *
