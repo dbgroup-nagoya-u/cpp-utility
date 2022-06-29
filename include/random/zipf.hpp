@@ -176,6 +176,156 @@ class ZipfDistribution
   std::vector<double> zipf_cdf_{};
 };
 
+/**
+ * @brief A class to generate random values according to Zipf's law approximately.
+ *
+ */
+template <class IntType>
+class ApproxZipfDistribution
+{
+  static_assert(std::is_integral_v<IntType>);
+
+ public:
+  /*####################################################################################
+   * Public constructors and assignment operators
+   *##################################################################################*/
+
+  /**
+   * @brief Construct an empty distribution.
+   *
+   * This always returns zero.
+   */
+  constexpr ApproxZipfDistribution() = default;
+
+  /**
+   * @brief Construct a new Zipf distribution with given parameters.
+   *
+   * This distribution will generate random values within [`min`, `max`) according to
+   * Zipf's law with a skew paramter `alpha`.
+   *
+   * @param min the minimum value to be generated.
+   * @param max the maximum value to be generated.
+   * @param alpha a skew parameter (zero means uniform distribution).
+   */
+  ApproxZipfDistribution(  //
+      const IntType min,
+      const IntType max,
+      const double alpha)
+      : min_{min}, max_{max}, alpha_{alpha}, n_{max_ - min_}, pow_{1.0 - alpha_}
+  {
+    if (max <= min) {
+      std::string err_msg = "ERROR: the maximum value must be greater than the minimum one.";
+      throw std::runtime_error{err_msg};
+    }
+
+    denom_ = GetHarmonicNum(n_);
+  }
+
+  constexpr ApproxZipfDistribution(const ApproxZipfDistribution &) = default;
+  constexpr auto operator=(const ApproxZipfDistribution &obj) -> ApproxZipfDistribution & = default;
+  constexpr ApproxZipfDistribution(ApproxZipfDistribution &&) noexcept = default;
+  constexpr auto operator=(ApproxZipfDistribution &&) noexcept
+      -> ApproxZipfDistribution & = default;
+
+  /*####################################################################################
+   * Public destructors
+   *##################################################################################*/
+
+  ~ApproxZipfDistribution() = default;
+
+  /*####################################################################################
+   * Public getters
+   *##################################################################################*/
+
+  /**
+   * @param id a target ID in [0, `bin_num`).
+   * @return A CDF value of the given ID.
+   */
+  [[nodiscard]] constexpr auto
+  GetCDF(const IntType id) const  //
+      -> double
+  {
+    return GetHarmonicNum(id + 1) / denom_;
+  }
+
+  /*####################################################################################
+   * Public utility operators
+   *##################################################################################*/
+
+  /**
+   * @param g a random value generator.
+   * @return a random value according to Zipf's law.
+   */
+  template <class RandEngine>
+  [[nodiscard]] auto
+  operator()(RandEngine &g) const  //
+      -> IntType
+  {
+    thread_local std::uniform_real_distribution<double> uniform_dist{0.0, 1.0};
+    const auto target_prob = uniform_dist(g);
+
+    // find a target bin by using a binary search
+    int64_t begin_pos = 0;
+    int64_t end_pos = n_ - 1;
+    while (begin_pos < end_pos) {
+      auto pos = (begin_pos + end_pos) >> 1UL;  // NOLINT
+      const auto cdf_val = GetCDF(pos);
+      if (target_prob < cdf_val) {
+        end_pos = pos - 1;
+      } else if (target_prob > cdf_val) {
+        begin_pos = pos + 1;
+      } else {  // target_prob == cdf_val
+        begin_pos = pos;
+        break;
+      }
+    }
+    if (target_prob > GetCDF(begin_pos)) {
+      ++begin_pos;
+    }
+
+    return min_ + static_cast<IntType>(begin_pos);
+  }
+
+ private:
+  /*####################################################################################
+   * Internal utility functions
+   *##################################################################################*/
+
+  /**
+   * @param n the number of partial elements in the p-serires.
+   * @return an approximate partial sum of the p-series.
+   */
+  [[nodiscard]] constexpr auto
+  GetHarmonicNum(const IntType n) const  //
+      -> double
+  {
+    if (pow_ == 0.0) return (1 + log(n) + log(n + 1)) * 0.5;
+    return (pow(n + 1, pow_) + pow(n, pow_) - 2) / (2 * pow_) + 0.5;
+  }
+
+  /*####################################################################################
+   * Internal member variables
+   *##################################################################################*/
+
+  /// the minimum value to be generated.
+  IntType min_{0};
+
+  /// the maximum value to be generated.
+  IntType max_{1};
+
+  /// a skew parameter (zero means uniform distribution).
+  double alpha_{0.0};
+
+  /// the number of bins in this Zipf distribution.
+  IntType n_{1};
+
+  /// equal to `1 - alpha_`.
+  double pow_{1.0};
+
+  /// equal to `GetHarmonicNum(n_)`.
+  double denom_{1.0};
+};
+
 }  // namespace dbgroup::random
 
 #endif  // CPP_UTILITY_RANDOM_ZIPF_HPP
