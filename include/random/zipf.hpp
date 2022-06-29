@@ -80,10 +80,10 @@ class ZipfGenerator
    */
   template <class RandEngine>
   auto
-  operator()(RandEngine &g)  //
+  operator()(RandEngine &g) const  //
       -> size_t
   {
-    const auto target_prob = prob_generator_(g);
+    const auto target_prob = std::uniform_real_distribution<double>{0.0, 1.0}(g);
 
     // find a target bin by using a binary search
     int64_t begin_index = 0;
@@ -149,9 +149,6 @@ class ZipfGenerator
   /*####################################################################################
    * Internal member variables
    *##################################################################################*/
-
-  /// a probability generator with range [0, 1.0]
-  std::uniform_real_distribution<double> prob_generator_{0, 1};
 
   /// a cumulative distribution function according to Zipf's law
   std::vector<double> zipf_cdf_;

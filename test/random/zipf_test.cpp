@@ -57,7 +57,7 @@ class ZipfGeneratorFixture : public ::testing::Test
 
   [[nodiscard]] static auto
   RunZipfEngine(  //
-      ZipfGenerator zipf_gen,
+      const ZipfGenerator &zipf_gen,
       const size_t seed)  //
       -> std::vector<size_t>
   {
