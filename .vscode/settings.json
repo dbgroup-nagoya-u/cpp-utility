@@ -128,6 +128,11 @@
     "any": "cpp",
     "cstring": "cpp",
     "future": "cpp",
-    "variant": "cpp"
+    "variant": "cpp",
+    "csignal": "cpp",
+    "strstream": "cpp",
+    "bitset": "cpp",
+    "complex": "cpp",
+    "typeindex": "cpp"
   },
 }

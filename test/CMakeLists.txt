@@ -45,6 +45,9 @@ function(ADD_CPP_UTILITY_TEST CPP_UTILITY_TARGET_DIR CPP_UTILITY_TEST_TARGET)
     $<$<STREQUAL:${CMAKE_BUILD_TYPE},"RelWithDebInfo">:"-g3 -Og -pg">
     $<$<STREQUAL:${CMAKE_BUILD_TYPE},"Debug">:"-g3 -O0 -pg">
   )
+  target_include_directories(${CPP_UTILITY_TEST_TARGET} PRIVATE
+    "${CPP_UTILITY_SOURCE_DIR}/test"
+  )
   target_link_libraries(${CPP_UTILITY_TEST_TARGET} PRIVATE
     cpp_utility
     gtest_main
