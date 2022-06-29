@@ -48,6 +48,7 @@
   "plantuml.exportSubFolder": false,
   // local dictionary
   "cSpell.words": [
+    "Chlebus",
     "DCMAKE",
     "DCPP",
     "gtest",
