@@ -106,10 +106,11 @@ class ZipfDistribution
    *##################################################################################*/
 
   /**
+   * @param g a random value generator.
    * @return a random value according to Zipf's law.
    */
   template <class RandEngine>
-  auto
+  [[nodiscard]] auto
   operator()(RandEngine &g) const  //
       -> IntType
   {
@@ -121,16 +122,17 @@ class ZipfDistribution
     int64_t end_pos = zipf_cdf_.size() - 1;
     while (begin_pos < end_pos) {
       auto pos = (begin_pos + end_pos) >> 1UL;  // NOLINT
-      if (target_prob < zipf_cdf_[pos]) {
+      const auto cdf_val = zipf_cdf_.at(pos);
+      if (target_prob < cdf_val) {
         end_pos = pos - 1;
-      } else if (target_prob > zipf_cdf_[pos]) {
+      } else if (target_prob > cdf_val) {
         begin_pos = pos + 1;
-      } else {  // target_prob == zipf_cdf_[pos]
+      } else {  // target_prob == cdf_val
         begin_pos = pos;
         break;
       }
     }
-    if (target_prob > zipf_cdf_[begin_pos]) {
+    if (target_prob > zipf_cdf_.at(begin_pos)) {
       ++begin_pos;
     }
 
@@ -143,10 +145,7 @@ class ZipfDistribution
    *##################################################################################*/
 
   /**
-   * @brief Set new parameters for Zipf's law.
-   *
-   * This function recreates a CDF according to Zipf's law by using new paramters, and
-   * it may take some time.
+   * @brief Compute CDF values for this Zipf distribution.
    */
   void
   UpdateCDF()
@@ -168,7 +167,7 @@ class ZipfDistribution
     zipf_cdf_.reserve(bin_num);
     zipf_cdf_.emplace_back(base_prob);
     for (IntType i = 1; i < bin_num; ++i) {
-      const auto ith_prob = zipf_cdf_[i - 1] + base_prob / pow(i + 1, alpha_);  // NOLINT
+      const auto ith_prob = zipf_cdf_.at(i - 1) + base_prob / pow(i + 1, alpha_);
       zipf_cdf_.emplace_back(ith_prob);
     }
     zipf_cdf_[bin_num - 1] = 1.0;
@@ -314,8 +313,8 @@ class ApproxZipfDistribution
   GetHarmonicNum(const IntType n) const  //
       -> double
   {
-    if (pow_ == 0.0) return (1 + log(n) + log(n + 1)) * 0.5;
-    return (pow(n + 1, pow_) + pow(n, pow_) - 2) / (2 * pow_) + 0.5;
+    if (pow_ == 0.0) return (1 + log(n) + log(n + 1)) * 0.5;          // NOLINT
+    return (pow(n + 1, pow_) + pow(n, pow_) - 2) / (2 * pow_) + 0.5;  // NOLINT
   }
 
   /*####################################################################################
