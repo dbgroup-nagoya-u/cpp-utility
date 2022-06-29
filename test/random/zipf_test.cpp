@@ -21,21 +21,37 @@
 #include <thread>
 #include <vector>
 
-#include "../common.hpp"
+#include "common.hpp"
 #include "gtest/gtest.h"
 
-namespace dbgroup::random::zipf
+namespace dbgroup::random::test
 {
-class ZipfGeneratorFixture : public ::testing::Test
+/*####################################################################################
+ * Global constants
+ *##################################################################################*/
+
+constexpr size_t kSkew = 1.0;
+constexpr size_t kRandomSeed = 20;
+constexpr size_t kRepeatNum = 1e6;
+constexpr double kAllowableError = 0.015;
+constexpr size_t kAlphaUnitUL = 10;
+constexpr size_t kMaxAlphaUL = 10;
+
+template <class IntType>
+class ZipfDistributionFixture : public ::testing::Test
 {
+  using ZipfDist_t = ZipfDistribution<IntType>;
+  using ApproxZipf_t = ApproxZipfDistribution<IntType>;
+
  protected:
   /*####################################################################################
-   * Public constants
+   * Constants
    *##################################################################################*/
 
-  static constexpr size_t kBinNum = 1000;
-  static constexpr size_t kSkew = 0;
-  static constexpr size_t kRandomSeed = 20;
+  static constexpr IntType kSmallBinNum = 1000;
+  static constexpr IntType kLargeBinNum = 100000;
+  static constexpr IntType kMin = std::numeric_limits<IntType>::min();
+  static constexpr IntType kMax = std::numeric_limits<IntType>::max() - kSmallBinNum;
 
   /*####################################################################################
    * Setup/Teardown
@@ -52,25 +68,121 @@ class ZipfGeneratorFixture : public ::testing::Test
   }
 
   /*####################################################################################
+   * Functions for verification
+   *##################################################################################*/
+
+  void
+  VerifyConstructorWOArgs()
+  {
+    std::mt19937_64 rand_engine{kRandomSeed};  // NOLINT
+
+    ZipfDist_t zipf_dist{};
+    for (size_t i = 0; i < kRepeatNum; ++i) {
+      EXPECT_EQ(zipf_dist(rand_engine), 0);
+    }
+  }
+
+  void
+  VerifyConstructorWithArgs()
+  {
+    std::mt19937_64 rand_engine{kRandomSeed};  // NOLINT
+    std::uniform_int_distribution<IntType> uniform_dist{kMin, kMax};
+
+    for (size_t i = 0; i <= kMaxAlphaUL; ++i) {
+      const auto min = uniform_dist(rand_engine);
+      const auto max = min + kSmallBinNum;
+      const auto alpha = i / static_cast<double>(kAlphaUnitUL);
+      const ZipfDist_t zipf_dist{min, max, alpha};
+
+      const auto generated_ids = RunZipfEngine(zipf_dist, min, max, rand_engine());
+      CheckGeneratedIDsObeyZipfLaw(generated_ids, min, alpha);
+    }
+  }
+
+  void
+  VerifyCopyInitializers()
+  {
+    std::mt19937_64 rand_engine{kRandomSeed};  // NOLINT
+    std::uniform_int_distribution<IntType> uniform_dist{kMin, kMax};
+
+    // prepare a base distribution
+    const auto min = uniform_dist(rand_engine);
+    const auto max = min + kSmallBinNum;
+    ZipfDist_t orig_engine{min, max, kSkew};
+    const auto orig = RunZipfEngine(orig_engine, min, max, kRandomSeed);
+
+    // copy the instance by using constructors
+    ZipfDist_t copied_engine{orig_engine};  // NOLINT
+    auto copied = RunZipfEngine(copied_engine, min, max, kRandomSeed);
+    EXPECT_TRUE(std::equal(orig.begin(), orig.end(), copied.begin(), copied.end()));
+
+    // copy the instance by using operators
+    copied_engine = orig_engine;
+    copied = RunZipfEngine(copied_engine, min, max, kRandomSeed);
+    EXPECT_TRUE(std::equal(orig.begin(), orig.end(), copied.begin(), copied.end()));
+  }
+
+  void
+  VerifyMoveInitializers()
+  {
+    std::mt19937_64 rand_engine{kRandomSeed};  // NOLINT
+    std::uniform_int_distribution<IntType> uniform_dist{kMin, kMax};
+
+    // prepare a base distribution
+    const auto min = uniform_dist(rand_engine);
+    const auto max = min + kSmallBinNum;
+    ZipfDist_t orig_engine{min, max, kSkew};
+    const auto orig = RunZipfEngine(orig_engine, min, max, kRandomSeed);
+
+    // move the instance by using constructors
+    ZipfDist_t moved_engine{std::move(orig_engine)};  // NOLINT
+    auto copied = RunZipfEngine(moved_engine, min, max, kRandomSeed);
+    EXPECT_TRUE(std::equal(orig.begin(), orig.end(), copied.begin(), copied.end()));
+
+    // move the instance by using operators
+    auto re_moved_engine = std::move(moved_engine);
+    copied = RunZipfEngine(re_moved_engine, min, max, kRandomSeed);
+    EXPECT_TRUE(std::equal(orig.begin(), orig.end(), copied.begin(), copied.end()));
+  }
+
+  void
+  VerifyApproxZipf()
+  {
+    for (size_t i = 0; i <= kMaxAlphaUL; ++i) {
+      const auto alpha = i / static_cast<double>(kAlphaUnitUL);
+      ZipfDist_t zipf{0, kLargeBinNum, alpha};
+      ApproxZipf_t approx_zipf{0, kLargeBinNum, alpha};
+
+      for (size_t i = 0; i < kLargeBinNum; ++i) {
+        const auto expect = zipf.GetCDF(i);
+        const auto actual = approx_zipf.GetCDF(i);
+        EXPECT_LT(fabs(expect - actual), kAllowableError);
+      }
+    }
+  }
+
+  /*####################################################################################
    * Public utility functions
    *##################################################################################*/
 
   [[nodiscard]] static auto
   RunZipfEngine(  //
-      ZipfGenerator zipf_gen,
+      const ZipfDist_t &zipf_dist,
+      const IntType min,
+      const IntType max,
       const size_t seed)  //
-      -> std::vector<size_t>
+      -> std::vector<IntType>
   {
     std::mt19937_64 rand_engine{seed};
 
-    std::vector<size_t> generated_ids;
+    std::vector<IntType> generated_ids;
     generated_ids.reserve(kRepeatNum);
     for (size_t i = 0; i < kRepeatNum; ++i) {
-      const auto id = zipf_gen(rand_engine);
+      const auto id = zipf_dist(rand_engine);
       generated_ids.emplace_back(id);
 
-      EXPECT_GE(id, 0);
-      EXPECT_LT(id, kBinNum);
+      EXPECT_GE(id, min);
+      EXPECT_LT(id, max);
     }
 
     return generated_ids;
@@ -78,151 +190,69 @@ class ZipfGeneratorFixture : public ::testing::Test
 
   static void
   CheckGeneratedIDsObeyZipfLaw(  //
-      const std::vector<size_t> &generated_ids,
+      const std::vector<IntType> &generated_ids,
+      const IntType min,
       const double alpha)
   {
     // count ID frequency
-    std::vector<size_t> freq_dist(kBinNum, 0);
+    std::vector<size_t> freq_dist(kSmallBinNum, 0);
     for (auto &&id : generated_ids) {
-      ++freq_dist[id];
+      ++freq_dist[id - min];
     }
 
     // check ID frequency approximately equals to Zipf's law
     const auto base_prob = static_cast<double>(freq_dist[0]) / kRepeatNum;
-    for (size_t k = 2; k <= kBinNum; ++k) {
+    for (size_t k = 2; k <= kSmallBinNum; ++k) {
       const auto kth_prob = static_cast<double>(freq_dist[k - 1]) / kRepeatNum;
       const auto error = abs(kth_prob - base_prob / pow(k, alpha));
 
       EXPECT_LT(error, kAllowableError);
     }
   }
-
- private:
-  /*####################################################################################
-   * Internal constants
-   *##################################################################################*/
-
-  static constexpr size_t kRepeatNum = 1e6;
-  static constexpr double kAllowableError = 0.01;
 };
+
+/*######################################################################################
+ * Preparation for typed testing
+ *####################################################################################*/
+
+using IntegralTypes = ::testing::Types<int32_t, int64_t, uint32_t, uint64_t>;
+TYPED_TEST_SUITE(ZipfDistributionFixture, IntegralTypes);
+
+/*######################################################################################
+ * Unit test definitions
+ *####################################################################################*/
 
 /*--------------------------------------------------------------------------------------
  * Constructor tests
  *------------------------------------------------------------------------------------*/
 
-TEST_F(ZipfGeneratorFixture, ConstructWithoutArgsAlwaysGenerateZero)
+TYPED_TEST(ZipfDistributionFixture, ConstructWithoutArgsAlwaysGenerateZero)
 {
-  ZipfGenerator zipf_gen{};
-
-  const auto generated_ids = RunZipfEngine(zipf_gen, kRandomSeed);
-  for (auto &&id : generated_ids) {
-    EXPECT_EQ(id, 0);
-  }
+  TestFixture::VerifyConstructorWOArgs();
 }
 
-TEST_F(ZipfGeneratorFixture, ConstructWithDifferentSkewsGenerateCorrectSkewValues)
+TYPED_TEST(ZipfDistributionFixture, ConstructWithDifferentSkewsGenerateCorrectSkewValues)
 {
-  for (size_t alpha_ul = 0; alpha_ul < 2; ++alpha_ul) {
-    double alpha = alpha_ul / 10;  // NOLINT
-    ZipfGenerator zipf_gen{kBinNum, alpha};
-
-    const auto generated_ids = RunZipfEngine(zipf_gen, kRandomSeed);
-    CheckGeneratedIDsObeyZipfLaw(generated_ids, alpha);
-  }
+  TestFixture::VerifyConstructorWithArgs();
 }
 
-TEST_F(ZipfGeneratorFixture, CopyConstructCopyInstanceAndGenerateSameIDs)
+TYPED_TEST(ZipfDistributionFixture, CopiedInstanceGenerateSameIDs)
 {
-  ZipfGenerator orig_engine{kBinNum, kSkew};
-  const auto orig = RunZipfEngine(orig_engine, kRandomSeed);
-
-  ZipfGenerator copied_engine{orig_engine};  // NOLINT
-  auto copied = RunZipfEngine(copied_engine, kRandomSeed);
-
-  EXPECT_TRUE(std::equal(orig.begin(), orig.end(), copied.begin(), copied.end()));
+  TestFixture::VerifyCopyInitializers();
 }
 
-TEST_F(ZipfGeneratorFixture, CopyAssignmentCopyInstanceAndGenerateSameIDs)
+TYPED_TEST(ZipfDistributionFixture, MovedInstanceGenerateSameIDs)
 {
-  ZipfGenerator orig_engine{kBinNum, kSkew};
-  const auto orig = RunZipfEngine(orig_engine, kRandomSeed);
-
-  ZipfGenerator copied_engine = orig_engine;  // NOLINT
-  auto copied = RunZipfEngine(copied_engine, kRandomSeed);
-
-  EXPECT_TRUE(std::equal(orig.begin(), orig.end(), copied.begin(), copied.end()));
-}
-
-TEST_F(ZipfGeneratorFixture, MoveConstructMoveInstanceAndGenerateSameIDs)
-{
-  ZipfGenerator orig_engine{kBinNum, kSkew};
-  const auto orig = RunZipfEngine(orig_engine, kRandomSeed);
-
-  ZipfGenerator moved_engine{std::move(orig_engine)};
-  auto moved = RunZipfEngine(moved_engine, kRandomSeed);
-
-  EXPECT_TRUE(std::equal(orig.begin(), orig.end(), moved.begin(), moved.end()));
-}
-
-TEST_F(ZipfGeneratorFixture, MoveAssignmentMoveInstanceAndGenerateSameIDs)
-{
-  ZipfGenerator orig_engine{kBinNum, kSkew};
-  const auto orig = RunZipfEngine(orig_engine, kRandomSeed);
-
-  ZipfGenerator moved_engine = std::move(orig_engine);
-  auto moved = RunZipfEngine(moved_engine, kRandomSeed);
-
-  EXPECT_TRUE(std::equal(orig.begin(), orig.end(), moved.begin(), moved.end()));
+  TestFixture::VerifyMoveInitializers();
 }
 
 /*--------------------------------------------------------------------------------------
- * Public utility tests
+ * Approximate Zipf distribution tests
  *------------------------------------------------------------------------------------*/
 
-TEST_F(ZipfGeneratorFixture, ParenOpsWithMultiThreadsGenerateCorrectSkewValues)
+TYPED_TEST(ZipfDistributionFixture, ApproxZipfDistributionApproximateOriginalOne)
 {
-  for (size_t alpha_ul = 0; alpha_ul < 2; ++alpha_ul) {
-    double alpha = alpha_ul / 10;  // NOLINT
-    ZipfGenerator zipf_gen{kBinNum, alpha};
-
-    auto f = [&]() {
-      const auto generated_ids = RunZipfEngine(zipf_gen, kRandomSeed);
-      CheckGeneratedIDsObeyZipfLaw(generated_ids, alpha);
-    };
-
-    std::vector<std::thread> threads;
-    for (size_t i = 0; i < kThreadNum; ++i) {
-      threads.emplace_back(f);
-    }
-    for (auto &&thread : threads) {
-      thread.join();
-    }
-  }
+  TestFixture::VerifyApproxZipf();
 }
 
-TEST_F(ZipfGeneratorFixture, SetZipfParametersWithSameSkewGenerateSameValues)
-{
-  ZipfGenerator zipf_gen{kBinNum, kSkew};
-  const auto first = RunZipfEngine(zipf_gen, kRandomSeed);
-
-  zipf_gen.SetZipfParameters(kBinNum, kSkew);
-  const auto second = RunZipfEngine(zipf_gen, kRandomSeed);
-
-  EXPECT_TRUE(std::equal(first.begin(), first.end(), second.begin(), second.end()));
-}
-
-TEST_F(ZipfGeneratorFixture, SetZipfParametersWithDifferentSkewGenerateDifferentValues)
-{
-  constexpr double kFirstSkew = 0;
-  constexpr double kSecondSkew = 1.0;
-
-  ZipfGenerator zipf_gen{kBinNum, kFirstSkew};
-  const auto first = RunZipfEngine(zipf_gen, kRandomSeed);
-
-  zipf_gen.SetZipfParameters(kBinNum, kSecondSkew);
-  const auto second = RunZipfEngine(zipf_gen, kRandomSeed);
-
-  EXPECT_FALSE(std::equal(first.begin(), first.end(), second.begin(), second.end()));
-}
-
-}  // namespace dbgroup::random::zipf
+}  // namespace dbgroup::random::test
