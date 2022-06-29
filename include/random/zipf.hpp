@@ -87,6 +87,21 @@ class ZipfDistribution
   ~ZipfDistribution() = default;
 
   /*####################################################################################
+   * Public getters
+   *##################################################################################*/
+
+  /**
+   * @param id a target ID in [0, `bin_num`).
+   * @return A CDF value of the given ID.
+   */
+  [[nodiscard]] constexpr auto
+  GetCDF(const IntType id) const  //
+      -> double
+  {
+    return zipf_cdf_.at(id);
+  }
+
+  /*####################################################################################
    * Public utility operators
    *##################################################################################*/
 

@@ -26,20 +26,30 @@
 
 namespace dbgroup::random::test
 {
+/*####################################################################################
+ * Global constants
+ *##################################################################################*/
+
+constexpr size_t kSkew = 1.0;
+constexpr size_t kRandomSeed = 20;
+constexpr size_t kRepeatNum = 1e6;
+constexpr double kAllowableError = 0.015;
+constexpr size_t kAlphaUnitUL = 10;
+constexpr size_t kMaxAlphaUL = 10;
 
 template <class IntType>
 class ZipfDistributionFixture : public ::testing::Test
 {
   using ZipfDist_t = ZipfDistribution<IntType>;
+  using ApproxZipf_t = ApproxZipfDistribution<IntType>;
 
  protected:
   /*####################################################################################
-   * Public constants
+   * Constants
    *##################################################################################*/
 
   static constexpr IntType kSmallBinNum = 1000;
-  static constexpr size_t kSkew = 1.0;
-  static constexpr size_t kRandomSeed = 20;
+  static constexpr IntType kLargeBinNum = 100000;
   static constexpr IntType kMin = std::numeric_limits<IntType>::min();
   static constexpr IntType kMax = std::numeric_limits<IntType>::max() - kSmallBinNum;
 
@@ -78,11 +88,10 @@ class ZipfDistributionFixture : public ::testing::Test
     std::mt19937_64 rand_engine{kRandomSeed};  // NOLINT
     std::uniform_int_distribution<IntType> uniform_dist{kMin, kMax};
 
-    constexpr size_t kMaxAlphaUL = 20;
-    for (size_t i = 0; i < kMaxAlphaUL; ++i) {
+    for (size_t i = 0; i <= kMaxAlphaUL; ++i) {
       const auto min = uniform_dist(rand_engine);
       const auto max = min + kSmallBinNum;
-      const auto alpha = i / static_cast<double>(kMaxAlphaUL);
+      const auto alpha = i / static_cast<double>(kAlphaUnitUL);
       const ZipfDist_t zipf_dist{min, max, alpha};
 
       const auto generated_ids = RunZipfEngine(zipf_dist, min, max, rand_engine());
@@ -136,6 +145,22 @@ class ZipfDistributionFixture : public ::testing::Test
     EXPECT_TRUE(std::equal(orig.begin(), orig.end(), copied.begin(), copied.end()));
   }
 
+  void
+  VerifyApproxZipf()
+  {
+    for (size_t i = 0; i <= kMaxAlphaUL; ++i) {
+      const auto alpha = i / static_cast<double>(kAlphaUnitUL);
+      ZipfDist_t zipf{0, kLargeBinNum, alpha};
+      ApproxZipf_t approx_zipf{0, kLargeBinNum, alpha};
+
+      for (size_t i = 0; i < kLargeBinNum; ++i) {
+        const auto expect = zipf.GetCDF(i);
+        const auto actual = approx_zipf.GetCDF(i);
+        EXPECT_LT(fabs(expect - actual), kAllowableError);
+      }
+    }
+  }
+
   /*####################################################################################
    * Public utility functions
    *##################################################################################*/
@@ -184,14 +209,6 @@ class ZipfDistributionFixture : public ::testing::Test
       EXPECT_LT(error, kAllowableError);
     }
   }
-
- private:
-  /*####################################################################################
-   * Internal constants
-   *##################################################################################*/
-
-  static constexpr size_t kRepeatNum = 1e6;
-  static constexpr double kAllowableError = 0.01;
 };
 
 /*######################################################################################
@@ -227,6 +244,15 @@ TYPED_TEST(ZipfDistributionFixture, CopiedInstanceGenerateSameIDs)
 TYPED_TEST(ZipfDistributionFixture, MovedInstanceGenerateSameIDs)
 {
   TestFixture::VerifyMoveInitializers();
+}
+
+/*--------------------------------------------------------------------------------------
+ * Approximate Zipf distribution tests
+ *------------------------------------------------------------------------------------*/
+
+TYPED_TEST(ZipfDistributionFixture, ApproxZipfDistributionApproximateOriginalOne)
+{
+  TestFixture::VerifyApproxZipf();
 }
 
 }  // namespace dbgroup::random::test
