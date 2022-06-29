@@ -15,6 +15,10 @@ project(cpp_utility
 # define source directories
 set(CPP_UTILITY_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
+# check SSE support for spinlock hints
+include(CheckIncludeFileCXX)
+CHECK_INCLUDE_FILE_CXX("xmmintrin.h" CPP_UTILITY_HAS_SPINLOCK_HINT)
+
 #--------------------------------------------------------------------------------------#
 # Build targets
 #--------------------------------------------------------------------------------------#
@@ -28,6 +32,9 @@ if(NOT TARGET cpp_utility::cpp_utility)
   )
   target_include_directories(cpp_utility INTERFACE
     "${CPP_UTILITY_SOURCE_DIR}/include"
+  )
+  target_compile_definitions(cpp_utility INTERFACE
+    $<$<BOOL:${CPP_UTILITY_HAS_SPINLOCK_HINT}>:CPP_UTILITY_HAS_SPINLOCK_HINT>
   )
 endif()
 
