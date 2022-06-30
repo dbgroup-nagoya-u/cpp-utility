@@ -58,10 +58,10 @@ class PessimisticLock
   void
   LockShared()
   {
-    auto expected = lock_ & (~1);  // turn-off LSB
+    auto expected = lock_.load(std::memory_order_acquire) & (~1UL);  // turn-off LSB
     auto desired = expected + 2;   // increment read-counter
-    while (!lock_.compare_exchange_strong(expected, desired, std::memory_order_relaxed)) {
-      expected = expected & (~1);
+    while (!lock_.compare_exchange_strong(expected, desired, std::memory_order_relaxed, std::memory_order_acquire)) {
+      expected = expected & (~1UL);
       desired = expected + 2;
       SPINLOCK_HINT
     }
