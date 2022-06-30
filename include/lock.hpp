@@ -37,7 +37,13 @@ class PessimisticLock
    * Public constructors and assignment operators
    *##################################################################################*/
 
-  PessimisticLock(){};
+  constexpr PessimisticLock() = default;
+
+  PessimisticLock(const PessimisticLock&) = delete;
+  PessimisticLock(PessimisticLock&&) = delete;
+
+  auto operator=(const PessimisticLock&) -> PessimisticLock& = delete;
+  auto operator=(PessimisticLock&&) -> PessimisticLock& = delete;
 
   /*####################################################################################
    * Public destructors
