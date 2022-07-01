@@ -90,7 +90,7 @@ class ZipfDistributionFixture : public ::testing::Test
 
     for (size_t i = 0; i <= kMaxAlphaUL; ++i) {
       const auto min = uniform_dist(rand_engine);
-      const auto max = min + kSmallBinNum;
+      const auto max = min + kSmallBinNum - 1;
       const auto alpha = i / static_cast<double>(kAlphaUnitUL);
       const ZipfDist_t zipf_dist{min, max, alpha};
 
@@ -107,7 +107,7 @@ class ZipfDistributionFixture : public ::testing::Test
 
     // prepare a base distribution
     const auto min = uniform_dist(rand_engine);
-    const auto max = min + kSmallBinNum;
+    const auto max = min + kSmallBinNum - 1;
     ZipfDist_t orig_engine{min, max, kSkew};
     const auto orig = RunZipfEngine(orig_engine, min, max, kRandomSeed);
 
@@ -130,7 +130,7 @@ class ZipfDistributionFixture : public ::testing::Test
 
     // prepare a base distribution
     const auto min = uniform_dist(rand_engine);
-    const auto max = min + kSmallBinNum;
+    const auto max = min + kSmallBinNum - 1;
     ZipfDist_t orig_engine{min, max, kSkew};
     const auto orig = RunZipfEngine(orig_engine, min, max, kRandomSeed);
 
@@ -150,8 +150,8 @@ class ZipfDistributionFixture : public ::testing::Test
   {
     for (size_t i = 0; i <= kMaxAlphaUL; ++i) {
       const auto alpha = i / static_cast<double>(kAlphaUnitUL);
-      ZipfDist_t zipf{0, kLargeBinNum, alpha};
-      ApproxZipf_t approx_zipf{0, kLargeBinNum, alpha};
+      ZipfDist_t zipf{0, kLargeBinNum - 1, alpha};
+      ApproxZipf_t approx_zipf{0, kLargeBinNum - 1, alpha};
 
       for (size_t i = 0; i < kLargeBinNum; ++i) {
         const auto expect = zipf.GetCDF(i);
@@ -182,7 +182,7 @@ class ZipfDistributionFixture : public ::testing::Test
       generated_ids.emplace_back(id);
 
       EXPECT_GE(id, min);
-      EXPECT_LT(id, max);
+      EXPECT_LE(id, max);
     }
 
     return generated_ids;

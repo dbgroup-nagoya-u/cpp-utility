@@ -54,7 +54,7 @@ class ZipfDistribution
   /**
    * @brief Construct a new Zipf distribution with given parameters.
    *
-   * This distribution will generate random values within [`min`, `max`) according to
+   * This distribution will generate random values within [`min`, `max`] according to
    * Zipf's law with a skew paramter `alpha`.
    *
    * @param min the minimum value to be generated.
@@ -67,7 +67,7 @@ class ZipfDistribution
       const double alpha)
       : min_{min}, max_{max}, alpha_{alpha}
   {
-    if (max <= min) {
+    if (max < min) {
       std::string err_msg = "ERROR: the maximum value must be greater than the minimum one.";
       throw std::runtime_error{err_msg};
     }
@@ -150,8 +150,8 @@ class ZipfDistribution
   void
   UpdateCDF()
   {
-    const auto bin_num = max_ - min_;
-    if (bin_num == 1) {
+    const auto bin_num = max_ - min_ + 1;
+    if (bin_num <= 1) {
       zipf_cdf_ = {1.0};
       return;
     }
@@ -170,7 +170,7 @@ class ZipfDistribution
       const auto ith_prob = zipf_cdf_.at(i - 1) + base_prob / pow(i + 1, alpha_);
       zipf_cdf_.emplace_back(ith_prob);
     }
-    zipf_cdf_[bin_num - 1] = 1.0;
+    zipf_cdf_.at(bin_num - 1) = 1.0;
   }
 
   /*####################################################################################
@@ -181,7 +181,7 @@ class ZipfDistribution
   IntType min_{0};
 
   /// the maximum value to be generated.
-  IntType max_{1};
+  IntType max_{0};
 
   /// a skew parameter (zero means uniform distribution).
   double alpha_{0.0};
@@ -214,7 +214,7 @@ class ApproxZipfDistribution
   /**
    * @brief Construct a new Zipf distribution with given parameters.
    *
-   * This distribution will generate random values within [`min`, `max`) according to
+   * This distribution will generate random values within [`min`, `max`] according to
    * Zipf's law with a skew paramter `alpha`.
    *
    * @param min the minimum value to be generated.
@@ -225,9 +225,9 @@ class ApproxZipfDistribution
       const IntType min,
       const IntType max,
       const double alpha)
-      : min_{min}, max_{max}, alpha_{alpha}, n_{max_ - min_}, pow_{1.0 - alpha_}
+      : min_{min}, max_{max}, alpha_{alpha}, n_{max_ - min_ + 1}, pow_{1.0 - alpha_}
   {
-    if (max <= min) {
+    if (max < min) {
       std::string err_msg = "ERROR: the maximum value must be greater than the minimum one.";
       throw std::runtime_error{err_msg};
     }
@@ -325,7 +325,7 @@ class ApproxZipfDistribution
   IntType min_{0};
 
   /// the maximum value to be generated.
-  IntType max_{1};
+  IntType max_{0};
 
   /// a skew parameter (zero means uniform distribution).
   double alpha_{0.0};
