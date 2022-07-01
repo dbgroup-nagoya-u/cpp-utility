@@ -94,7 +94,7 @@ class PessimisticLock
   void
   Unlock()
   {
-    lock_ = 0;
+    lock_.store(0, std::memory_order_release);
   }
 
  private:
