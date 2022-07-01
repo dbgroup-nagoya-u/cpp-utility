@@ -61,7 +61,7 @@ class PessimisticLock
     auto expected = lock_.load(std::memory_order_relaxed) & (~1UL);  // turn-off LSB
     auto desired = expected + 2;                                     // increment read-counter
     while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_acquire,
-                                          std::memory_order_relaxed)) {
+                                        std::memory_order_relaxed)) {
       expected = expected & (~1UL);
       desired = expected + 2;
       SPINLOCK_HINT
@@ -85,7 +85,7 @@ class PessimisticLock
     uint64_t expected = 0;
     const uint64_t desired = 1;
     while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_acq_rel,
-                                          std::memory_order_relaxed)) {
+                                        std::memory_order_relaxed)) {
       expected = 0;
       SPINLOCK_HINT
     }
