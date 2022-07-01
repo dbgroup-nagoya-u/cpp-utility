@@ -97,6 +97,12 @@ class PessimisticLock
     lock_.store(0, std::memory_order_release);
   }
 
+  std::atomic<uint64_t>
+  GetLock()
+  {
+    return lock_.load(std::memory_order_acquire);
+  }
+
  private:
   /*####################################################################################
    * Internal member variables
