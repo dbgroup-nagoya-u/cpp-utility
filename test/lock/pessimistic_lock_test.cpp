@@ -40,6 +40,8 @@ class PessimisticLockFixture : public ::testing::Test
    * Constants
    *##################################################################################*/
 
+  static constexpr auto kWriteNum = 100000;
+
   /*####################################################################################
    * Setup/Teardown
    *##################################################################################*/
@@ -77,6 +79,41 @@ class PessimisticLockFixture : public ::testing::Test
     VerifyLock(expected_rc);
   }
 
+  void
+  VerifyLockWithMultiThread()
+  {
+    lock_.LockShared();
+
+    auto increment_with_lock = [&]() {
+      for (size_t i = 0; i < kWriteNum; i++) {
+        lock_.Lock();
+        counter_++;
+        lock_.Unlock();
+      }
+    };
+
+    std::vector<std::thread> threads{};
+    threads.reserve(kThreadNum);
+
+    for (size_t i = 0; i < kThreadNum; ++i) {
+      threads.emplace_back(increment_with_lock);
+    }
+
+    // after 10 milliseconds has passed, check that the counter has not incremented
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    ASSERT_EQ(counter_, 0);
+
+    lock_.UnlockShared();
+
+    for (auto&& t : threads) {
+      t.join();
+    }
+
+    lock_.LockShared();
+    ASSERT_EQ(counter_, kThreadNum * kWriteNum);
+    lock_.UnlockShared();
+  }
+
   /*####################################################################################
    * Public utility functions
    *##################################################################################*/
@@ -101,7 +138,7 @@ class PessimisticLockFixture : public ::testing::Test
     if (expect_success) {
       ASSERT_EQ(rc, std::future_status::ready);
       while (s_lock_count_.load(std::memory_order_acquire) > 0) {
-        lock_.UnlockShared();  // unlock to join the thread
+        lock_.UnlockShared();
         s_lock_count_.fetch_sub(1);
       }
     } else {
@@ -144,7 +181,8 @@ class PessimisticLockFixture : public ::testing::Test
    *##############################################################################################*/
 
   PessimisticLock lock_{};
-  std::atomic_size_t s_lock_count_ = 0;
+  std::atomic_size_t s_lock_count_{0};
+  size_t counter_{0};
 };
 
 /*######################################################################################
@@ -177,6 +215,11 @@ TEST_F(PessimisticLockFixture, LockAfterLockSharedWithSingleThreadFailed)
 {
   const bool with_lock_shared = true;
   VerifyLockWithSingleThread(with_lock_shared);
+}
+
+TEST_F(PessimisticLockFixture, IncrementCounterWithMultiThreadSuccess)
+{
+  VerifyLockWithMultiThread();
 }
 
 }  // namespace dbgroup::lock::test
