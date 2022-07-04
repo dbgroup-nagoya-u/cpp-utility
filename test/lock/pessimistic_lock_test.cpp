@@ -80,6 +80,35 @@ class PessimisticLockFixture : public ::testing::Test
   }
 
   void
+  VerifyLockSharedWithMultiThread()
+  {
+    lock_.LockShared();
+    s_lock_count_.fetch_add(1);
+
+    // try to get a shared lock by another thread
+    auto lock_shared = [this](std::promise<void> p) {
+      lock_.LockShared();
+      s_lock_count_.fetch_add(1);
+      p.set_value();
+    };
+    std::promise<void> p{};
+    auto&& f = p.get_future();
+    std::thread t{lock_shared, std::move(p)};
+
+    // after one millisecond has passed, give up on acquiring the lock
+    const auto rc = f.wait_for(std::chrono::milliseconds{1});
+
+    // verify status to check locking is succeeded
+    ASSERT_EQ(rc, std::future_status::ready);
+    while (s_lock_count_.load(std::memory_order_acquire) > 0) {
+      lock_.UnlockShared();
+      s_lock_count_.fetch_sub(1);
+    }
+
+    t.join();
+  }
+
+  void
   VerifyLockWithMultiThread()
   {
     lock_.LockShared();
@@ -215,6 +244,11 @@ TEST_F(PessimisticLockFixture, LockAfterLockSharedWithSingleThreadFailed)
 {
   const bool with_lock_shared = true;
   VerifyLockWithSingleThread(with_lock_shared);
+}
+
+TEST_F(PessimisticLockFixture, LockSharedWithMultiThreadSuccess)
+{
+  VerifyLockSharedWithMultiThread();
 }
 
 TEST_F(PessimisticLockFixture, IncrementCounterWithMultiThreadSuccess)
