@@ -84,7 +84,7 @@ class PessimisticLock
   {
     uint64_t expected = 0;
     const uint64_t desired = 1;
-    while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_acq_rel,
+    while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_acquire,
                                         std::memory_order_relaxed)) {
       expected = 0;
       SPINLOCK_HINT
