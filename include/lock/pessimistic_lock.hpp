@@ -59,11 +59,11 @@ class PessimisticLock
   LockS()
   {
     auto expected = lock_.load(std::memory_order_relaxed) & kSLockMask;
-    auto desired = expected + kSLockUnit;                   // increment read-counter
+    auto desired = expected + kSLock;                       // increment read-counter
     while (!lock_.compare_exchange_weak(expected, desired,  //
                                         std::memory_order_acquire, std::memory_order_relaxed)) {
       expected &= kSLockMask;
-      desired = expected + kSLockUnit;
+      desired = expected + kSLock;
       SPINLOCK_HINT
     }
   }
@@ -71,10 +71,10 @@ class PessimisticLock
   void
   UnlockS()
   {
-    auto expected = lock_.load(std::memory_order_relaxed) & kSLockMask;
-    auto desired = expected - kSLockUnit;  // decrement read-counter
+    auto expected = lock_.load(std::memory_order_relaxed);
+    auto desired = expected - kSLock;  // decrement read-counter
     while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed)) {
-      desired = expected - kSLockUnit;
+      desired = expected - kSLock;
       SPINLOCK_HINT
     }
   }
@@ -96,6 +96,30 @@ class PessimisticLock
     lock_.store(kNoLocks, std::memory_order_release);
   }
 
+  void
+  LockSIX()
+  {
+    auto expected = lock_.load(std::memory_order_relaxed) & kSIXLockMask;
+    auto desired = expected | kSIXLock;
+    while (!lock_.compare_exchange_weak(expected, desired,  //
+                                        std::memory_order_acquire, std::memory_order_relaxed)) {
+      expected &= kSIXLockMask;
+      desired = expected | kSIXLock;
+      SPINLOCK_HINT
+    }
+  }
+
+  void
+  UnlockSIX()
+  {
+    auto expected = lock_.load(std::memory_order_relaxed);
+    auto desired = expected - kSIXLock;
+    while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed)) {
+      desired = expected - kSIXLock;
+      SPINLOCK_HINT
+    }
+  }
+
  private:
   /*####################################################################################
    * Internal constants
@@ -105,9 +129,13 @@ class PessimisticLock
 
   static constexpr uint64_t kXLock = 0b001;
 
-  static constexpr uint64_t kSLockMask = ~0b001;
+  static constexpr uint64_t kSIXLock = 0b010;
 
-  static constexpr uint64_t kSLockUnit = 0b100;
+  static constexpr uint64_t kSLock = 0b100;
+
+  static constexpr uint64_t kSIXLockMask = ~0b011;
+
+  static constexpr uint64_t kSLockMask = ~0b001;
 
   /*####################################################################################
    * Internal member variables
