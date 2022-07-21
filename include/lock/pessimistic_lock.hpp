@@ -56,7 +56,7 @@ class PessimisticLock
    *##################################################################################*/
 
   void
-  LockShared()
+  LockS()
   {
     auto expected = lock_.load(std::memory_order_relaxed) & (~1UL);  // turn-off LSB
     auto desired = expected + 2;                                     // increment read-counter
@@ -69,7 +69,7 @@ class PessimisticLock
   }
 
   void
-  UnlockShared()
+  UnlockS()
   {
     auto expected = lock_.load(std::memory_order_relaxed) & (~1UL);  // turn-off LSB
     auto desired = expected - 2;                                     // decrement read-counter
@@ -80,7 +80,7 @@ class PessimisticLock
   }
 
   void
-  Lock()
+  LockX()
   {
     uint64_t expected = 0;
     const uint64_t desired = 1;
@@ -92,7 +92,7 @@ class PessimisticLock
   }
 
   void
-  Unlock()
+  UnlockX()
   {
     lock_.store(0, std::memory_order_release);
   }

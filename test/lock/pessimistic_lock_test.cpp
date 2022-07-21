@@ -64,7 +64,7 @@ class PessimisticLockFixture : public ::testing::Test
   VerifyLockSharedWithSingleThread(const bool with_lock)
   {
     const auto expected_rc = with_lock ? kExpectFailed : kExpectSuccess;
-    if (with_lock) lock_.Lock();
+    if (with_lock) lock_.LockX();
     VerifyLockShared(expected_rc);
   }
 
@@ -73,7 +73,7 @@ class PessimisticLockFixture : public ::testing::Test
   {
     const auto expected_rc = with_lock_shared ? kExpectFailed : kExpectSuccess;
     if (with_lock_shared) {
-      lock_.LockShared();
+      lock_.LockS();
       s_lock_count_.fetch_add(1);
     }
     VerifyLock(expected_rc);
@@ -82,12 +82,12 @@ class PessimisticLockFixture : public ::testing::Test
   void
   VerifyLockSharedWithMultiThread()
   {
-    lock_.LockShared();
+    lock_.LockS();
     s_lock_count_.fetch_add(1);
 
     // try to get a shared lock by another thread
     auto lock_shared = [this](std::promise<void> p) {
-      lock_.LockShared();
+      lock_.LockS();
       s_lock_count_.fetch_add(1);
       p.set_value();
     };
@@ -101,7 +101,7 @@ class PessimisticLockFixture : public ::testing::Test
     // verify status to check locking is succeeded
     ASSERT_EQ(rc, std::future_status::ready);
     while (s_lock_count_.load(std::memory_order_acquire) > 0) {
-      lock_.UnlockShared();
+      lock_.UnlockS();
       s_lock_count_.fetch_sub(1);
     }
 
@@ -111,13 +111,13 @@ class PessimisticLockFixture : public ::testing::Test
   void
   VerifyLockWithMultiThread()
   {
-    lock_.LockShared();
+    lock_.LockS();
 
     auto increment_with_lock = [&]() {
       for (size_t i = 0; i < kWriteNum; i++) {
-        lock_.Lock();
+        lock_.LockX();
         counter_++;
-        lock_.Unlock();
+        lock_.UnlockX();
       }
     };
 
@@ -132,15 +132,15 @@ class PessimisticLockFixture : public ::testing::Test
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
     ASSERT_EQ(counter_, 0);
 
-    lock_.UnlockShared();
+    lock_.UnlockS();
 
     for (auto&& t : threads) {
       t.join();
     }
 
-    lock_.LockShared();
+    lock_.LockS();
     ASSERT_EQ(counter_, kThreadNum * kWriteNum);
-    lock_.UnlockShared();
+    lock_.UnlockS();
   }
 
   /*####################################################################################
@@ -152,7 +152,7 @@ class PessimisticLockFixture : public ::testing::Test
   {
     // try to get a shared lock by another thread
     auto lock_shared = [this](std::promise<void> p) {
-      lock_.LockShared();
+      lock_.LockS();
       s_lock_count_.fetch_add(1);
       p.set_value();
     };
@@ -167,12 +167,12 @@ class PessimisticLockFixture : public ::testing::Test
     if (expect_success) {
       ASSERT_EQ(rc, std::future_status::ready);
       while (s_lock_count_.load(std::memory_order_acquire) > 0) {
-        lock_.UnlockShared();
+        lock_.UnlockS();
         s_lock_count_.fetch_sub(1);
       }
     } else {
       ASSERT_EQ(rc, std::future_status::timeout);
-      lock_.Unlock();  // unlock to join the thread
+      lock_.UnlockX();  // unlock to join the thread
     }
     t.join();
   }
@@ -182,7 +182,7 @@ class PessimisticLockFixture : public ::testing::Test
   {
     // try to get a lock by another thread
     auto lock = [this](std::promise<void> p) {
-      lock_.Lock();
+      lock_.LockX();
       p.set_value();
     };
     std::promise<void> p{};
@@ -198,7 +198,7 @@ class PessimisticLockFixture : public ::testing::Test
     } else {
       ASSERT_EQ(rc, std::future_status::timeout);
       while (s_lock_count_.load(std::memory_order_acquire) > 0) {
-        lock_.UnlockShared();  // unlock to join the thread
+        lock_.UnlockS();  // unlock to join the thread
         s_lock_count_.fetch_sub(1);
       }
     }
