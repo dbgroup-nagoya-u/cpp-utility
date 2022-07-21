@@ -91,6 +91,12 @@ class PessimisticLock
   }
 
   void
+  DowngradeToSIX()
+  {
+    lock_.store(kSIXLock, std::memory_order_release);
+  }
+
+  void
   UnlockX()
   {
     lock_.store(kNoLocks, std::memory_order_release);
@@ -105,6 +111,17 @@ class PessimisticLock
                                         std::memory_order_acquire, std::memory_order_relaxed)) {
       expected &= kSIXLockMask;
       desired = expected | kSIXLock;
+      SPINLOCK_HINT
+    }
+  }
+
+  void
+  UpgradeToX()
+  {
+    auto expected = kSIXLock;
+    while (!lock_.compare_exchange_weak(expected, kXLock,  //
+                                        std::memory_order_acquire, std::memory_order_relaxed)) {
+      expected = kSIXLock;
       SPINLOCK_HINT
     }
   }
