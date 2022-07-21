@@ -52,18 +52,18 @@ class PessimisticLock
   ~PessimisticLock() = default;
 
   /*####################################################################################
-   * Public getters
+   * Public utility functions
    *##################################################################################*/
 
   void
   LockS()
   {
-    auto expected = lock_.load(std::memory_order_relaxed) & (~1UL);  // turn-off LSB
-    auto desired = expected + 2;                                     // increment read-counter
-    while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_acquire,
-                                        std::memory_order_relaxed)) {
-      expected = expected & (~1UL);
-      desired = expected + 2;
+    auto expected = lock_.load(std::memory_order_relaxed) & kSLockMask;
+    auto desired = expected + kSLockUnit;                   // increment read-counter
+    while (!lock_.compare_exchange_weak(expected, desired,  //
+                                        std::memory_order_acquire, std::memory_order_relaxed)) {
+      expected &= kSLockMask;
+      desired = expected + kSLockUnit;
       SPINLOCK_HINT
     }
   }
@@ -71,10 +71,10 @@ class PessimisticLock
   void
   UnlockS()
   {
-    auto expected = lock_.load(std::memory_order_relaxed) & (~1UL);  // turn-off LSB
-    auto desired = expected - 2;                                     // decrement read-counter
+    auto expected = lock_.load(std::memory_order_relaxed) & kSLockMask;
+    auto desired = expected - kSLockUnit;  // decrement read-counter
     while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed)) {
-      desired = expected - 2;
+      desired = expected - kSLockUnit;
       SPINLOCK_HINT
     }
   }
@@ -82,11 +82,10 @@ class PessimisticLock
   void
   LockX()
   {
-    uint64_t expected = 0;
-    const uint64_t desired = 1;
-    while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_acquire,
-                                        std::memory_order_relaxed)) {
-      expected = 0;
+    auto expected = kNoLocks;
+    while (!lock_.compare_exchange_weak(expected, kXLock,  //
+                                        std::memory_order_acquire, std::memory_order_relaxed)) {
+      expected = kNoLocks;
       SPINLOCK_HINT
     }
   }
@@ -94,10 +93,22 @@ class PessimisticLock
   void
   UnlockX()
   {
-    lock_.store(0, std::memory_order_release);
+    lock_.store(kNoLocks, std::memory_order_release);
   }
 
  private:
+  /*####################################################################################
+   * Internal constants
+   *##################################################################################*/
+
+  static constexpr uint64_t kNoLocks = 0b000;
+
+  static constexpr uint64_t kXLock = 0b001;
+
+  static constexpr uint64_t kSLockMask = ~0b001;
+
+  static constexpr uint64_t kSLockUnit = 0b100;
+
   /*####################################################################################
    * Internal member variables
    *##################################################################################*/
