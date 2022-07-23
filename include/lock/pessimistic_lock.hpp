@@ -55,6 +55,11 @@ class PessimisticLock
    * Public utility functions
    *##################################################################################*/
 
+  /**
+   * @brief Get a shared lock.
+   *
+   * NOTE: this function does not give up acquiring locks and continues spinlock.
+   */
   void
   LockS()
   {
@@ -68,6 +73,10 @@ class PessimisticLock
     }
   }
 
+  /**
+   * @brief Release a shared lock.
+   *
+   */
   void
   UnlockS()
   {
@@ -79,6 +88,11 @@ class PessimisticLock
     }
   }
 
+  /**
+   * @brief Get an exclusive lock.
+   *
+   * NOTE: this function does not give up acquiring locks and continues spinlock.
+   */
   void
   LockX()
   {
@@ -90,18 +104,33 @@ class PessimisticLock
     }
   }
 
+  /**
+   * @brief Downgrade an X lock to an SIX lock.
+   *
+   * NOTE: if a thread that does not have an exclusive lock calls this function, it will
+   * corrupt an internal lock status.
+   */
   void
   DowngradeToSIX()
   {
     lock_.store(kSIXLock, std::memory_order_release);
   }
 
+  /**
+   * @brief Release an exclusive lock.
+   *
+   */
   void
   UnlockX()
   {
     lock_.store(kNoLocks, std::memory_order_release);
   }
 
+  /**
+   * @brief Get a shared lock with an intent-exclusive lock.
+   *
+   * NOTE: this function does not give up acquiring locks and continues spinlock.
+   */
   void
   LockSIX()
   {
@@ -115,6 +144,12 @@ class PessimisticLock
     }
   }
 
+  /**
+   * @brief Upgrade an SIX lock to an X lock.
+   *
+   * NOTE: if a thread that does not have a shared lock with an intent-exclusive lock
+   * calls this function, it will corrupt an internal lock status.
+   */
   void
   UpgradeToX()
   {
@@ -126,6 +161,10 @@ class PessimisticLock
     }
   }
 
+  /**
+   * @brief Release a shared lock with an intent-exclusive lock.
+   *
+   */
   void
   UnlockSIX()
   {
@@ -142,22 +181,29 @@ class PessimisticLock
    * Internal constants
    *##################################################################################*/
 
+  /// a lock status for no locks.
   static constexpr uint64_t kNoLocks = 0b000UL;
 
+  /// a lock status for exclusive locks.
   static constexpr uint64_t kXLock = 0b001UL;
 
+  /// a lock status for shared locks with intent-exclusive locks.
   static constexpr uint64_t kSIXLock = 0b010UL;
 
+  /// a lock status for shared locks.
   static constexpr uint64_t kSLock = 0b100UL;
 
+  /// a bit mask for removing SIX/X-lock flags.
   static constexpr uint64_t kSIXLockMask = ~0b011UL;
 
+  /// a bit mask for removing an X-lock flag.
   static constexpr uint64_t kSLockMask = ~0b001UL;
 
   /*####################################################################################
    * Internal member variables
    *##################################################################################*/
 
+  /// an internal lock status.
   std::atomic<uint64_t> lock_{0};
 };
 
