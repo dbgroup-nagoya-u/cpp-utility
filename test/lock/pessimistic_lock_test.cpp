@@ -43,7 +43,7 @@ enum LockType {
 constexpr bool kExpectSucceed = true;
 constexpr bool kExpectFail = false;
 constexpr size_t kWaitTimeMill = 100;
-constexpr auto kThreadNumForLockS = 1E3;
+constexpr auto kThreadNumForLockS = 1E2;
 constexpr auto kWriteNumPerThread = 1E5;
 
 /*######################################################################################
