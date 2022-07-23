@@ -79,6 +79,8 @@ class PessimisticLockFixture : public ::testing::Test
     GetLock(lock_type);
     TryLock(kSLock, expected_rc);
     ReleaseLock(lock_type);
+
+    t_.join();
   }
 
   void
@@ -89,6 +91,8 @@ class PessimisticLockFixture : public ::testing::Test
     GetLock(lock_type);
     TryLock(kXLock, expected_rc);
     ReleaseLock(lock_type);
+
+    t_.join();
   }
 
   void
@@ -100,19 +104,36 @@ class PessimisticLockFixture : public ::testing::Test
     GetLock(lock_type);
     TryLock(kSIXLock, expected_rc);
     ReleaseLock(lock_type);
+
+    t_.join();
   }
 
   void
-  VerifyDowngradeToSIX()
+  VerifyDowngradeToSIX(const LockType lock_type)
   {
     lock_.LockX();
     lock_.DowngradeToSIX();
 
-    TryLock(kSLock, kExpectSucceed);
-    TryLock(kXLock, kExpectFail);
-    TryLock(kSIXLock, kExpectFail);
+    switch (lock_type) {
+      case kSLock:
+        TryLock(kSLock, kExpectSucceed);
+        break;
+
+      case kXLock:
+        TryLock(kXLock, kExpectFail);
+        break;
+
+      case kSIXLock:
+        TryLock(kSIXLock, kExpectFail);
+        break;
+
+      default:
+        break;
+    }
 
     lock_.UnlockSIX();
+
+    t_.join();
   }
 
   void
@@ -124,6 +145,8 @@ class PessimisticLockFixture : public ::testing::Test
     GetLock(lock_type);
     TryUpgrade(expected_rc);
     ReleaseLock(lock_type);
+
+    t_.join();
   }
 
   void
@@ -145,6 +168,8 @@ class PessimisticLockFixture : public ::testing::Test
       t.join();
     }
     TryLock(kXLock, kExpectSucceed);
+
+    t_.join();
   }
 
   void
@@ -249,7 +274,7 @@ class PessimisticLockFixture : public ::testing::Test
     // try to get an exclusive lock by another thread
     std::promise<void> p{};
     auto&& f = p.get_future();
-    std::thread{&PessimisticLockFixture::LockWorker, this, lock_type, std::move(p)}.detach();
+    t_ = std::thread{&PessimisticLockFixture::LockWorker, this, lock_type, std::move(p)};
 
     // after short sleep, give up on acquiring the lock
     const auto rc = f.wait_for(std::chrono::milliseconds{kWaitTimeMill});
@@ -274,7 +299,7 @@ class PessimisticLockFixture : public ::testing::Test
     // try to get an exclusive lock by another thread
     std::promise<void> p{};
     auto&& f = p.get_future();
-    std::thread{upgrade_worker, std::move(p)}.detach();
+    t_ = std::thread{upgrade_worker, std::move(p)};
 
     // after short sleep, give up on acquiring the lock
     const auto rc = f.wait_for(std::chrono::milliseconds{kWaitTimeMill});
@@ -294,6 +319,8 @@ class PessimisticLockFixture : public ::testing::Test
   PessimisticLock lock_{};
 
   size_t counter_{0};
+
+  std::thread t_{};
 };
 
 /*######################################################################################
@@ -360,9 +387,19 @@ TEST_F(PessimisticLockFixture, LockSIXWithSIXLockFail)
   VerifyLockSIXWith(kSIXLock);
 }
 
-TEST_F(PessimisticLockFixture, DowngradeToSIXSucceed)
+TEST_F(PessimisticLockFixture, LockSAfterDowngradeToSIXSucceed)
 {  //
-  VerifyDowngradeToSIX();
+  VerifyDowngradeToSIX(kSLock);
+}
+
+TEST_F(PessimisticLockFixture, LockXAfterDowngradeToSIXFail)
+{  //
+  VerifyDowngradeToSIX(kXLock);
+}
+
+TEST_F(PessimisticLockFixture, LockSIXAfterDowngradeToSIXFail)
+{  //
+  VerifyDowngradeToSIX(kSIXLock);
 }
 
 TEST_F(PessimisticLockFixture, UpgradeToXWithoutLocksSucceed)
