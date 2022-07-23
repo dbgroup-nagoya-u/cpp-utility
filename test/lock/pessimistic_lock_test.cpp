@@ -32,6 +32,9 @@ namespace dbgroup::lock::test
 
 constexpr bool kExpectSuccess = true;
 constexpr bool kExpectFailed = false;
+constexpr bool kWithSLock = true;
+constexpr bool kWithXLock = true;
+constexpr size_t kWaitTimeMill = 10;
 
 class PessimisticLockFixture : public ::testing::Test
 {
@@ -61,26 +64,26 @@ class PessimisticLockFixture : public ::testing::Test
    *##################################################################################*/
 
   void
-  VerifyLockSharedWithSingleThread(const bool with_lock)
+  VerifySLockWithSingleThread(const bool with_x_lock)
   {
-    const auto expected_rc = with_lock ? kExpectFailed : kExpectSuccess;
-    if (with_lock) lock_.LockX();
-    VerifyLockShared(expected_rc);
+    const auto expected_rc = with_x_lock ? kExpectFailed : kExpectSuccess;
+    if (with_x_lock) lock_.LockX();
+    VerifySLock(expected_rc);
   }
 
   void
-  VerifyLockWithSingleThread(const bool with_lock_shared)
+  VerifyXLockWithSingleThread(const bool with_s_lock)
   {
-    const auto expected_rc = with_lock_shared ? kExpectFailed : kExpectSuccess;
-    if (with_lock_shared) {
+    const auto expected_rc = with_s_lock ? kExpectFailed : kExpectSuccess;
+    if (with_s_lock) {
       lock_.LockS();
       s_lock_count_.fetch_add(1);
     }
-    VerifyLock(expected_rc);
+    VerifyXLock(expected_rc);
   }
 
   void
-  VerifyLockSharedWithMultiThread()
+  VerifySLockWithMultiThread()
   {
     lock_.LockS();
     s_lock_count_.fetch_add(1);
@@ -109,7 +112,7 @@ class PessimisticLockFixture : public ::testing::Test
   }
 
   void
-  VerifyLockWithMultiThread()
+  VerifyXLockWithMultiThread()
   {
     lock_.LockS();
 
@@ -128,8 +131,8 @@ class PessimisticLockFixture : public ::testing::Test
       threads.emplace_back(increment_with_lock);
     }
 
-    // after 10 milliseconds has passed, check that the counter has not incremented
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    // after short sleep, check that the counter has not incremented
+    std::this_thread::sleep_for(std::chrono::milliseconds(kWaitTimeMill));
     ASSERT_EQ(counter_, 0);
 
     lock_.UnlockS();
@@ -148,7 +151,7 @@ class PessimisticLockFixture : public ::testing::Test
    *##################################################################################*/
 
   void
-  VerifyLockShared(const bool expect_success)
+  VerifySLock(const bool expect_success)
   {
     // try to get a shared lock by another thread
     auto lock_shared = [this](std::promise<void> p) {
@@ -178,7 +181,7 @@ class PessimisticLockFixture : public ::testing::Test
   }
 
   void
-  VerifyLock(const bool expect_success)
+  VerifyXLock(const bool expect_success)
   {
     // try to get a lock by another thread
     auto lock = [this](std::promise<void> p) {
@@ -222,38 +225,34 @@ class PessimisticLockFixture : public ::testing::Test
  * Constructor tests
  *------------------------------------------------------------------------------------*/
 
-TEST_F(PessimisticLockFixture, LockSharedWithSingleThreadSuccess)
+TEST_F(PessimisticLockFixture, SLockWithSingleThreadSuccess)
 {
-  const bool with_lock = false;
-  VerifyLockSharedWithSingleThread(with_lock);
+  VerifySLockWithSingleThread(!kWithXLock);
 }
 
-TEST_F(PessimisticLockFixture, LockSharedAfterLockWithSingleThreadFailed)
+TEST_F(PessimisticLockFixture, SLockAfterXLockWithSingleThreadFailed)
 {
-  const bool with_lock = true;
-  VerifyLockSharedWithSingleThread(with_lock);
+  VerifySLockWithSingleThread(kWithXLock);
 }
 
-TEST_F(PessimisticLockFixture, LockWithSingleThreadSuccess)
+TEST_F(PessimisticLockFixture, XLockWithSingleThreadSuccess)
 {
-  const bool with_lock_shared = false;
-  VerifyLockWithSingleThread(with_lock_shared);
+  VerifyXLockWithSingleThread(!kWithSLock);
 }
 
-TEST_F(PessimisticLockFixture, LockAfterLockSharedWithSingleThreadFailed)
+TEST_F(PessimisticLockFixture, XLockAfterSLockWithSingleThreadFailed)
 {
-  const bool with_lock_shared = true;
-  VerifyLockWithSingleThread(with_lock_shared);
+  VerifyXLockWithSingleThread(kWithSLock);
 }
 
-TEST_F(PessimisticLockFixture, LockSharedWithMultiThreadSuccess)
-{
-  VerifyLockSharedWithMultiThread();
+TEST_F(PessimisticLockFixture, SLockWithMultiThreadSuccess)
+{  //
+  VerifySLockWithMultiThread();
 }
 
 TEST_F(PessimisticLockFixture, IncrementCounterWithMultiThreadSuccess)
 {
-  VerifyLockWithMultiThread();
+  VerifyXLockWithMultiThread();
 }
 
 }  // namespace dbgroup::lock::test

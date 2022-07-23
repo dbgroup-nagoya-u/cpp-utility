@@ -142,17 +142,17 @@ class PessimisticLock
    * Internal constants
    *##################################################################################*/
 
-  static constexpr uint64_t kNoLocks = 0b000;
+  static constexpr uint64_t kNoLocks = 0b000UL;
 
-  static constexpr uint64_t kXLock = 0b001;
+  static constexpr uint64_t kXLock = 0b001UL;
 
-  static constexpr uint64_t kSIXLock = 0b010;
+  static constexpr uint64_t kSIXLock = 0b010UL;
 
-  static constexpr uint64_t kSLock = 0b100;
+  static constexpr uint64_t kSLock = 0b100UL;
 
-  static constexpr uint64_t kSIXLockMask = ~0b011;
+  static constexpr uint64_t kSIXLockMask = ~0b011UL;
 
-  static constexpr uint64_t kSLockMask = ~0b001;
+  static constexpr uint64_t kSLockMask = ~0b001UL;
 
   /*####################################################################################
    * Internal member variables
