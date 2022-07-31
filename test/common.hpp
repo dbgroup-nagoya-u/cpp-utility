@@ -21,10 +21,10 @@
 #include <cstddef>
 #include <cstdint>
 
-#ifdef CPP_UTILITY_TEST_THREAD_NUM
+/// the number of threads for testing.
 constexpr size_t kThreadNum = CPP_UTILITY_TEST_THREAD_NUM;
-#else
-constexpr size_t kThreadNum = 8;
-#endif
+
+/// a fixed seed value to reproduce unit tests.
+constexpr size_t kRandomSeed = CPP_UTILITY_TEST_RANDOM_SEED;
 
 #endif  // CPP_UTILITY_TEST_COMMON_HPP
