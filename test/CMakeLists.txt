@@ -27,6 +27,13 @@ add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/googletest-src
                  EXCLUDE_FROM_ALL)
 
 #--------------------------------------------------------------------------------------#
+# Configurations for testing
+#--------------------------------------------------------------------------------------#
+
+set(CPP_UTILITY_TEST_THREAD_NUM "8" CACHE STRING "The number of worker threads for testing.")
+set(CPP_UTILITY_TEST_RANDOM_SEED "0" CACHE STRING "A fixed seed value to reproduce unit tests.")
+
+#--------------------------------------------------------------------------------------#
 # Build unit tests
 #--------------------------------------------------------------------------------------#
 
@@ -48,17 +55,15 @@ function(ADD_CPP_UTILITY_TEST CPP_UTILITY_TARGET_DIR CPP_UTILITY_TEST_TARGET)
   target_include_directories(${CPP_UTILITY_TEST_TARGET} PRIVATE
     "${CPP_UTILITY_SOURCE_DIR}/test"
   )
+  target_compile_definitions(${CPP_UTILITY_TEST_TARGET} PRIVATE
+    CPP_UTILITY_TEST_THREAD_NUM=${CPP_UTILITY_TEST_THREAD_NUM}
+    CPP_UTILITY_TEST_RANDOM_SEED=${CPP_UTILITY_TEST_RANDOM_SEED}
+  )
   target_link_libraries(${CPP_UTILITY_TEST_TARGET} PRIVATE
     cpp_utility
     gtest_main
     pthread
   )
-
-  if(DEFINED CPP_UTILITY_TEST_THREAD_NUM)
-    target_compile_definitions(${CPP_UTILITY_TEST_TARGET} PRIVATE
-      CPP_UTILITY_TEST_THREAD_NUM=${CPP_UTILITY_TEST_THREAD_NUM}
-    )
-  endif()
 
   add_test(NAME ${CPP_UTILITY_TEST_TARGET} COMMAND $<TARGET_FILE:${CPP_UTILITY_TEST_TARGET}>)
 endfunction()

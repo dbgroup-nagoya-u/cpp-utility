@@ -136,6 +136,7 @@
     "complex": "cpp",
     "typeindex": "cpp",
     "cfenv": "cpp",
-    "valarray": "cpp"
+    "valarray": "cpp",
+    "*.ipp": "cpp"
   },
 }

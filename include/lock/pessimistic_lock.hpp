@@ -27,6 +27,8 @@
 #endif
 
 #include <atomic>
+#include <chrono>
+#include <thread>
 
 namespace dbgroup::lock
 {
@@ -63,13 +65,20 @@ class PessimisticLock
   void
   LockS()
   {
-    auto expected = lock_.load(std::memory_order_relaxed) & kSLockMask;
-    auto desired = expected + kSLock;                       // increment read-counter
-    while (!lock_.compare_exchange_weak(expected, desired,  //
-                                        std::memory_order_acquire, std::memory_order_relaxed)) {
-      expected &= kSLockMask;
-      desired = expected + kSLock;
-      SPINLOCK_HINT
+    while (true) {
+      auto expected = lock_.load(std::memory_order_relaxed) & kSLockMask;
+      auto desired = expected + kSLock;  // increment read-counter
+      for (size_t i = 0; i < kRetryNum; ++i) {
+        const auto cas_success = lock_.compare_exchange_weak(
+            expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
+        if (cas_success) return;
+
+        expected &= kSLockMask;
+        desired = expected + kSLock;
+        SPINLOCK_HINT
+      }
+
+      std::this_thread::sleep_for(kShortSleep);
     }
   }
 
@@ -96,11 +105,18 @@ class PessimisticLock
   void
   LockX()
   {
-    auto expected = kNoLocks;
-    while (!lock_.compare_exchange_weak(expected, kXLock,  //
-                                        std::memory_order_acquire, std::memory_order_relaxed)) {
-      expected = kNoLocks;
-      SPINLOCK_HINT
+    while (true) {
+      auto expected = kNoLocks;
+      for (size_t i = 0; i < kRetryNum; ++i) {
+        const auto cas_success = lock_.compare_exchange_weak(
+            expected, kXLock, std::memory_order_acquire, std::memory_order_relaxed);
+        if (cas_success) return;
+
+        expected = kNoLocks;
+        SPINLOCK_HINT
+      }
+
+      std::this_thread::sleep_for(kShortSleep);
     }
   }
 
@@ -134,13 +150,20 @@ class PessimisticLock
   void
   LockSIX()
   {
-    auto expected = lock_.load(std::memory_order_relaxed) & kSIXLockMask;
-    auto desired = expected | kSIXLock;
-    while (!lock_.compare_exchange_weak(expected, desired,  //
-                                        std::memory_order_acquire, std::memory_order_relaxed)) {
-      expected &= kSIXLockMask;
-      desired = expected | kSIXLock;
-      SPINLOCK_HINT
+    while (true) {
+      auto expected = lock_.load(std::memory_order_relaxed) & kSIXLockMask;
+      auto desired = expected | kSIXLock;
+      for (size_t i = 0; i < kRetryNum; ++i) {
+        const auto cas_success = lock_.compare_exchange_weak(
+            expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
+        if (cas_success) return;
+
+        expected &= kSIXLockMask;
+        desired = expected | kSIXLock;
+        SPINLOCK_HINT
+      }
+
+      std::this_thread::sleep_for(kShortSleep);
     }
   }
 
@@ -153,11 +176,18 @@ class PessimisticLock
   void
   UpgradeToX()
   {
-    auto expected = kSIXLock;
-    while (!lock_.compare_exchange_weak(expected, kXLock,  //
-                                        std::memory_order_acquire, std::memory_order_relaxed)) {
-      expected = kSIXLock;
-      SPINLOCK_HINT
+    while (true) {
+      auto expected = kSIXLock;
+      for (size_t i = 0; i < kRetryNum; ++i) {
+        const auto cas_success = lock_.compare_exchange_weak(
+            expected, kXLock, std::memory_order_acquire, std::memory_order_relaxed);
+        if (cas_success) return;
+
+        expected = kSIXLock;
+        SPINLOCK_HINT
+      }
+
+      std::this_thread::sleep_for(kShortSleep);
     }
   }
 
@@ -198,6 +228,12 @@ class PessimisticLock
 
   /// a bit mask for removing an X-lock flag.
   static constexpr uint64_t kSLockMask = ~0b001UL;
+
+  /// the maximum number of retries for preventing busy loops.
+  static constexpr size_t kRetryNum = 10UL;
+
+  /// a sleep time for preventing busy loops.
+  static constexpr auto kShortSleep = std::chrono::microseconds{10};
 
   /*####################################################################################
    * Internal member variables
