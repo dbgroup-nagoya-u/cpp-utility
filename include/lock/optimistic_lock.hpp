@@ -203,7 +203,7 @@ class OptimisticLock
 
  private:
   /*####################################################################################
-   * Internal member variables
+   * Internal constants
    *##################################################################################*/
 
   /// a lock status for no locks.
