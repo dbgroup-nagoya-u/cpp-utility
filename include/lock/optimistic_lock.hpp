@@ -124,7 +124,7 @@ class OptimisticLock
   void
   DowngradeToSIX()
   {
-    lock_.store(kSIXLock, std::memory_order_release);
+    lock_.fetch_add(kXLock + kSIXLock, std::memory_order_release);
   }
 
   /**
