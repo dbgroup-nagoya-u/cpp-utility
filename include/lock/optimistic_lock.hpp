@@ -171,19 +171,7 @@ class OptimisticLock
   void
   UpgradeToX()
   {
-    while (true) {
-      auto expected = kSIXLock;
-      for (size_t i = 0; i < kRetryNum; ++i) {
-        const auto cas_success = lock_.compare_exchange_weak(
-            expected, kXLock, std::memory_order_acquire, std::memory_order_relaxed);
-        if (cas_success) return;
-
-        expected = kSIXLock;
-        SPINLOCK_HINT
-      }
-
-      std::this_thread::sleep_for(kShortSleep);
-    }
+    lock_.fetch_add(kSIXLock, std::memory_order_relaxed);
   }
 
   /**
