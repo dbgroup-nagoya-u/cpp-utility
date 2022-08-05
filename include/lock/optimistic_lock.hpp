@@ -224,8 +224,12 @@ class OptimisticLock
   /// a sleep time for preventing busy loops.
   static constexpr auto kShortSleep = std::chrono::microseconds{10};
 
+  /*####################################################################################
+   * Internal member variables
+   *##################################################################################*/
+
+  /// an actual lock status.
   std::atomic<uint64_t> lock_{0};
-  std::atomic<uint64_t> version_{0};
 };
 
 }  // namespace dbgroup::lock
