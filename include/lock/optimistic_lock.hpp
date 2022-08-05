@@ -66,12 +66,20 @@ class OptimisticLock
    * @return std::pair<uint64_t, bool>
    */
   [[nodiscard]] auto
-  GetVersion()  //
-      -> std::pair<uint64_t, bool>
+  GetVersion() const  //
+      -> uint64_t
   {
-    version_ = lock_.load(std::memory_order_relaxed);
-    if (version_ & (2UL) == 0b10) return std::make_pair(version_, false);
-    return std::make_pair(version_, true);
+    while (true) {
+      auto expected = lock_.load(std::memory_order_acquire);
+      for (size_t i = 0; i < kRetryNum; ++i) {
+        if (expected & kXLock == 0) return expected & kXLockMask;
+
+        SPINLOCK_HINT
+        expected = lock_.load(std::memory_order_acquire);
+      }
+
+      std::this_thread::sleep_for(kShortSleep);
+    }
   }
 
   /**
