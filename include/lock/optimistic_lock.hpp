@@ -89,13 +89,11 @@ class OptimisticLock
    * @return false
    */
   auto
-  CheckVersion()  //
+  CheckVersion(const uint64_t expected) const  //
       -> bool
   {
-    std::pair<uint64_t, bool> current_version_ = GetVersion();
-    if (!GetVersion().second) return false;
-    if (current_version_.first == version_) return true;
-    return false;
+    const auto desired = lock_.load(std::memory_order_relaxed) & kXLockMask;
+    return expected == desired;
   }
 
   /**
