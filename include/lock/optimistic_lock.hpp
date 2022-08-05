@@ -181,12 +181,7 @@ class OptimisticLock
   void
   UnlockSIX()
   {
-    auto expected = lock_.load(std::memory_order_relaxed);
-    auto desired = expected - kSIXLock;
-    while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed)) {
-      desired = expected - kSIXLock;
-      SPINLOCK_HINT
-    }
+    lock_.fetch_sub(kSIXLock, std::memory_order_relaxed);
   }
 
  private:
