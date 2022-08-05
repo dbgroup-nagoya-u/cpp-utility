@@ -146,15 +146,15 @@ class OptimisticLock
   LockSIX()
   {
     while (true) {
-      auto expected = lock_.load(std::memory_order_relaxed) & kSIXLockMask;
-      auto desired = expected | kSIXLock;
+      auto expected = lock_.load(std::memory_order_relaxed) & kXLockMask;
+      auto desired = expected + kSIXLock;
       for (size_t i = 0; i < kRetryNum; ++i) {
         const auto cas_success = lock_.compare_exchange_weak(
-            expected, desired, std::memory_order_acquire, std::memory_order_release);
+            expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
         if (cas_success) return;
 
-        expected &= kSIXLockMask;
-        desired = expected | kSIXLock;
+        expected &= kXLockMask;
+        desired = expected + kSIXLock;
         SPINLOCK_HINT
       }
 
