@@ -134,14 +134,7 @@ class OptimisticLock
   void
   UnlockX()
   {
-    auto expected = lock_.load(std::memory_order_relaxed);
-    auto desired = expected + kXLock;
-
-    while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_acquire,
-                                        std::memory_order_relaxed)) {
-      desired = expected + kXLock;
-      SPINLOCK_HINT
-    }
+    lock_.fetch_add(kXLock, std::memory_order_release);
   }
 
   /**
