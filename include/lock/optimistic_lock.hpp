@@ -98,13 +98,20 @@ class OptimisticLock
   void
   LockX()
   {
-    auto expected = lock_.load(std::memory_order_relaxed);
-    auto desired = expected + kXLock;
+    while (true) {
+      auto expected = lock_.load(std::memory_order_relaxed) & kXLockMask;
+      auto desired = expected + kXLock;
+      for (size_t i = 0; i < kRetryNum; ++i) {
+        const auto cas_success = lock_.compare_exchange_weak(
+            expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
+        if (cas_success) return;
 
-    while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_acquire,
-                                        std::memory_order_relaxed)) {
-      desired = expected + kXLock;
-      SPINLOCK_HINT
+        expected &= kXLockMask;
+        desired = expected + kXLock;
+        SPINLOCK_HINT
+      }
+
+      std::this_thread::sleep_for(kShortSleep);
     }
   }
 
