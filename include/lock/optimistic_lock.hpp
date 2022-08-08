@@ -61,6 +61,46 @@ class OptimisticLock
    *##################################################################################*/
 
   /**
+   * @brief Get a shared lock.
+   *
+   * NOTE: this function does not give up acquiring locks and continues spinlock.
+   */
+  void
+  LockS()
+  {
+    while (true) {
+      auto expected = lock_.load(std::memory_order_relaxed) & kSLockMask;
+      auto desired = expected + kSLock;  // increment read-counter
+      for (size_t i = 0; i < kRetryNum; ++i) {
+        const auto cas_success = lock_.compare_exchange_weak(
+            expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
+        if (cas_success) return;
+
+        expected &= kSLockMask;
+        desired = expected + kSLock;
+        SPINLOCK_HINT
+      }
+
+      std::this_thread::sleep_for(kShortSleep);
+    }
+  }
+
+  /**
+   * @brief Release a shared lock.
+   *
+   */
+  void
+  UnlockS()
+  {
+    auto expected = lock_.load(std::memory_order_relaxed);
+    auto desired = expected - kSLock;  // decrement read-counter
+    while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed)) {
+      desired = expected - kSLock;
+      SPINLOCK_HINT
+    }
+  }
+
+  /**
    * @brief Get the Version object
    *
    * @return std::pair<uint64_t, bool>
@@ -198,14 +238,20 @@ class OptimisticLock
   /// a lock status for no locks.
   static constexpr uint64_t kNoLocks = 0b000UL;
 
+  /// a lock status for shared locks.
+  static constexpr uint64_t kSLock = 0b001UL;
+
   /// a lock status for exclusive locks.
-  static constexpr uint64_t kXLock = 0b010UL;
+  static constexpr uint64_t kXLock = 0b010UL << 16;
 
   /// a lock status for shared locks with intent-exclusive locks.
-  static constexpr uint64_t kSIXLock = 0b001UL;
+  static constexpr uint64_t kSIXLock = 0b001UL << 16;
+
+  /// a bit mask for removing an X-lock flag.
+  static constexpr uint64_t kSLockMask = ~(0b010UL << 16);
 
   /// a bit mask for removing SIX/X-lock flags.
-  static constexpr uint64_t kXLockMask = ~0b011UL;
+  static constexpr uint64_t kXLockMask = ~(0b011UL << 16);
 
   /// the maximum number of retries for preventing busy loops/
   static constexpr size_t kRetryNum = 10UL;
