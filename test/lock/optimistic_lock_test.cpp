@@ -30,13 +30,6 @@ namespace dbgroup::lock::test
  * Global constants
  *####################################################################################*/
 
-enum LockType {
-  kFree,
-  kSLock,
-  kXLock,
-  kSIXLock,
-};
-
 constexpr bool kExpectSuccess = true;
 constexpr bool kExpectFailed = false;
 constexpr size_t kWaitTimeMill = 100;
@@ -46,12 +39,6 @@ constexpr auto kWriteNumPerThread = 1E5;
 class OptimisticLockFixture : public ::testing::Test
 {
  protected:
-  /*####################################################################################
-   * Constants
-   *##################################################################################*/
-
-  static constexpr auto kWriteNum = 100000;
-
   /*####################################################################################
    * Setup/Teardown
    *##################################################################################*/
