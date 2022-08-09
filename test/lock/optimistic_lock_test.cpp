@@ -97,6 +97,47 @@ class OptimisticLockFixture : public ::testing::Test
     t_.join();
   }
 
+  void
+  VerifyDowngradeToSIX(const LockType lock_type)
+  {
+    lock_.LockX();
+    lock_.DowngradeToSIX();
+
+    switch (lock_type) {
+      case kSLock:
+        TryLock(kSLock, kExpectSucceed);
+        break;
+
+      case kXLock:
+        TryLock(kXLock, kExpectFail);
+        break;
+
+      case kSIXLock:
+        TryLock(kSIXLock, kExpectFail);
+        break;
+
+      default:
+        break;
+    }
+
+    lock_.UnlockSIX();
+
+    t_.join();
+  }
+
+  void
+  VerifyUpgradeToXWith(const LockType lock_type)
+  {
+    const auto expected_rc = (lock_type == kSLock) ? kExpectFail : kExpectSucceed;
+
+    lock_.LockSIX();  // this lock is going to be released in TryUpgrade
+    GetLock(lock_type);
+    TryUpgrade(expected_rc);
+    ReleaseLock(lock_type);
+
+    t_.join();
+  }
+
   /*####################################################################################
    * Public utility functions
    *##################################################################################*/
@@ -164,6 +205,31 @@ class OptimisticLockFixture : public ::testing::Test
     std::promise<void> p{};
     auto&& f = p.get_future();
     t_ = std::thread{&OptimisticLockFixture::LockWorker, this, lock_type, std::move(p)};
+
+    // after short sleep, give up on acquiring the lock
+    const auto rc = f.wait_for(std::chrono::milliseconds{kWaitTimeMill});
+
+    // verify status to check locking is succeeded
+    if (expect_success) {
+      ASSERT_EQ(rc, std::future_status::ready);
+    } else {
+      ASSERT_EQ(rc, std::future_status::timeout);
+    }
+  }
+
+  void
+  TryUpgrade(const bool expect_success)
+  {
+    auto upgrade_worker = [this](std::promise<void> p) -> void {
+      lock_.UpgradeToX();
+      p.set_value();
+      lock_.UnlockX();
+    };
+
+    // try to get an exclusive lock by another thread
+    std::promise<void> p{};
+    auto&& f = p.get_future();
+    t_ = std::thread{upgrade_worker, std::move(p)};
 
     // after short sleep, give up on acquiring the lock
     const auto rc = f.wait_for(std::chrono::milliseconds{kWaitTimeMill});
@@ -253,6 +319,31 @@ TEST_F(OptimisticLockFixture, LockSIXWithXLockFail)
 TEST_F(OptimisticLockFixture, LockSIXWithSIXLockFail)
 {  //
   VerifyLockSIXWith(kSIXLock);
+}
+
+TEST_F(OptimisticLockFixture, LockSAfterDowngradeToSIXSucceed)
+{  //
+  VerifyDowngradeToSIX(kSLock);
+}
+
+TEST_F(OptimisticLockFixture, LockXAfterDowngradeToSIXFail)
+{  //
+  VerifyDowngradeToSIX(kXLock);
+}
+
+TEST_F(OptimisticLockFixture, LockSIXAfterDowngradeToSIXFail)
+{  //
+  VerifyDowngradeToSIX(kSIXLock);
+}
+
+TEST_F(OptimisticLockFixture, UpgradeToXWithoutLocksSucceed)
+{  //
+  VerifyUpgradeToXWith(kFree);
+}
+
+TEST_F(OptimisticLockFixture, UpgradeToXWithSLockFail)
+{  //
+  VerifyUpgradeToXWith(kSLock);
 }
 
 }  // namespace dbgroup::lock::test
