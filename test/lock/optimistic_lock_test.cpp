@@ -30,8 +30,18 @@ namespace dbgroup::lock::test
  * Global constants
  *####################################################################################*/
 
+enum LockType {
+  kFree,
+  kSLock,
+  kXLock,
+  kSIXLock,
+};
+
 constexpr bool kExpectSuccess = true;
 constexpr bool kExpectFailed = false;
+constexpr size_t kWaitTimeMill = 100;
+constexpr auto kThreadNumForLockS = 1E2;
+constexpr auto kWriteNumPerThread = 1E5;
 
 class OptimisticLockFixture : public ::testing::Test
 {
@@ -60,232 +70,134 @@ class OptimisticLockFixture : public ::testing::Test
    * Functions for verification
    *##################################################################################*/
 
-  //  void
-  //  VerifyLockSharedWithSingleThread(const bool with_lock)
-  // {
-  //    const auto expected_rc = with_lock ? kExpectFailed : kExpectSuccess;
-  //    if (with_lock) lock_.Lock();
-  //    VerifyLockShared(expected_rc);
-  //  }
-  //
-  //  void
-  //  VerifyLockWithSingleThread(const bool with_lock_shared)
-  // {
-  //   const auto expected_rc = with_lock_shared ? kExpectFailed : kExpectSuccess;
-  //   if (with_lock_shared) {
-  //     lock_.LockShared();
-  //     s_lock_count_.fetch_add(1);
-  //   }
-  //   VerifyLock(expected_rc);
-  // }
-  //
-  //  void
-  //  VerifyLockSharedWithMultiThread()
-  // {
-  //   lock_.LockShared();
-  //   s_lock_count_.fetch_add(1);
-  //
-  //   // try to get a shared lock by another thread
-  //   auto lock_shared = [this](std::promise<void> p) {
-  //     lock_.LockShared();
-  //     s_lock_count_.fetch_add(1);
-  //     p.set_value();
-  //   };
-  //   std::promise<void> p{};
-  //   auto&& f = p.get_future();
-  //   std::thread t{lock_shared, std::move(p)};
-  //
-  //   // after one millisecond has passed, give up on acquiring the lock
-  //   const auto rc = f.wait_for(std::chrono::milliseconds{1});
-  //
-  //   // verify status to check locking is succeeded
-  //   ASSERT_EQ(rc, std::future_status::ready);
-  //   while (s_lock_count_.load(std::memory_order_acquire) > 0) {
-  //     lock_.UnlockShared();
-  //     s_lock_count_.fetch_sub(1);
-  //   }
-  //
-  //   t.join();
-  // }
+  void
+  VerifyLockSWith(const LockType lock_type)
+  {
+    const auto expected_rc = (lock_type == kXLock) ? kExpectFailed : kExpectSuccess;
 
-  // void
-  // VerifyLockWithMultiThread()
-  // {
-  //   lock_.LockShared();
-  //
-  //   auto increment_with_lock = [&]() {
-  //     for (size_t i = 0; i < kWriteNum; i++) {
-  //       lock_.Lock();
-  //       counter_++;
-  //       lock_.Unlock();
-  //     }
-  //   };
-  //
-  //   std::vector<std::thread> threads{};
-  //   threads.reserve(kThreadNum);
-  //
-  //   for (size_t i = 0; i < kThreadNum; ++i) {
-  //     threads.emplace_back(increment_with_lock);
-  //   }
-  //
-  //   // after 10 milliseconds has passed, check that the counter has not incremented
-  //   std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  //   ASSERT_EQ(counter_, 0);
-  //
-  //   lock_.UnlockShared();
-  //
-  //   for (auto&& t : threads) {
-  //     t.join();
-  //   }
-  //
-  //   lock_.LockShared();
-  //   ASSERT_EQ(counter_, kThreadNum * kWriteNum);
-  //   lock_.UnlockShared();
-  // }
+    GetLock(lock_type);
+    TryLock(kSLock, expected_rc);
+    ReleaseLock(lock_type);
+
+    t_.join();
+  }
+
+  void
+  TryLock(  //
+      const LockType lock_type,
+      const bool expect_success)
+  {
+    // try to get an exclusive lock by another thread
+    std::promise<void> p{};
+    auto&& f = p.get_future();
+    t_ = std::thread{&OptimisticLockFixture::LockWorker, this, lock_type, std::move(p)};
+
+    // after short sleep, give up on acquiring the lock
+    const auto rc = f.wait_for(std::chrono::milliseconds{kWaitTimeMill});
+
+    // verify status to check locking is succeeded
+    if (expect_success) {
+      ASSERT_EQ(rc, std::future_status::ready);
+    } else {
+      ASSERT_EQ(rc, std::future_status::timeout);
+    }
+  }
 
   /*####################################################################################
    * Public utility functions
    *##################################################################################*/
 
-  // void
-  // VerifyLockShared(const bool expect_success)
-  // {
-  //   // try to get a shared lock by another thread
-  //   auto lock_shared = [this](std::promise<void> p) {
-  //     lock_.LockShared();
-  //     s_lock_count_.fetch_add(1);
-  //     p.set_value();
-  //   };
-  //   std::promise<void> p{};
-  //   auto&& f = p.get_future();
-  //   std::thread t{lock_shared, std::move(p)};
-  //
-  //   // after one millisecond has passed, give up on acquiring the lock
-  //   const auto rc = f.wait_for(std::chrono::milliseconds{1});
-  //
-  //   // verify status to check locking is succeeded
-  //   if (expect_success) {
-  //     ASSERT_EQ(rc, std::future_status::ready);
-  //     while (s_lock_count_.load(std::memory_order_acquire) > 0) {
-  //       lock_.UnlockShared();
-  //       s_lock_count_.fetch_sub(1);
-  //     }
-  //   } else {
-  //     ASSERT_EQ(rc, std::future_status::timeout);
-  //     lock_.Unlock();  // unlock to join the thread
-  //   }
-  //   t.join();
-  // }
-
   void
-  VerifyGetVersion(const bool expect_success)
+  GetLock(const LockType lock_type)
   {
-    // try to get a version of target node
-    auto version = [this](std::promise<void> p) {
-      version_.GetVersion();
-      p.set_value();
-    };
-    std::promise<void> p{};
-    auto&& f = p.get_future();
-    std::thread t{version, std::move(p)};
+    switch (lock_type) {
+      case kSLock:
+        lock_.LockS();
+        break;
 
-    // after one millisecond has passed, give up on acquiring the lock
-    const auto rc = f.wait_for(std::chrono::milliseconds{1});
+      case kXLock:
+        lock_.LockX();
+        break;
 
-    // verify status to check locking is succeeded
-    if (expect_success) {
-      ASSERT_EQ(rc, std::future_status::ready);
-    } else {
-      ASSERT_EQ(rc, std::future_status::timeout);
-      while (s_lock_count_.load(std::memory_order_acquire) > 0) {
-        lock_.UnlockShared();  // unlock to join the thread
-        s_lock_count_.fetch_sub(1);
-      }
+      case kSIXLock:
+        lock_.LockSIX();
+        break;
+
+      case kFree:
+      default:
+        break;
     }
-    t.join();
   }
 
   void
-  VerifyCheckVersion(const bool expect_success)
+  ReleaseLock(const LockType lock_type)
   {
-  }
+    switch (lock_type) {
+      case kSLock:
+        lock_.UnlockS();
+        break;
 
-  void
-  VerifyLock(const bool expect_success)
-  {
-    // try to get a lock by another thread
-    auto lock = [this](std::promise<void> p) {
-      lock_.Lock();
-      p.set_value();
-    };
-    std::promise<void> p{};
-    auto&& f = p.get_future();
-    std::thread t{lock, std::move(p)};
+      case kXLock:
+        lock_.UnlockX();
+        break;
 
-    // after one millisecond has passed, give up on acquiring the lock
-    const auto rc = f.wait_for(std::chrono::milliseconds{1});
+      case kSIXLock:
+        lock_.UnlockSIX();
+        break;
 
-    // verify status to check locking is succeeded
-    if (expect_success) {
-      ASSERT_EQ(rc, std::future_status::ready);
-    } else {
-      ASSERT_EQ(rc, std::future_status::timeout);
-      while (s_lock_count_.load(std::memory_order_acquire) > 0) {
-        lock_.UnlockShared();  // unlock to join the thread
-        s_lock_count_.fetch_sub(1);
-      }
+      case kFree:
+      default:
+        break;
     }
-    t.join();
-
-    /*################################################################################################
-     * Internal member variables
-     *##############################################################################################*/
-
-    OptimisticLock lock_{};
-    std::atomic_size_t s_lock_count_{0};
-    size_t counter_{0};
-  };
-
-  /*######################################################################################
-   * Unit test definitions
-   *####################################################################################*/
-
-  /*--------------------------------------------------------------------------------------
-   * Constructor tests
-   *------------------------------------------------------------------------------------*/
-
-  TEST_F(PessimisticLockFixture, LockSharedWithSingleThreadSuccess)
-  {
-    const bool with_lock = false;
-    VerifyLockSharedWithSingleThread(with_lock);
   }
 
-  TEST_F(PessimisticLockFixture, LockSharedAfterLockWithSingleThreadFailed)
+  void
+  LockWorker(  //
+      const LockType lock_type,
+      std::promise<void> p)
   {
-    const bool with_lock = true;
-    VerifyLockSharedWithSingleThread(with_lock);
+    GetLock(lock_type);
+    p.set_value();
+    ReleaseLock(lock_type);
   }
 
-  TEST_F(PessimisticLockFixture, LockWithSingleThreadSuccess)
-  {
-    const bool with_lock_shared = false;
-    VerifyLockWithSingleThread(with_lock_shared);
-  }
+  /*################################################################################################
+   * Internal member variables
+   *##############################################################################################*/
 
-  TEST_F(PessimisticLockFixture, LockAfterLockSharedWithSingleThreadFailed)
-  {
-    const bool with_lock_shared = true;
-    VerifyLockWithSingleThread(with_lock_shared);
-  }
+  OptimisticLock lock_{};
 
-  TEST_F(PessimisticLockFixture, LockSharedWithMultiThreadSuccess)
-  {
-    VerifyLockSharedWithMultiThread();
-  }
+  size_t counter_{0};
 
-  TEST_F(PessimisticLockFixture, IncrementCounterWithMultiThreadSuccess)
-  {
-    VerifyLockWithMultiThread();
-  }
+  std::thread t_{};
+};
+
+/*######################################################################################
+ * Unit test definitions
+ *####################################################################################*/
+
+/*--------------------------------------------------------------------------------------
+ * Constructor tests
+ *------------------------------------------------------------------------------------*/
+
+TEST_F(OptimisticLockFixture, LockSWithoutLocksSucceed)
+{  //
+  VerifyLockSWith(kFree);
+}
+
+TEST_F(OptimisticLockFixture, LockSWithSLockSucceed)
+{  //
+  VerifyLockSWith(kSLock);
+}
+
+TEST_F(OptimisticLockFixture, LockSWithXLockFail)
+{  //
+  VerifyLockSWith(kXLock);
+}
+
+TEST_F(OptimisticLockFixture, LockSWithSIXLockSucceed)
+{  //
+  VerifyLockSWith(kSIXLock);
+}
 
 }  // namespace dbgroup::lock::test

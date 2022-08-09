@@ -66,3 +66,4 @@ endfunction()
 # add unit tests to build targets
 ADD_CPP_UTILITY_TEST("random" "zipf_test")
 ADD_CPP_UTILITY_TEST("lock" "pessimistic_lock_test")
+ADD_CPP_UTILITY_TEST("lock" "optimistic_lock_test")
