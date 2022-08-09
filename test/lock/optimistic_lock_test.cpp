@@ -30,8 +30,8 @@ namespace dbgroup::lock::test
  * Global constants
  *####################################################################################*/
 
-constexpr bool kExpectSuccess = true;
-constexpr bool kExpectFailed = false;
+constexpr bool kExpectSucceed = true;
+constexpr bool kExpectFail = false;
 constexpr size_t kWaitTimeMill = 100;
 constexpr auto kThreadNumForLockS = 1E2;
 constexpr auto kWriteNumPerThread = 1E5;
@@ -60,7 +60,7 @@ class OptimisticLockFixture : public ::testing::Test
   void
   VerifyLockSWith(const LockType lock_type)
   {
-    const auto expected_rc = (lock_type == kXLock) ? kExpectFailed : kExpectSuccess;
+    const auto expected_rc = (lock_type == kXLock) ? kExpectFail : kExpectSucceed;
     const auto version = lock_.GetVersion();
 
     GetLock(lock_type);
@@ -70,6 +70,31 @@ class OptimisticLockFixture : public ::testing::Test
     t_.join();
 
     ASSERT_EQ(lock_.CheckVersion(version), expected_rc);
+  }
+
+  void
+  VerifyLockXWith(const LockType lock_type)
+  {
+    const auto expected_rc = (lock_type != kFree) ? kExpectFail : kExpectSucceed;
+
+    GetLock(lock_type);
+    TryLock(kXLock, expected_rc);
+    ReleaseLock(lock_type);
+
+    t_.join();
+  }
+
+  void
+  VerifyLockSIXWith(const LockType lock_type)
+  {
+    const auto expected_rc =
+        (lock_type == kXLock || lock_type == kSIXLock) ? kExpectFail : kExpectSucceed;
+
+    GetLock(lock_type);
+    TryLock(kSIXLock, expected_rc);
+    ReleaseLock(lock_type);
+
+    t_.join();
   }
 
   /*####################################################################################
@@ -188,6 +213,46 @@ TEST_F(OptimisticLockFixture, LockSWithXLockFail)
 TEST_F(OptimisticLockFixture, LockSWithSIXLockSucceed)
 {  //
   VerifyLockSWith(kSIXLock);
+}
+
+TEST_F(OptimisticLockFixture, LockXWithoutLocksSucceed)
+{  //
+  VerifyLockXWith(kFree);
+}
+
+TEST_F(OptimisticLockFixture, LockXWithSLockFail)
+{  //
+  VerifyLockXWith(kSLock);
+}
+
+TEST_F(OptimisticLockFixture, LockXWithXLockFail)
+{  //
+  VerifyLockXWith(kXLock);
+}
+
+TEST_F(OptimisticLockFixture, LockXWithSIXLockFail)
+{  //
+  VerifyLockXWith(kSIXLock);
+}
+
+TEST_F(OptimisticLockFixture, LockSIXWithoutLocksSucceed)
+{  //
+  VerifyLockSIXWith(kFree);
+}
+
+TEST_F(OptimisticLockFixture, LockSIXWithSLockSucceed)
+{  //
+  VerifyLockSIXWith(kSLock);
+}
+
+TEST_F(OptimisticLockFixture, LockSIXWithXLockFail)
+{  //
+  VerifyLockSIXWith(kXLock);
+}
+
+TEST_F(OptimisticLockFixture, LockSIXWithSIXLockFail)
+{  //
+  VerifyLockSIXWith(kSIXLock);
 }
 
 }  // namespace dbgroup::lock::test

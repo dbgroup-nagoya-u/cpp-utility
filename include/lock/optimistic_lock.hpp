@@ -145,14 +145,14 @@ class OptimisticLock
   LockX()
   {
     while (true) {
-      auto expected = lock_.load(std::memory_order_relaxed) & kXLockMask;
+      auto expected = lock_.load(std::memory_order_relaxed) & kLockMask;
       auto desired = expected + kXLock;
       for (size_t i = 0; i < kRetryNum; ++i) {
         const auto cas_success = lock_.compare_exchange_weak(
             expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
         if (cas_success) return;
 
-        expected &= kXLockMask;
+        expected &= kLockMask;
         desired = expected + kXLock;
         SPINLOCK_HINT
       }
@@ -254,7 +254,7 @@ class OptimisticLock
   static constexpr uint64_t kXLockMask = ~(0b011UL << 16);
 
   /// a bit mask for removing S/SIX/X-lock flags.
-  static constexpr uint64_t kLockMask = ~((0b001 << 17) - 1);
+  static constexpr uint64_t kLockMask = ~((0b001 << 18) - 1);
 
   /// the maximum number of retries for preventing busy loops/
   static constexpr size_t kRetryNum = 10UL;
