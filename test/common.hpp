@@ -28,3 +28,18 @@ constexpr size_t kThreadNum = 8;
 #endif
 
 #endif  // CPP_UTILITY_TEST_COMMON_HPP
+
+namespace dbgroup::lock::test
+{
+/*######################################################################################
+ * Internal enum and constants
+ *####################################################################################*/
+
+enum LockType {
+  kFree,
+  kSLock,
+  kXLock,
+  kSIXLock,
+};
+
+}  // namespace dbgroup::lock::test
