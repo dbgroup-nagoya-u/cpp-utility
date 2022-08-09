@@ -31,7 +31,6 @@ namespace dbgroup::random::test
  *##################################################################################*/
 
 constexpr size_t kSkew = 1.0;
-constexpr size_t kRandomSeed = 20;
 constexpr size_t kRepeatNum = 1e6;
 constexpr double kAllowableError = 0.015;
 constexpr size_t kAlphaUnitUL = 10;

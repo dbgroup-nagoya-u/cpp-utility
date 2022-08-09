@@ -134,6 +134,9 @@
     "strstream": "cpp",
     "bitset": "cpp",
     "complex": "cpp",
-    "typeindex": "cpp"
+    "typeindex": "cpp",
+    "cfenv": "cpp",
+    "valarray": "cpp",
+    "*.ipp": "cpp"
   },
 }
