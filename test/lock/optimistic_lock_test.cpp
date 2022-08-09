@@ -61,33 +61,15 @@ class OptimisticLockFixture : public ::testing::Test
   VerifyLockSWith(const LockType lock_type)
   {
     const auto expected_rc = (lock_type == kXLock) ? kExpectFailed : kExpectSuccess;
+    const auto version_ = lock_.GetVersion();
 
     GetLock(lock_type);
     TryLock(kSLock, expected_rc);
     ReleaseLock(lock_type);
 
     t_.join();
-  }
 
-  void
-  TryLock(  //
-      const LockType lock_type,
-      const bool expect_success)
-  {
-    // try to get an exclusive lock by another thread
-    std::promise<void> p{};
-    auto&& f = p.get_future();
-    t_ = std::thread{&OptimisticLockFixture::LockWorker, this, lock_type, std::move(p)};
-
-    // after short sleep, give up on acquiring the lock
-    const auto rc = f.wait_for(std::chrono::milliseconds{kWaitTimeMill});
-
-    // verify status to check locking is succeeded
-    if (expect_success) {
-      ASSERT_EQ(rc, std::future_status::ready);
-    } else {
-      ASSERT_EQ(rc, std::future_status::timeout);
-    }
+    ASSERT_EQ(lock_.CheckVersion(version_), expected_rc);
   }
 
   /*####################################################################################
@@ -146,6 +128,27 @@ class OptimisticLockFixture : public ::testing::Test
     GetLock(lock_type);
     p.set_value();
     ReleaseLock(lock_type);
+  }
+
+  void
+  TryLock(  //
+      const LockType lock_type,
+      const bool expect_success)
+  {
+    // try to get an exclusive lock by another thread
+    std::promise<void> p{};
+    auto&& f = p.get_future();
+    t_ = std::thread{&OptimisticLockFixture::LockWorker, this, lock_type, std::move(p)};
+
+    // after short sleep, give up on acquiring the lock
+    const auto rc = f.wait_for(std::chrono::milliseconds{kWaitTimeMill});
+
+    // verify status to check locking is succeeded
+    if (expect_success) {
+      ASSERT_EQ(rc, std::future_status::ready);
+    } else {
+      ASSERT_EQ(rc, std::future_status::timeout);
+    }
   }
 
   /*################################################################################################
