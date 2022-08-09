@@ -33,13 +33,6 @@ namespace dbgroup::lock::test
  * Global constants
  *####################################################################################*/
 
-enum LockType {
-  kFree,
-  kSLock,
-  kXLock,
-  kSIXLock,
-};
-
 constexpr bool kExpectSucceed = true;
 constexpr bool kExpectFail = false;
 constexpr size_t kWaitTimeMill = 100;
