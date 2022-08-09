@@ -61,7 +61,7 @@ class OptimisticLockFixture : public ::testing::Test
   VerifyLockSWith(const LockType lock_type)
   {
     const auto expected_rc = (lock_type == kXLock) ? kExpectFailed : kExpectSuccess;
-    const auto version_ = lock_.GetVersion();
+    const auto version = lock_.GetVersion();
 
     GetLock(lock_type);
     TryLock(kSLock, expected_rc);
@@ -69,7 +69,7 @@ class OptimisticLockFixture : public ::testing::Test
 
     t_.join();
 
-    ASSERT_EQ(lock_.CheckVersion(version_), expected_rc);
+    ASSERT_EQ(lock_.CheckVersion(version), expected_rc);
   }
 
   /*####################################################################################
