@@ -88,7 +88,9 @@ class OptimisticLockFixture : public ::testing::Test
 
     t_.join();
 
-    ASSERT_FALSE(lock_.CheckVersion(version));
+    const auto expect_version =
+        (lock_type == kXLock) ? version + (0b001UL << 19) : version + (0b001UL << 18);
+    ASSERT_EQ(lock_.GetVersion(), expect_version);
   }
 
   void
@@ -112,8 +114,12 @@ class OptimisticLockFixture : public ::testing::Test
   void
   VerifyDowngradeToSIX(const LockType lock_type)
   {
+    const auto version = lock_.GetVersion();
+
     lock_.LockX();
     lock_.DowngradeToSIX();
+
+    ASSERT_EQ(lock_.GetVersion(), version + (0b001UL << 18));
 
     switch (lock_type) {
       case kSLock:
@@ -141,13 +147,85 @@ class OptimisticLockFixture : public ::testing::Test
   VerifyUpgradeToXWith(const LockType lock_type)
   {
     const auto expected_rc = (lock_type == kSLock) ? kExpectFail : kExpectSucceed;
+    const auto version = lock_.GetVersion();
 
     lock_.LockSIX();  // this lock is going to be released in TryUpgrade
     GetLock(lock_type);
     TryUpgrade(expected_rc);
     ReleaseLock(lock_type);
 
+    if (lock_type == kSLock) {
+      ASSERT_TRUE(lock_.CheckVersion(version));
+    }
+
     t_.join();
+
+    ASSERT_EQ(lock_.GetVersion(), version + (0b001UL << 18));
+  }
+
+  void
+  VerifyLockSWithMultiThread()
+  {
+    // create threads to get/release a shared lock
+    auto lock_unlock_s = [this]() {
+      lock_.LockS();
+      lock_.UnlockS();
+    };
+    std::vector<std::thread> threads{};
+    threads.reserve(kThreadNumForLockS);
+    for (size_t i = 0; i < kThreadNumForLockS; ++i) {
+      threads.emplace_back(lock_unlock_s);
+    }
+
+    // check the counter of shared locks is correctly managed
+    for (auto&& t : threads) {
+      t.join();
+    }
+
+    ASSERT_EQ(lock_.GetVersion(), 0UL);
+
+    TryLock(kXLock, kExpectSucceed);
+
+    t_.join();
+
+    ASSERT_EQ(lock_.GetVersion(), 0b001UL << 18);
+  }
+
+  void
+  VerifyLockXWithMultiThread()
+  {
+    // create a shared lock to prevent a counter from modifying
+    lock_.LockS();
+
+    // create incrementor threads
+    auto increment_with_lock = [&]() {
+      for (size_t i = 0; i < kWriteNumPerThread; i++) {
+        lock_.LockX();
+        ++counter_;
+        lock_.UnlockX();
+      }
+    };
+    std::vector<std::thread> threads{};
+    threads.reserve(kThreadNum);
+    for (size_t i = 0; i < kThreadNum; ++i) {
+      threads.emplace_back(increment_with_lock);
+    }
+
+    // after short sleep, check that the counter has not incremented
+    std::this_thread::sleep_for(std::chrono::milliseconds(kWaitTimeMill));
+    ASSERT_EQ(counter_, 0);
+
+    // release the shared lock, and then wait for the incrementors
+    lock_.UnlockS();
+    for (auto&& t : threads) {
+      t.join();
+    }
+
+    // check the counter
+    lock_.LockS();
+    ASSERT_EQ(counter_, kThreadNum * kWriteNumPerThread);
+    lock_.UnlockS();
+    ASSERT_EQ(lock_.GetVersion(), (0b001UL << 18) * counter_);
   }
 
   /*####################################################################################
@@ -356,6 +434,16 @@ TEST_F(OptimisticLockFixture, UpgradeToXWithoutLocksSucceed)
 TEST_F(OptimisticLockFixture, UpgradeToXWithSLockFail)
 {  //
   VerifyUpgradeToXWith(kSLock);
+}
+
+TEST_F(OptimisticLockFixture, SharedLockCounterIsCorrectlyManaged)
+{  //
+  VerifyLockSWithMultiThread();
+}
+
+TEST_F(OptimisticLockFixture, IncrementWithLockXKeepConsistentCounter)
+{  //
+  VerifyLockXWithMultiThread();
 }
 
 }  // namespace dbgroup::lock::test
