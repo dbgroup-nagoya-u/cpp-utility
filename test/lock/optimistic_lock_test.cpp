@@ -67,21 +67,28 @@ class OptimisticLockFixture : public ::testing::Test
     TryLock(kSLock, expected_rc);
     ReleaseLock(lock_type);
 
+    ASSERT_EQ(lock_.CheckVersion(version), lock_type != kXLock);
+
     t_.join();
 
-    ASSERT_EQ(lock_.CheckVersion(version), expected_rc);
+    ASSERT_EQ(lock_.CheckVersion(version), lock_type != kXLock);
   }
 
   void
   VerifyLockXWith(const LockType lock_type)
   {
     const auto expected_rc = (lock_type != kFree) ? kExpectFail : kExpectSucceed;
+    const auto version = lock_.GetVersion();
 
     GetLock(lock_type);
     TryLock(kXLock, expected_rc);
     ReleaseLock(lock_type);
 
+    ASSERT_EQ(lock_.CheckVersion(version), ((lock_type == kSLock) || (lock_type == kSIXLock)));
+
     t_.join();
+
+    ASSERT_FALSE(lock_.CheckVersion(version));
   }
 
   void
@@ -89,12 +96,17 @@ class OptimisticLockFixture : public ::testing::Test
   {
     const auto expected_rc =
         (lock_type == kXLock || lock_type == kSIXLock) ? kExpectFail : kExpectSucceed;
+    const auto version = lock_.GetVersion();
 
     GetLock(lock_type);
     TryLock(kSIXLock, expected_rc);
     ReleaseLock(lock_type);
 
+    ASSERT_EQ(lock_.CheckVersion(version), lock_type != kXLock);
+
     t_.join();
+
+    ASSERT_EQ(lock_.CheckVersion(version), lock_type != kXLock);
   }
 
   void
