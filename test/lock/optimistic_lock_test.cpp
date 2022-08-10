@@ -24,9 +24,6 @@
 // external libraries
 #include "gtest/gtest.h"
 
-// local sorces
-#include "common.hpp"
-
 namespace dbgroup::lock::test
 {
 /*######################################################################################
@@ -91,9 +88,7 @@ class OptimisticLockFixture : public ::testing::Test
 
     t_.join();
 
-    const auto expect_version =
-        (lock_type == kXLock) ? version + (0b001UL << 19) : version + (0b001UL << 18);
-    ASSERT_EQ(lock_.GetVersion(), expect_version);
+    ASSERT_FALSE(lock_.CheckVersion(version));
   }
 
   void
@@ -122,7 +117,7 @@ class OptimisticLockFixture : public ::testing::Test
     lock_.LockX();
     lock_.DowngradeToSIX();
 
-    ASSERT_EQ(lock_.GetVersion(), version + (0b001UL << 18));
+    ASSERT_FALSE(lock_.CheckVersion(version));
 
     switch (lock_type) {
       case kSLock:
@@ -163,12 +158,14 @@ class OptimisticLockFixture : public ::testing::Test
 
     t_.join();
 
-    ASSERT_EQ(lock_.GetVersion(), version + (0b001UL << 18));
+    ASSERT_FALSE(lock_.CheckVersion(version));
   }
 
   void
   VerifyLockSWithMultiThread()
   {
+    const auto version = lock_.GetVersion();
+
     // create threads to get/release a shared lock
     auto lock_unlock_s = [this]() {
       lock_.LockS();
@@ -185,18 +182,20 @@ class OptimisticLockFixture : public ::testing::Test
       t.join();
     }
 
-    ASSERT_EQ(lock_.GetVersion(), 0UL);
+    ASSERT_TRUE(lock_.CheckVersion(version));
 
     TryLock(kXLock, kExpectSucceed);
 
     t_.join();
 
-    ASSERT_EQ(lock_.GetVersion(), 0b001UL << 18);
+    ASSERT_FALSE(lock_.CheckVersion(version));
   }
 
   void
   VerifyLockXWithMultiThread()
   {
+    const auto version = lock_.GetVersion();
+
     // create a shared lock to prevent a counter from modifying
     lock_.LockS();
 
@@ -228,7 +227,7 @@ class OptimisticLockFixture : public ::testing::Test
     lock_.LockS();
     ASSERT_EQ(counter_, kThreadNum * kWriteNumPerThread);
     lock_.UnlockS();
-    ASSERT_EQ(lock_.GetVersion(), (0b001UL << 18) * counter_);
+    ASSERT_FALSE(lock_.CheckVersion(version));
   }
 
   /*####################################################################################

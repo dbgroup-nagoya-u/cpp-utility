@@ -17,18 +17,11 @@
 #ifndef CPP_UTILITY_PESSIMISTIC_LOCK_HPP
 #define CPP_UTILITY_PESSIMISTIC_LOCK_HPP
 
-#ifndef SPINLOCK_HINT
-#ifdef CPP_UTILITY_HAS_SPINLOCK_HINT
-#include <xmmintrin.h>
-#define SPINLOCK_HINT _mm_pause();  // NOLINT
-#else
-#define SPINLOCK_HINT /* do nothing */
-#endif
-#endif
-
 #include <atomic>
 #include <chrono>
 #include <thread>
+
+#include "common.hpp"
 
 namespace dbgroup::lock
 {
@@ -75,7 +68,7 @@ class PessimisticLock
 
         expected &= kSLockMask;
         desired = expected + kSLock;
-        SPINLOCK_HINT
+        CPP_UTILITY_SPINLOCK_HINT
       }
 
       std::this_thread::sleep_for(kShortSleep);
@@ -93,7 +86,7 @@ class PessimisticLock
     auto desired = expected - kSLock;  // decrement read-counter
     while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed)) {
       desired = expected - kSLock;
-      SPINLOCK_HINT
+      CPP_UTILITY_SPINLOCK_HINT
     }
   }
 
@@ -113,7 +106,7 @@ class PessimisticLock
         if (cas_success) return;
 
         expected = kNoLocks;
-        SPINLOCK_HINT
+        CPP_UTILITY_SPINLOCK_HINT
       }
 
       std::this_thread::sleep_for(kShortSleep);
@@ -160,7 +153,7 @@ class PessimisticLock
 
         expected &= kSIXLockMask;
         desired = expected | kSIXLock;
-        SPINLOCK_HINT
+        CPP_UTILITY_SPINLOCK_HINT
       }
 
       std::this_thread::sleep_for(kShortSleep);
@@ -184,7 +177,7 @@ class PessimisticLock
         if (cas_success) return;
 
         expected = kSIXLock;
-        SPINLOCK_HINT
+        CPP_UTILITY_SPINLOCK_HINT
       }
 
       std::this_thread::sleep_for(kShortSleep);
@@ -202,7 +195,7 @@ class PessimisticLock
     auto desired = expected - kSIXLock;
     while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed)) {
       desired = expected - kSIXLock;
-      SPINLOCK_HINT
+      CPP_UTILITY_SPINLOCK_HINT
     }
   }
 
