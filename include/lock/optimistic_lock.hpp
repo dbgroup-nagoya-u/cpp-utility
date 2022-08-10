@@ -266,7 +266,7 @@ class OptimisticLock
   static constexpr uint64_t kXLockMask = ~(0b011UL << 16);
 
   /// a bit mask for removing S/SIX/X-lock flags.
-  static constexpr uint64_t kLockMask = ~((0b001 << 18) - 1);
+  static constexpr uint64_t kLockMask = (~0UL) << 18;
 
   /// the maximum number of retries for preventing busy loops.
   static constexpr size_t kRetryNum = 10UL;
