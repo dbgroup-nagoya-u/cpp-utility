@@ -21,7 +21,7 @@
 #include <chrono>
 #include <thread>
 
-#include "lock/common.hpp"
+#include "common.hpp"
 
 namespace dbgroup::lock
 {
