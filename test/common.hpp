@@ -17,15 +17,6 @@
 #ifndef CPP_UTILITY_TEST_COMMON_HPP
 #define CPP_UTILITY_TEST_COMMON_HPP
 
-#ifndef CPP_UTILITY_SPINLOCK_HINT
-#ifdef CPP_UTILITY_HAS_SPINLOCK_HINT
-#include <xmmintrin.h>
-#define CPP_UTILITY_SPINLOCK_HINT _mm_pause();  // NOLINT
-#else
-#define CPP_UTILITY_SPINLOCK_HINT /* do nothing */
-#endif
-#endif
-
 #include <cassert>
 #include <cstddef>
 #include <cstdint>

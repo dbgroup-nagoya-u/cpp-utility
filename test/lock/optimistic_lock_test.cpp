@@ -24,6 +24,9 @@
 // external libraries
 #include "gtest/gtest.h"
 
+// local sources
+#include "common.hpp"
+
 namespace dbgroup::lock::test
 {
 /*######################################################################################
