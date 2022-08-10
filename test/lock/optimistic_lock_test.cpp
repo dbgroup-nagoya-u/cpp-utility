@@ -21,8 +21,11 @@
 #include <thread>
 #include <vector>
 
-#include "common.hpp"
+// external libraries
 #include "gtest/gtest.h"
+
+// local sorces
+#include "common.hpp"
 
 namespace dbgroup::lock::test
 {
