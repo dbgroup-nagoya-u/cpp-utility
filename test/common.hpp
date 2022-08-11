@@ -28,3 +28,18 @@ constexpr size_t kThreadNum = CPP_UTILITY_TEST_THREAD_NUM;
 constexpr size_t kRandomSeed = CPP_UTILITY_TEST_RANDOM_SEED;
 
 #endif  // CPP_UTILITY_TEST_COMMON_HPP
+
+namespace dbgroup::lock::test
+{
+/*######################################################################################
+ * Internal enum and constants
+ *####################################################################################*/
+
+enum LockType {
+  kFree,
+  kSLock,
+  kXLock,
+  kSIXLock,
+};
+
+}  // namespace dbgroup::lock::test

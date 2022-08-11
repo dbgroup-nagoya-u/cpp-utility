@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef CPP_UTILITY_PESSIMISTIC_LOCK_HPP
-#define CPP_UTILITY_PESSIMISTIC_LOCK_HPP
+#ifndef CPP_UTILITY_OPTIMISTIC_LOCK_HPP
+#define CPP_UTILITY_OPTIMISTIC_LOCK_HPP
 
 #include <atomic>
 #include <chrono>
@@ -25,30 +25,62 @@
 
 namespace dbgroup::lock
 {
-class PessimisticLock
+class OptimisticLock
 {
  public:
   /*####################################################################################
    * Public constructors and assignment operators
    *##################################################################################*/
 
-  constexpr PessimisticLock() = default;
+  constexpr OptimisticLock() = default;
 
-  PessimisticLock(const PessimisticLock&) = delete;
-  PessimisticLock(PessimisticLock&&) = delete;
+  OptimisticLock(const OptimisticLock&) = delete;
+  OptimisticLock(OptimisticLock&&) = delete;
 
-  auto operator=(const PessimisticLock&) -> PessimisticLock& = delete;
-  auto operator=(PessimisticLock&&) -> PessimisticLock& = delete;
+  auto operator=(const OptimisticLock&) -> OptimisticLock& = delete;
+  auto operator=(OptimisticLock&&) -> OptimisticLock& = delete;
 
   /*####################################################################################
    * Public destructors
    *##################################################################################*/
 
-  ~PessimisticLock() = default;
+  ~OptimisticLock() = default;
 
   /*####################################################################################
-   * Public utility functions
+   * Public getters
    *##################################################################################*/
+  /**
+   * @return a current version value.
+   */
+  [[nodiscard]] auto
+  GetVersion() const  //
+      -> uint64_t
+  {
+    while (true) {
+      auto expected = lock_.load(std::memory_order_acquire);
+      for (size_t i = 0; i < kRetryNum; ++i) {
+        if ((expected & kXLock) == 0) return expected & kAllBitsMask;
+
+        CPP_UTILITY_SPINLOCK_HINT
+        expected = lock_.load(std::memory_order_acquire);
+      }
+
+      std::this_thread::sleep_for(kShortSleep);
+    }
+  }
+
+  /**
+   * @param expected an expected version value.
+   * @retval true if the given version value is the same as a current one.
+   * @retval false otherwise.
+   */
+  auto
+  CheckVersion(const uint64_t expected) const  //
+      -> bool
+  {
+    const auto desired = lock_.load(std::memory_order_relaxed) & kAllBitsMask;
+    return expected == desired;
+  }
 
   /**
    * @brief Get a shared lock.
@@ -59,14 +91,14 @@ class PessimisticLock
   LockS()
   {
     while (true) {
-      auto expected = lock_.load(std::memory_order_relaxed) & kSLockMask;
+      auto expected = lock_.load(std::memory_order_relaxed) & kXBitMask;
       auto desired = expected + kSLock;  // increment read-counter
       for (size_t i = 0; i < kRetryNum; ++i) {
         const auto cas_success = lock_.compare_exchange_weak(
             expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
         if (cas_success) return;
 
-        expected &= kSLockMask;
+        expected &= kXBitMask;
         desired = expected + kSLock;
         CPP_UTILITY_SPINLOCK_HINT
       }
@@ -99,13 +131,15 @@ class PessimisticLock
   LockX()
   {
     while (true) {
-      auto expected = kNoLocks;
+      auto expected = lock_.load(std::memory_order_relaxed) & kAllBitsMask;
+      auto desired = expected + kXLock;
       for (size_t i = 0; i < kRetryNum; ++i) {
         const auto cas_success = lock_.compare_exchange_weak(
-            expected, kXLock, std::memory_order_acquire, std::memory_order_relaxed);
+            expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
         if (cas_success) return;
 
-        expected = kNoLocks;
+        expected &= kAllBitsMask;
+        desired = expected + kXLock;
         CPP_UTILITY_SPINLOCK_HINT
       }
 
@@ -122,7 +156,7 @@ class PessimisticLock
   void
   DowngradeToSIX()
   {
-    lock_.store(kSIXLock, std::memory_order_release);
+    lock_.fetch_add(kXLock + kSIXLock, std::memory_order_release);
   }
 
   /**
@@ -132,7 +166,7 @@ class PessimisticLock
   void
   UnlockX()
   {
-    lock_.store(kNoLocks, std::memory_order_release);
+    lock_.fetch_add(kXLock, std::memory_order_release);
   }
 
   /**
@@ -144,15 +178,15 @@ class PessimisticLock
   LockSIX()
   {
     while (true) {
-      auto expected = lock_.load(std::memory_order_relaxed) & kSIXLockMask;
-      auto desired = expected | kSIXLock;
+      auto expected = lock_.load(std::memory_order_relaxed) & kXAndSIXBitsMask;
+      auto desired = expected + kSIXLock;
       for (size_t i = 0; i < kRetryNum; ++i) {
         const auto cas_success = lock_.compare_exchange_weak(
             expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
         if (cas_success) return;
 
-        expected &= kSIXLockMask;
-        desired = expected | kSIXLock;
+        expected &= kXAndSIXBitsMask;
+        desired = expected + kSIXLock;
         CPP_UTILITY_SPINLOCK_HINT
       }
 
@@ -169,17 +203,17 @@ class PessimisticLock
   void
   UpgradeToX()
   {
+    auto expected = lock_.load(std::memory_order_relaxed) & kSBitsMask;
+    auto desired = expected + kSIXLock;
     while (true) {
-      auto expected = kSIXLock;
       for (size_t i = 0; i < kRetryNum; ++i) {
-        const auto cas_success = lock_.compare_exchange_weak(
-            expected, kXLock, std::memory_order_acquire, std::memory_order_relaxed);
+        const auto cas_success =
+            lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed);
         if (cas_success) return;
 
-        expected = kSIXLock;
+        expected &= kSBitsMask;
         CPP_UTILITY_SPINLOCK_HINT
       }
-
       std::this_thread::sleep_for(kShortSleep);
     }
   }
@@ -191,12 +225,7 @@ class PessimisticLock
   void
   UnlockSIX()
   {
-    auto expected = lock_.load(std::memory_order_relaxed);
-    auto desired = expected - kSIXLock;
-    while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed)) {
-      desired = expected - kSIXLock;
-      CPP_UTILITY_SPINLOCK_HINT
-    }
+    lock_.fetch_sub(kSIXLock, std::memory_order_relaxed);
   }
 
  private:
@@ -207,20 +236,26 @@ class PessimisticLock
   /// a lock status for no locks.
   static constexpr uint64_t kNoLocks = 0b000UL;
 
+  /// a lock status for shared locks.
+  static constexpr uint64_t kSLock = 0b001UL;
+
   /// a lock status for exclusive locks.
-  static constexpr uint64_t kXLock = 0b001UL;
+  static constexpr uint64_t kXLock = 0b010UL << 16;
 
   /// a lock status for shared locks with intent-exclusive locks.
-  static constexpr uint64_t kSIXLock = 0b010UL;
-
-  /// a lock status for shared locks.
-  static constexpr uint64_t kSLock = 0b100UL;
-
-  /// a bit mask for removing SIX/X-lock flags.
-  static constexpr uint64_t kSIXLockMask = ~0b011UL;
+  static constexpr uint64_t kSIXLock = 0b001UL << 16;
 
   /// a bit mask for removing an X-lock flag.
-  static constexpr uint64_t kSLockMask = ~0b001UL;
+  static constexpr uint64_t kSBitsMask = (~0UL) << 16;
+
+  /// a bit mask for removing an X-lock flag.
+  static constexpr uint64_t kXBitMask = ~(0b010UL << 16);
+
+  /// a bit mask for removing SIX/X-lock flags.
+  static constexpr uint64_t kXAndSIXBitsMask = ~(0b011UL << 16);
+
+  /// a bit mask for removing S/SIX/X-lock flags.
+  static constexpr uint64_t kAllBitsMask = (~0UL) << 18;
 
   /// the maximum number of retries for preventing busy loops.
   static constexpr size_t kRetryNum = 10UL;
@@ -232,10 +267,10 @@ class PessimisticLock
    * Internal member variables
    *##################################################################################*/
 
-  /// an internal lock status.
+  /// an actual lock status.
   std::atomic<uint64_t> lock_{0};
 };
 
 }  // namespace dbgroup::lock
 
-#endif  // CPP_UTILITY_PESSIMISTIC_LOCK_HPP
+#endif  // CPP_UTILITY_OPTIMISTIC_LOCK_HPP
