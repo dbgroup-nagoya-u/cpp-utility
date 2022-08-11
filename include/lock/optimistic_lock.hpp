@@ -50,9 +50,7 @@ class OptimisticLock
    * Public getters
    *##################################################################################*/
   /**
-   * @brief Get the Version object
-   *
-   * @return std::pair<uint64_t, bool>
+   * @return a current version value.
    */
   [[nodiscard]] auto
   GetVersion() const  //
