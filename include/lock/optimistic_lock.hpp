@@ -70,10 +70,9 @@ class OptimisticLock
   }
 
   /**
-   * @brief Check whether the version after reading is equal to the version before reading
-   *
-   * @return true
-   * @return false
+   * @param expected an expected version value.
+   * @retval true if the given version value is the same as a current one.
+   * @retval false otherwise.
    */
   auto
   CheckVersion(const uint64_t expected) const  //
