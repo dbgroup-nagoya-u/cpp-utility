@@ -78,7 +78,7 @@ class OptimisticLock
   CheckVersion(const uint64_t expected) const  //
       -> bool
   {
-    const auto desired = lock_.load(std::memory_order_relaxed) & kAllBitsMask;
+    const auto desired = lock_.load(std::memory_order_relaxed) & kSAndSIXBitsMask;
     return expected == desired;
   }
 
@@ -253,6 +253,9 @@ class OptimisticLock
 
   /// a bit mask for removing SIX/X-lock flags.
   static constexpr uint64_t kXAndSIXBitsMask = ~(0b011UL << 16);
+
+  /// a bit mask for removing S/SIX-lock flags.
+  static constexpr uint64_t kSAndSIXBitsMask = (~0UL) << 17;
 
   /// a bit mask for removing S/SIX/X-lock flags.
   static constexpr uint64_t kAllBitsMask = (~0UL) << 18;
