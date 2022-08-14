@@ -70,11 +70,11 @@ class OptimisticLockFixture : public ::testing::Test
     TryLock(kSLock, expected_rc);
     ReleaseLock(lock_type);
 
-    ASSERT_EQ(lock_.CheckVersion(version), lock_type != kXLock);
+    ASSERT_EQ(lock_.HasSameVersion(version), lock_type != kXLock);
 
     t_.join();
 
-    ASSERT_EQ(lock_.CheckVersion(version), lock_type != kXLock);
+    ASSERT_EQ(lock_.HasSameVersion(version), lock_type != kXLock);
   }
 
   void
@@ -86,13 +86,13 @@ class OptimisticLockFixture : public ::testing::Test
     GetLock(lock_type);
     TryLock(kXLock, expected_rc);
     if (((lock_type == kSLock) || (lock_type == kSIXLock))) {
-      ASSERT_TRUE(lock_.CheckVersion(version));
+      ASSERT_TRUE(lock_.HasSameVersion(version));
     }
     ReleaseLock(lock_type);
 
     t_.join();
 
-    ASSERT_FALSE(lock_.CheckVersion(version));
+    ASSERT_FALSE(lock_.HasSameVersion(version));
   }
 
   void
@@ -106,11 +106,11 @@ class OptimisticLockFixture : public ::testing::Test
     TryLock(kSIXLock, expected_rc);
     ReleaseLock(lock_type);
 
-    ASSERT_EQ(lock_.CheckVersion(version), lock_type != kXLock);
+    ASSERT_EQ(lock_.HasSameVersion(version), lock_type != kXLock);
 
     t_.join();
 
-    ASSERT_EQ(lock_.CheckVersion(version), lock_type != kXLock);
+    ASSERT_EQ(lock_.HasSameVersion(version), lock_type != kXLock);
   }
 
   void
@@ -121,7 +121,7 @@ class OptimisticLockFixture : public ::testing::Test
     lock_.LockX();
     lock_.DowngradeToSIX();
 
-    ASSERT_FALSE(lock_.CheckVersion(version));
+    ASSERT_FALSE(lock_.HasSameVersion(version));
 
     switch (lock_type) {
       case kSLock:
@@ -157,12 +157,12 @@ class OptimisticLockFixture : public ::testing::Test
     ReleaseLock(lock_type);
 
     if (lock_type == kSLock) {
-      ASSERT_TRUE(lock_.CheckVersion(version));
+      ASSERT_TRUE(lock_.HasSameVersion(version));
     }
 
     t_.join();
 
-    ASSERT_FALSE(lock_.CheckVersion(version));
+    ASSERT_FALSE(lock_.HasSameVersion(version));
   }
 
   void
@@ -186,13 +186,13 @@ class OptimisticLockFixture : public ::testing::Test
       t.join();
     }
 
-    ASSERT_TRUE(lock_.CheckVersion(version));
+    ASSERT_TRUE(lock_.HasSameVersion(version));
 
     TryLock(kXLock, kExpectSucceed);
 
     t_.join();
 
-    ASSERT_FALSE(lock_.CheckVersion(version));
+    ASSERT_FALSE(lock_.HasSameVersion(version));
   }
 
   void
@@ -231,7 +231,7 @@ class OptimisticLockFixture : public ::testing::Test
     lock_.LockS();
     ASSERT_EQ(counter_, kThreadNum * kWriteNumPerThread);
     lock_.UnlockS();
-    ASSERT_FALSE(lock_.CheckVersion(version));
+    ASSERT_FALSE(lock_.HasSameVersion(version));
   }
 
   /*####################################################################################

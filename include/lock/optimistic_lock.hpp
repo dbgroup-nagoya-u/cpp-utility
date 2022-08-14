@@ -74,8 +74,8 @@ class OptimisticLock
    * @retval true if the given version value is the same as a current one.
    * @retval false otherwise.
    */
-  auto
-  CheckVersion(const uint64_t expected) const  //
+  [[nodiscard]] auto
+  HasSameVersion(const uint64_t expected) const  //
       -> bool
   {
     const auto desired = lock_.load(std::memory_order_relaxed) & kSIXAndSBitsMask;
@@ -240,25 +240,25 @@ class OptimisticLock
   static constexpr uint64_t kSLock = 0b001UL;
 
   /// a lock status for exclusive locks.
-  static constexpr uint64_t kXLock = 0b010UL << 16;
+  static constexpr uint64_t kXLock = 0b010UL << 16UL;
 
   /// a lock status for shared locks with intent-exclusive locks.
-  static constexpr uint64_t kSIXLock = 0b001UL << 16;
+  static constexpr uint64_t kSIXLock = 0b001UL << 16UL;
 
   /// a bit mask for removing an X-lock flag.
-  static constexpr uint64_t kSBitsMask = (~0UL) << 16;
+  static constexpr uint64_t kSBitsMask = (~0UL) << 16UL;
 
   /// a bit mask for removing an X-lock flag.
-  static constexpr uint64_t kXBitMask = ~(0b010UL << 16);
+  static constexpr uint64_t kXBitMask = ~(0b010UL << 16UL);
 
   /// a bit mask for removing SIX/X-lock flags.
-  static constexpr uint64_t kXAndSIXBitsMask = ~(0b011UL << 16);
+  static constexpr uint64_t kXAndSIXBitsMask = ~(0b011UL << 16UL);
 
   /// a bit mask for removing S/SIX-lock flags.
-  static constexpr uint64_t kSIXAndSBitsMask = (~0UL) << 17;
+  static constexpr uint64_t kSIXAndSBitsMask = (~0UL) << 17UL;
 
   /// a bit mask for removing S/SIX/X-lock flags.
-  static constexpr uint64_t kAllBitsMask = (~0UL) << 18;
+  static constexpr uint64_t kAllBitsMask = (~0UL) << 18UL;
 
   /// the maximum number of retries for preventing busy loops.
   static constexpr size_t kRetryNum = 10UL;
