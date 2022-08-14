@@ -75,7 +75,7 @@ class OptimisticLock
    * @retval false otherwise.
    */
   auto
-  CheckVersion(const uint64_t expected) const  //
+  HasSameVersion(const uint64_t expected) const  //
       -> bool
   {
     const auto desired = lock_.load(std::memory_order_relaxed) & kSIXAndSBitsMask;
