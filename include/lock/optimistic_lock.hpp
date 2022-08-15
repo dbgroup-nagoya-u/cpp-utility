@@ -57,12 +57,12 @@ class OptimisticLock
       -> uint64_t
   {
     while (true) {
-      auto expected = lock_.load(std::memory_order_acquire);
-      for (size_t i = 0; i < kRetryNum; ++i) {
+      for (size_t i = 1; true; ++i) {
+        const auto expected = lock_.load(std::memory_order_acquire);
         if ((expected & kXLock) == 0) return expected & kAllBitsMask;
+        if (i >= kRetryNum) break;
 
         CPP_UTILITY_SPINLOCK_HINT
-        expected = lock_.load(std::memory_order_acquire);
       }
 
       std::this_thread::sleep_for(kShortSleep);
@@ -94,10 +94,11 @@ class OptimisticLock
     while (true) {
       auto expected = lock_.load(std::memory_order_relaxed) & kXBitMask;
       auto desired = expected + kSLock;  // increment read-counter
-      for (size_t i = 0; i < kRetryNum; ++i) {
+      for (size_t i = 1; true; ++i) {
         const auto cas_success = lock_.compare_exchange_weak(
             expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
         if (cas_success) return;
+        if (i >= kRetryNum) break;
 
         expected &= kXBitMask;
         desired = expected + kSLock;
@@ -134,14 +135,15 @@ class OptimisticLock
   {
     while (true) {
       auto expected = lock_.load(std::memory_order_relaxed) & kAllBitsMask;
-      auto desired = expected + kXLock;
-      for (size_t i = 0; i < kRetryNum; ++i) {
+      auto desired = expected | kXLock;
+      for (size_t i = 1; true; ++i) {
         const auto cas_success = lock_.compare_exchange_weak(
             expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
         if (cas_success) return;
+        if (i >= kRetryNum) break;
 
         expected &= kAllBitsMask;
-        desired = expected + kXLock;
+        desired = expected | kXLock;
         CPP_UTILITY_SPINLOCK_HINT
       }
 
@@ -181,14 +183,15 @@ class OptimisticLock
   {
     while (true) {
       auto expected = lock_.load(std::memory_order_relaxed) & kXAndSIXBitsMask;
-      auto desired = expected + kSIXLock;
-      for (size_t i = 0; i < kRetryNum; ++i) {
+      auto desired = expected | kSIXLock;
+      for (size_t i = 1; true; ++i) {
         const auto cas_success = lock_.compare_exchange_weak(
             expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
         if (cas_success) return;
+        if (i >= kRetryNum) break;
 
         expected &= kXAndSIXBitsMask;
-        desired = expected + kSIXLock;
+        desired = expected | kSIXLock;
         CPP_UTILITY_SPINLOCK_HINT
       }
 
@@ -205,17 +208,17 @@ class OptimisticLock
   void
   UpgradeToX()
   {
-    auto expected = lock_.load(std::memory_order_relaxed) & kSBitsMask;
-    auto desired = expected + kSIXLock;
+    const auto expected = lock_.load(std::memory_order_relaxed) & kSBitsMask;
+    const auto desired = expected + kSIXLock;
     while (true) {
-      for (size_t i = 0; i < kRetryNum; ++i) {
-        const auto cas_success =
-            lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed);
-        if (cas_success) return;
+      for (size_t i = 1; true; ++i) {
+        auto tmp_exp = expected;
+        if (lock_.compare_exchange_weak(tmp_exp, desired, std::memory_order_relaxed)) return;
+        if (i >= kRetryNum) break;
 
-        expected &= kSBitsMask;
         CPP_UTILITY_SPINLOCK_HINT
       }
+
       std::this_thread::sleep_for(kShortSleep);
     }
   }

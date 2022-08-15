@@ -154,11 +154,10 @@ class OptimisticLockFixture : public ::testing::Test
     lock_.LockSIX();  // this lock is going to be released in TryUpgrade
     GetLock(lock_type);
     TryUpgrade(expected_rc);
-    ReleaseLock(lock_type);
-
     if (lock_type == kSLock) {
       ASSERT_TRUE(lock_.HasSameVersion(version));
     }
+    ReleaseLock(lock_type);
 
     t_.join();
 
