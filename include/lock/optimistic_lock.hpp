@@ -229,6 +229,35 @@ class OptimisticLock
   }
 
   /**
+   * @brief Get a shared lock with an intent-exclusive lock if version is same.
+   *
+   * @param ver an expected version value (turned off by kSIXAndSBitsMask).
+   * @retval true if the given version value is the same as a current one.
+   * @retval false otherwise.
+   */
+  [[nodiscard]] auto
+  TryLockSIX(const uint64_t ver)  //
+      -> bool
+  {
+    auto expected = ver | (lock_.load(std::memory_order_relaxed) & ~kSBitsMask);
+    const auto desired = expected | kSIXLock;
+    while (true) {
+      for (size_t i = 1; true; ++i) {
+        const auto cas_success = lock_.compare_exchange_weak(
+            expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
+        if (cas_success) return true;
+        if ((expected & kSIXAndSBitsMask) != ver) return false;
+        if (i >= kRetryNum) break;
+
+        expected = ver;
+        CPP_UTILITY_SPINLOCK_HINT
+      }
+
+      std::this_thread::sleep_for(kShortSleep);
+    }
+  }
+
+  /**
    * @brief Upgrade an SIX lock to an X lock.
    *
    * NOTE: if a thread that does not have a shared lock with an intent-exclusive lock
@@ -281,7 +310,7 @@ class OptimisticLock
   /// a lock status for shared locks with intent-exclusive locks.
   static constexpr uint64_t kSIXLock = 0b001UL << 16UL;
 
-  /// a bit mask for removing an X-lock flag.
+  /// a bit mask for removing an S-lock flag.
   static constexpr uint64_t kSBitsMask = (~0UL) << 16UL;
 
   /// a bit mask for removing an X-lock flag.
