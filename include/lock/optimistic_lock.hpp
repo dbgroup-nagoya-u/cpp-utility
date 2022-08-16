@@ -152,6 +152,24 @@ class OptimisticLock
   }
 
   /**
+   * @brief Get an exclusive lock if version is same.
+   *
+   * @param ver an expected version value (turned off by kSIXAndSBitsMask).
+   * @retval true if the given version value is the same as a current one.
+   * @retval false otherwise.
+   */
+  [[nodiscard]] auto
+  TryLockX(const uint64_t ver)  //
+      -> bool
+  {
+    auto expected = ver;
+    const auto desired = (lock_.load(std::memory_order_relaxed) & kAllBitsMask) | kXLock;
+    const auto cas_success = lock_.compare_exchange_weak(
+        expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
+    return cas_success;
+  }
+
+  /**
    * @brief Downgrade an X lock to an SIX lock.
    *
    * NOTE: if a thread that does not have an exclusive lock calls this function, it will

@@ -88,6 +88,9 @@ class OptimisticLockFixture : public ::testing::Test
     if (((lock_type == kSLock) || (lock_type == kSIXLock))) {
       ASSERT_TRUE(lock_.HasSameVersion(version));
     }
+    if (lock_type != kFree) {
+      ASSERT_FALSE(lock_.TryLockX(version));
+    }
     ReleaseLock(lock_type);
 
     t_.join();
