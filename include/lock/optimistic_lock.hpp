@@ -240,7 +240,7 @@ class OptimisticLock
       -> bool
   {
     auto expected = ver | (lock_.load(std::memory_order_relaxed) & ~kSBitsMask);
-    const auto desired = expected | kSIXLock;
+    auto desired = expected | kSIXLock;
     while (true) {
       for (size_t i = 1; true; ++i) {
         if (lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed)) return true;
@@ -303,13 +303,13 @@ class OptimisticLock
   /// a lock status for shared locks.
   static constexpr uint64_t kSLock = 0b001UL;
 
-  /// a lock status for exclusive locks.
+  /// a lock status for exclusive lock.
   static constexpr uint64_t kXLock = 0b010UL << 16UL;
 
-  /// a lock status for shared locks with intent-exclusive locks.
+  /// a lock status for shared locks with intent-exclusive lock.
   static constexpr uint64_t kSIXLock = 0b001UL << 16UL;
 
-  /// a bit mask for removing an S-lock flag.
+  /// a bit mask for removing an S-lock flags.
   static constexpr uint64_t kSBitsMask = (~0UL) << 16UL;
 
   /// a bit mask for removing an X-lock flag.
