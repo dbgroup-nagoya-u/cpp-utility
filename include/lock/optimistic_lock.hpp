@@ -247,7 +247,8 @@ class OptimisticLock
         if ((expected & kSIXAndSBitsMask) != ver) return false;
         if (i >= kRetryNum) break;
 
-        expected = ver;
+        expected &= ~kSIXLock;
+        desired = expected | kSIXLock;
         CPP_UTILITY_SPINLOCK_HINT
       }
 
