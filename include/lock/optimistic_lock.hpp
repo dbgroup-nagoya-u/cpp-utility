@@ -163,10 +163,21 @@ class OptimisticLock
       -> bool
   {
     auto expected = ver;
-    const auto desired = (lock_.load(std::memory_order_relaxed) & kAllBitsMask) | kXLock;
-    const auto cas_success = lock_.compare_exchange_weak(
-        expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
-    return cas_success;
+    const auto desired = ver | kXLock;
+    while (true) {
+      for (size_t i = 1; true; ++i) {
+        const auto cas_success = lock_.compare_exchange_weak(
+            expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
+        if (cas_success) return true;
+        if ((expected & kSIXAndSBitsMask) != ver) return false;
+        if (i >= kRetryNum) break;
+
+        expected = ver;
+        CPP_UTILITY_SPINLOCK_HINT
+      }
+
+      std::this_thread::sleep_for(kShortSleep);
+    }
   }
 
   /**
