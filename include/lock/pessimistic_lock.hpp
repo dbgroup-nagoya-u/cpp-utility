@@ -83,10 +83,10 @@ class PessimisticLock
   void
   UnlockS()
   {
-    std::atomic_signal_fence(std::memory_order_release);
     auto expected = lock_.load(std::memory_order_relaxed);
-    auto desired = expected - kSLock;  // decrement read-counter
-    while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed)) {
+    auto desired = expected - kSLock;     // decrement read-counter
+    while (!lock_.compare_exchange_weak(  //
+        expected, desired, std::memory_order_release, std::memory_order_relaxed)) {
       desired = expected - kSLock;
       CPP_UTILITY_SPINLOCK_HINT
     }
@@ -174,7 +174,9 @@ class PessimisticLock
     while (true) {
       for (size_t i = 1; true; ++i) {
         auto expected = kSIXLock;
-        if (lock_.compare_exchange_weak(expected, kXLock, std::memory_order_relaxed)) return;
+        const auto cas_success = lock_.compare_exchange_weak(
+            expected, kXLock, std::memory_order_acquire, std::memory_order_relaxed);
+        if (cas_success) return;
         if (i >= kRetryNum) break;
 
         CPP_UTILITY_SPINLOCK_HINT
@@ -191,10 +193,10 @@ class PessimisticLock
   void
   UnlockSIX()
   {
-    std::atomic_signal_fence(std::memory_order_release);
     auto expected = lock_.load(std::memory_order_relaxed);
     auto desired = expected - kSIXLock;
-    while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed)) {
+    while (!lock_.compare_exchange_weak(  //
+        expected, desired, std::memory_order_release, std::memory_order_relaxed)) {
       desired = expected - kSIXLock;
       CPP_UTILITY_SPINLOCK_HINT
     }

@@ -78,7 +78,7 @@ class OptimisticLock
   HasSameVersion(const uint64_t expected) const  //
       -> bool
   {
-    std::atomic_signal_fence(std::memory_order_release);
+    std::atomic_thread_fence(std::memory_order_release);
     const auto desired = lock_.load(std::memory_order_relaxed) & kSIXAndSBitsMask;
     return expected == desired;
   }
@@ -116,10 +116,10 @@ class OptimisticLock
   void
   UnlockS()
   {
-    std::atomic_signal_fence(std::memory_order_release);
     auto expected = lock_.load(std::memory_order_relaxed);
-    auto desired = expected - kSLock;  // decrement read-counter
-    while (!lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed)) {
+    auto desired = expected - kSLock;     // decrement read-counter
+    while (!lock_.compare_exchange_weak(  //
+        expected, desired, std::memory_order_release, std::memory_order_relaxed)) {
       desired = expected - kSLock;
       CPP_UTILITY_SPINLOCK_HINT
     }
@@ -213,7 +213,9 @@ class OptimisticLock
     while (true) {
       for (size_t i = 1; true; ++i) {
         auto tmp_exp = expected;
-        if (lock_.compare_exchange_weak(tmp_exp, desired, std::memory_order_relaxed)) return;
+        const auto cas_success = lock_.compare_exchange_weak(
+            tmp_exp, desired, std::memory_order_acquire, std::memory_order_relaxed);
+        if (cas_success) return;
         if (i >= kRetryNum) break;
 
         CPP_UTILITY_SPINLOCK_HINT
@@ -230,8 +232,7 @@ class OptimisticLock
   void
   UnlockSIX()
   {
-    std::atomic_signal_fence(std::memory_order_release);
-    lock_.fetch_sub(kSIXLock, std::memory_order_relaxed);
+    lock_.fetch_sub(kSIXLock, std::memory_order_release);
   }
 
  private:
