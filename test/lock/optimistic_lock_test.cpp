@@ -68,6 +68,9 @@ class OptimisticLockFixture : public ::testing::Test
 
     GetLock(lock_type);
     TryLock(kSLock, expected_rc);
+    if (lock_type == kXLock) {
+      ASSERT_FALSE(lock_.TryLockS(version));
+    }
     ReleaseLock(lock_type);
 
     ASSERT_EQ(lock_.HasSameVersion(version), lock_type != kXLock);

@@ -110,6 +110,34 @@ class OptimisticLock
   }
 
   /**
+   * @brief Get a shared lock if version is same.
+   *
+   * @param ver an expected version value (turned off by kSIXAndSBitsMask).
+   * @retval true if the given version value is the same as a current one.
+   * @retval false otherwise.
+   */
+  [[nodiscard]] auto
+  TryLockS(const uint64_t ver)  //
+      -> bool
+  {
+    auto expected = ver | (lock_.load(std::memory_order_relaxed) & ~kSIXAndSBitsMask);
+    auto desired = ver + kSLock;
+    while (true) {
+      for (size_t i = 1; true; ++i) {
+        if (lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed)) return true;
+        if ((expected & kSIXAndSBitsMask) != ver) return false;
+        if (i >= kRetryNum) break;
+
+        desired = expected + kSLock;
+
+        CPP_UTILITY_SPINLOCK_HINT
+      }
+
+      std::this_thread::sleep_for(kShortSleep);
+    }
+  }
+
+  /**
    * @brief Release a shared lock.
    *
    */
