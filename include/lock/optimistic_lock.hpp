@@ -243,9 +243,7 @@ class OptimisticLock
     const auto desired = expected | kSIXLock;
     while (true) {
       for (size_t i = 1; true; ++i) {
-        const auto cas_success = lock_.compare_exchange_weak(
-            expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
-        if (cas_success) return true;
+        if (lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed)) return true;
         if ((expected & kSIXAndSBitsMask) != ver) return false;
         if (i >= kRetryNum) break;
 
