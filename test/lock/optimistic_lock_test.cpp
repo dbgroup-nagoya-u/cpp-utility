@@ -68,6 +68,9 @@ class OptimisticLockFixture : public ::testing::Test
 
     GetLock(lock_type);
     TryLock(kSLock, expected_rc);
+    if (lock_type == kXLock) {
+      ASSERT_FALSE(lock_.TryLockS(version));
+    }
     ReleaseLock(lock_type);
 
     ASSERT_EQ(lock_.HasSameVersion(version), lock_type != kXLock);
@@ -88,6 +91,9 @@ class OptimisticLockFixture : public ::testing::Test
     if (((lock_type == kSLock) || (lock_type == kSIXLock))) {
       ASSERT_TRUE(lock_.HasSameVersion(version));
     }
+    if (lock_type == kXLock) {
+      ASSERT_FALSE(lock_.TryLockX(version));
+    }
     ReleaseLock(lock_type);
 
     t_.join();
@@ -104,6 +110,9 @@ class OptimisticLockFixture : public ::testing::Test
 
     GetLock(lock_type);
     TryLock(kSIXLock, expected_rc);
+    if (lock_type == kXLock) {
+      ASSERT_FALSE(lock_.TryLockSIX(version));
+    }
     ReleaseLock(lock_type);
 
     ASSERT_EQ(lock_.HasSameVersion(version), lock_type != kXLock);
