@@ -129,7 +129,6 @@ class OptimisticLock
         if (i >= kRetryNum) break;
 
         desired = expected + kSLock;
-
         CPP_UTILITY_SPINLOCK_HINT
       }
 
