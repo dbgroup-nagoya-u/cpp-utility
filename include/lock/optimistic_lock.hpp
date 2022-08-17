@@ -120,9 +120,9 @@ class OptimisticLock
   TryLockS(const uint64_t ver)  //
       -> bool
   {
-    auto expected = ver | (lock_.load(std::memory_order_relaxed) & ~kSIXAndSBitsMask);
-    auto desired = ver + kSLock;
     while (true) {
+      auto expected = ver | (lock_.load(std::memory_order_relaxed) & ~kSIXAndSBitsMask);
+      auto desired = expected + kSLock;
       for (size_t i = 1; true; ++i) {
         if (lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed)) return true;
         if ((expected & kSIXAndSBitsMask) != ver) return false;
@@ -189,17 +189,16 @@ class OptimisticLock
   TryLockX(const uint64_t ver)  //
       -> bool
   {
-    auto expected = ver;
     const auto desired = ver | kXLock;
     while (true) {
       for (size_t i = 1; true; ++i) {
+        auto expected = ver;
         const auto cas_success = lock_.compare_exchange_weak(
             expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
         if (cas_success) return true;
         if ((expected & kSIXAndSBitsMask) != ver) return false;
         if (i >= kRetryNum) break;
 
-        expected = ver;
         CPP_UTILITY_SPINLOCK_HINT
       }
 
@@ -266,9 +265,9 @@ class OptimisticLock
   TryLockSIX(const uint64_t ver)  //
       -> bool
   {
-    auto expected = ver | (lock_.load(std::memory_order_relaxed) & ~kSBitsMask);
-    auto desired = expected | kSIXLock;
     while (true) {
+      auto expected = ver | (lock_.load(std::memory_order_relaxed) & ~kSBitsMask);
+      auto desired = expected | kSIXLock;
       for (size_t i = 1; true; ++i) {
         if (lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed)) return true;
         if ((expected & kSIXAndSBitsMask) != ver) return false;
