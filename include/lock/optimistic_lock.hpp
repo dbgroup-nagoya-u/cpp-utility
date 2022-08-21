@@ -209,23 +209,30 @@ class OptimisticLock
   /**
    * @brief Downgrade an X lock to an SIX lock.
    *
+   * @retval version value after downgrade from an X lock to an SIX lock.
+   *
    * NOTE: if a thread that does not have an exclusive lock calls this function, it will
    * corrupt an internal lock status.
    */
-  void
-  DowngradeToSIX()
+  auto
+  DowngradeToSIX()  //
+      -> uint64_t
   {
-    lock_.fetch_add(kXLock + kSIXLock, std::memory_order_release);
+    const auto old_ver = lock_.fetch_add(kXLock + kSIXLock, std::memory_order_release);
+    return (old_ver + kXLock + kSIXLock) & kAllBitsMask;
   }
 
   /**
    * @brief Release an exclusive lock.
    *
+   * @retval version value after an exclusive lock release.
    */
-  void
-  UnlockX()
+  auto
+  UnlockX()  //
+      -> uint64_t
   {
-    lock_.fetch_add(kXLock, std::memory_order_release);
+    const auto old_ver = lock_.fetch_add(kXLock, std::memory_order_release);
+    return (old_ver + kXLock) & kAllBitsMask;
   }
 
   /**
