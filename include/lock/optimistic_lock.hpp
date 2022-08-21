@@ -218,8 +218,8 @@ class OptimisticLock
   DowngradeToSIX()  //
       -> uint64_t
   {
-    return (lock_.fetch_add(kXLock + kSIXLock, std::memory_order_release) + kXLock + kSIXLock)
-           & kAllBitsMask;
+    const auto old_ver = lock_.fetch_add(kXLock + kSIXLock, std::memory_order_release);
+    return (old_ver + kXLock + kSIXLock) & kAllBitsMask;
   }
 
   /**
