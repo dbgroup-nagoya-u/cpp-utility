@@ -231,7 +231,8 @@ class OptimisticLock
   UnlockX()  //
       -> uint64_t
   {
-    return (lock_.fetch_add(kXLock, std::memory_order_release) + kXLock) & kAllBitsMask;
+    const auto old_ver = lock_.fetch_add(kXLock, std::memory_order_release);
+    return (old_ver + kXLock) & kAllBitsMask;
   }
 
   /**
