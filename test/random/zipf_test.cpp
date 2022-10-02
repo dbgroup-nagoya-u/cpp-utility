@@ -32,9 +32,9 @@ namespace dbgroup::random::test
 
 constexpr size_t kSkew = 1.0;
 constexpr size_t kRepeatNum = 1e6;
-constexpr double kAllowableError = 0.015;
+constexpr double kAllowableError = 0.01;
 constexpr size_t kAlphaUnitUL = 10;
-constexpr size_t kMaxAlphaUL = 10;
+constexpr size_t kMaxAlphaUL = 30;
 
 template <class IntType>
 class ZipfDistributionFixture : public ::testing::Test
