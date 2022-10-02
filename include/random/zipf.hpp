@@ -17,6 +17,7 @@
 #ifndef CPP_UTILITY_RANDOM_ZIPF_HPP
 #define CPP_UTILITY_RANDOM_ZIPF_HPP
 
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
@@ -209,7 +210,7 @@ class ApproxZipfDistribution
    *
    * This always returns zero.
    */
-  constexpr ApproxZipfDistribution() = default;
+  ApproxZipfDistribution() { UpdateCDF(); }
 
   /**
    * @brief Construct a new Zipf distribution with given parameters.
@@ -225,14 +226,19 @@ class ApproxZipfDistribution
       const IntType min,
       const IntType max,
       const double alpha)
-      : min_{min}, max_{max}, alpha_{alpha}, n_{max_ - min_ + 1}, pow_{1.0 - alpha_}
+      : min_{min},
+        max_{max},
+        alpha_{alpha},
+        n_{max_ - min_ + 1},
+        pow_{1.0 - alpha_},
+        denom_{GetHarmonicNum(n_)}
   {
     if (max < min) {
       std::string err_msg = "ERROR: the maximum value must be greater than the minimum one.";
       throw std::runtime_error{err_msg};
     }
 
-    denom_ = GetHarmonicNum(n_);
+    UpdateCDF();
   }
 
   constexpr ApproxZipfDistribution(const ApproxZipfDistribution &) = default;
@@ -259,6 +265,7 @@ class ApproxZipfDistribution
   GetCDF(const IntType id) const  //
       -> double
   {
+    if (id < kExactBinNum) return zipf_cdf_.at(id);
     return GetHarmonicNum(id + 1) / denom_;
   }
 
@@ -302,8 +309,65 @@ class ApproxZipfDistribution
 
  private:
   /*####################################################################################
+   * Internal constants
+   *##################################################################################*/
+
+  static constexpr int64_t kExactBinNum = 100;
+
+  /*####################################################################################
    * Internal utility functions
    *##################################################################################*/
+
+  /**
+   * @brief Compute CDF values for this Zipf distribution.
+   */
+  void
+  UpdateCDF()
+  {
+    if (n_ <= 1) {
+      zipf_cdf_ = {1.0};
+      return;
+    }
+
+    if (n_ <= kExactBinNum) {
+      // compute a base probability exactly
+      auto base_prob = 0.0;
+      for (IntType i = 1; i < n_ + 1; ++i) {
+        base_prob += 1.0 / pow(i, alpha_);
+      }
+      base_prob = 1.0 / base_prob;
+
+      // create an exact CDF according to Zipf's law
+      zipf_cdf_.at(0) = base_prob;
+      for (IntType i = 1; i < kExactBinNum; ++i) {
+        const auto ith_prob = zipf_cdf_.at(i - 1) + base_prob / pow(i + 1, alpha_);
+        zipf_cdf_.at(i) = ith_prob;
+      }
+      zipf_cdf_.at(n_ - 1) = 1.0;
+    } else {
+      // compute a base probability approximately
+      constexpr size_t kSkipSize = 100;
+      auto base_prob = 0.0;
+      IntType i = 1;
+      while (i < kExactBinNum + 1) {  // compute exact values
+        base_prob += 1.0 / pow(i++, alpha_);
+      }
+      while (i < n_ + 1) {  // compute approximate values
+        const auto low = 1.0 / pow(i, alpha_);
+        i += kSkipSize;
+        const auto high = 1.0 / pow(i, alpha_);
+        base_prob += (low + high) * kSkipSize / 2;
+      }
+      base_prob = 1.0 / base_prob;
+
+      // create a CDF according to Zipf's law
+      zipf_cdf_.at(0) = base_prob;
+      for (IntType j = 1; j < kExactBinNum; ++j) {
+        const auto ith_prob = zipf_cdf_.at(j - 1) + base_prob / pow(j + 1, alpha_);
+        zipf_cdf_.at(j) = ith_prob;
+      }
+    }
+  }
 
   /**
    * @param n the number of partial elements in the p-serires.
@@ -338,6 +402,9 @@ class ApproxZipfDistribution
 
   /// equal to `GetHarmonicNum(n_)`.
   double denom_{1.0};
+
+  /// a cumulative distribution function according to Zipf's law.
+  std::array<double, kExactBinNum> zipf_cdf_{};
 };
 
 }  // namespace dbgroup::random
