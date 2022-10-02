@@ -15,4 +15,6 @@ For example, the maximum error of CDFs between `ApproxZipfDistribution<IntType> 
 
 <img src="figures/comparison_exact_approx_zipf.svg" width="540px">
 
+Thus, we prepare partial CDFs for large skew parameters. In our implementation, we compute approximate CDFs with $k < 100$ and use them for corresponding queries. If CDF values with $k \geq 100$ are required, we use Chlebus's approximate formula.
+
 [^1]: [Edward Chlebus, "An approximate formula for a partial sum of the divergent p-series," Applied Mathematics Letters, Vol. 22, No. 5, pp. 732-737, 2009.](https://doi.org/10.1016/j.aml.2008.07.007)
