@@ -124,7 +124,7 @@ class OptimisticLock
       for (size_t i = 1; true; ++i) {
         auto expected = lock_.load(std::memory_order_relaxed);
         if (!(expected & (~kXBitMask))) {
-          expected = (lock_.load(std::memory_order_relaxed) & ~kSIXAndSBitsMask) | ver;
+          expected = (expected & ~kSIXAndSBitsMask) | ver;
           auto desired = expected + kSLock;
 
           if (lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed))
