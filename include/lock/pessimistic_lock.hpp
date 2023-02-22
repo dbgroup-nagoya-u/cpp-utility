@@ -59,16 +59,16 @@ class PessimisticLock
   LockS()
   {
     while (true) {
-      auto expected = lock_.load(std::memory_order_relaxed) & kSLockMask;
-      auto desired = expected + kSLock;  // increment read-counter
       for (size_t i = 1; true; ++i) {
-        const auto cas_success = lock_.compare_exchange_weak(
-            expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
-        if (cas_success) return;
+        auto expected = lock_.load(std::memory_order_relaxed);
+        if (!(expected & (~kSLockMask))) {
+          const auto desired = expected + kSLock;  // increment read-counter
+          const auto cas_success = lock_.compare_exchange_weak(
+              expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
+          if (cas_success) return;
+        }
         if (i >= kRetryNum) break;
 
-        expected &= kSLockMask;
-        desired = expected + kSLock;
         CPP_UTILITY_SPINLOCK_HINT
       }
 
@@ -103,9 +103,11 @@ class PessimisticLock
     while (true) {
       for (size_t i = 1; true; ++i) {
         auto expected = kNoLocks;
-        const auto cas_success = lock_.compare_exchange_weak(
-            expected, kXLock, std::memory_order_acquire, std::memory_order_relaxed);
-        if (cas_success) return;
+        if (!lock_.load(std::memory_order_acquire)) {
+          const auto cas_success = lock_.compare_exchange_weak(
+              expected, kXLock, std::memory_order_acquire, std::memory_order_relaxed);
+          if (cas_success) return;
+        }
         if (i >= kRetryNum) break;
 
         CPP_UTILITY_SPINLOCK_HINT
@@ -146,15 +148,16 @@ class PessimisticLock
   LockSIX()
   {
     while (true) {
-      auto expected = lock_.load(std::memory_order_relaxed) & kSIXLockMask;
-      auto desired = expected | kSIXLock;
-      for (size_t i = 0; i < kRetryNum; ++i) {
-        const auto cas_success = lock_.compare_exchange_weak(
-            expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
-        if (cas_success) return;
+      for (size_t i = 1; true; ++i) {
+        auto expected = lock_.load(std::memory_order_relaxed);
+        if (!(expected & (~kSIXLockMask))) {
+          const auto desired = expected | kSIXLock;
+          const auto cas_success = lock_.compare_exchange_weak(
+              expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
+          if (cas_success) return;
+        }
+        if (i >= kRetryNum) break;
 
-        expected &= kSIXLockMask;
-        desired = expected | kSIXLock;
         CPP_UTILITY_SPINLOCK_HINT
       }
 
@@ -174,9 +177,11 @@ class PessimisticLock
     while (true) {
       for (size_t i = 1; true; ++i) {
         auto expected = kSIXLock;
-        const auto cas_success = lock_.compare_exchange_weak(
-            expected, kXLock, std::memory_order_acquire, std::memory_order_relaxed);
-        if (cas_success) return;
+        if (!(lock_.load(std::memory_order_acquire) & (~kSIXLock))) {
+          const auto cas_success = lock_.compare_exchange_weak(
+              expected, kXLock, std::memory_order_acquire, std::memory_order_relaxed);
+          if (cas_success) return;
+        }
         if (i >= kRetryNum) break;
 
         CPP_UTILITY_SPINLOCK_HINT
