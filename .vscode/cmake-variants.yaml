@@ -9,8 +9,8 @@ buildType:
       settings:
         CMAKE_CXX_CLANG_TIDY: "clang-tidy"
         CPP_UTILITY_BUILD_TESTS: ON
-        CPP_UTILITY_TEST_THREAD_NUM: 8
-        CPP_UTILITY_TEST_RANDOM_SEED: 0
+        DBGROUP_TEST_THREAD_NUM: 8
+        DBGROUP_TEST_RANDOM_SEED: 0
     relWithDebInfo:
       short: RelWithDebInfo
       long: Perform optimizations and include debugging informatin
@@ -18,8 +18,8 @@ buildType:
       settings:
         CMAKE_CXX_CLANG_TIDY: "clang-tidy"
         CPP_UTILITY_BUILD_TESTS: ON
-        CPP_UTILITY_TEST_THREAD_NUM: 8
-        CPP_UTILITY_TEST_RANDOM_SEED: 0
+        DBGROUP_TEST_THREAD_NUM: 8
+        DBGROUP_TEST_RANDOM_SEED: 0
     release:
       short: Release
       long: Perform optimizations and omit debugging informatin
@@ -27,5 +27,5 @@ buildType:
       settings:
         CMAKE_CXX_CLANG_TIDY: "clang-tidy"
         CPP_UTILITY_BUILD_TESTS: ON
-        CPP_UTILITY_TEST_THREAD_NUM: 8
-        CPP_UTILITY_TEST_RANDOM_SEED: 0
+        DBGROUP_TEST_THREAD_NUM: 8
+        DBGROUP_TEST_RANDOM_SEED: 0

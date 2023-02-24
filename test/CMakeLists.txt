@@ -2,73 +2,59 @@
 # Configure GoogleTest
 #--------------------------------------------------------------------------------------#
 
-configure_file(CMakeLists-googletest.txt.in googletest-download/CMakeLists.txt)
-execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-  RESULT_VARIABLE result
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/googletest-download )
-if(result)
-  message(FATAL_ERROR "CMake step for googletest failed: ${result}")
-endif()
-execute_process(COMMAND ${CMAKE_COMMAND} --build .
-  RESULT_VARIABLE result
-  WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/googletest-download )
-if(result)
-  message(FATAL_ERROR "Build step for googletest failed: ${result}")
-endif()
-
-# Prevent overriding the parent project's compiler/linker
-# settings on Windows
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-
-# Add googletest directly to our build. This defines
-# the gtest and gtest_main targets.
-add_subdirectory(${CMAKE_CURRENT_BINARY_DIR}/googletest-src
-                 ${CMAKE_CURRENT_BINARY_DIR}/googletest-build
-                 EXCLUDE_FROM_ALL)
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  GIT_REPOSITORY "https://github.com/google/googletest.git"
+  GIT_TAG "58d77fa8070e8cec2dc1ed015d66b454c8d78850" # v1.12.1
+)
+FetchContent_MakeAvailable(googletest)
 
 #--------------------------------------------------------------------------------------#
 # Configurations for testing
 #--------------------------------------------------------------------------------------#
 
-set(CPP_UTILITY_TEST_THREAD_NUM "8" CACHE STRING "The number of worker threads for testing.")
-set(CPP_UTILITY_TEST_RANDOM_SEED "0" CACHE STRING "A fixed seed value to reproduce unit tests.")
+set(DBGROUP_TEST_THREAD_NUM "8" CACHE STRING "The number of worker threads for testing.")
+set(DBGROUP_TEST_RANDOM_SEED "0" CACHE STRING "A fixed seed value to reproduce unit tests.")
 
 #--------------------------------------------------------------------------------------#
 # Build unit tests
 #--------------------------------------------------------------------------------------#
 
+# unit tests use multi-threads
+find_package(Threads)
+
 # define function to add unit tests in the same format
-function(ADD_CPP_UTILITY_TEST CPP_UTILITY_TARGET_DIR CPP_UTILITY_TEST_TARGET)
-  add_executable(${CPP_UTILITY_TEST_TARGET}
-    "${CMAKE_CURRENT_SOURCE_DIR}/${CPP_UTILITY_TARGET_DIR}/${CPP_UTILITY_TEST_TARGET}.cpp"
+function(ADD_DBGROUP_TEST DBGROUP_TEST_TARGET)
+  add_executable(${DBGROUP_TEST_TARGET}
+    "${CMAKE_CURRENT_SOURCE_DIR}/${DBGROUP_TEST_TARGET}.cpp"
   )
-  target_compile_features(${CPP_UTILITY_TEST_TARGET} PRIVATE
+  target_compile_features(${DBGROUP_TEST_TARGET} PRIVATE
     "cxx_std_17"
   )
-  target_compile_options(${CPP_UTILITY_TEST_TARGET} PRIVATE
+  target_compile_options(${DBGROUP_TEST_TARGET} PRIVATE
     -Wall
     -Wextra
     $<$<STREQUAL:${CMAKE_BUILD_TYPE},"Release">:"-O2 -march=native">
     $<$<STREQUAL:${CMAKE_BUILD_TYPE},"RelWithDebInfo">:"-g3 -Og -pg">
     $<$<STREQUAL:${CMAKE_BUILD_TYPE},"Debug">:"-g3 -O0 -pg">
   )
-  target_include_directories(${CPP_UTILITY_TEST_TARGET} PRIVATE
-    "${CPP_UTILITY_SOURCE_DIR}/test"
+  target_include_directories(${DBGROUP_TEST_TARGET} PRIVATE
+    "${PROJECT_SOURCE_DIR}/test"
   )
-  target_compile_definitions(${CPP_UTILITY_TEST_TARGET} PRIVATE
-    CPP_UTILITY_TEST_THREAD_NUM=${CPP_UTILITY_TEST_THREAD_NUM}
-    CPP_UTILITY_TEST_RANDOM_SEED=${CPP_UTILITY_TEST_RANDOM_SEED}
+  target_compile_definitions(${DBGROUP_TEST_TARGET} PRIVATE
+    DBGROUP_TEST_THREAD_NUM=${DBGROUP_TEST_THREAD_NUM}
+    DBGROUP_TEST_RANDOM_SEED=${DBGROUP_TEST_RANDOM_SEED}
   )
-  target_link_libraries(${CPP_UTILITY_TEST_TARGET} PRIVATE
+  target_link_libraries(${DBGROUP_TEST_TARGET} PRIVATE
     cpp_utility
-    gtest_main
-    pthread
+    GTest::gtest_main
+    Threads::Threads
   )
 
-  add_test(NAME ${CPP_UTILITY_TEST_TARGET} COMMAND $<TARGET_FILE:${CPP_UTILITY_TEST_TARGET}>)
+  add_test(NAME ${DBGROUP_TEST_TARGET} COMMAND $<TARGET_FILE:${DBGROUP_TEST_TARGET}>)
 endfunction()
 
 # add unit tests to build targets
-ADD_CPP_UTILITY_TEST("random" "zipf_test")
-ADD_CPP_UTILITY_TEST("lock" "pessimistic_lock_test")
-ADD_CPP_UTILITY_TEST("lock" "optimistic_lock_test")
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/lock")
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/random")

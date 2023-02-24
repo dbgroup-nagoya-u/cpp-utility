@@ -7,7 +7,7 @@ endif()
 
 # project information
 project(cpp_utility
-  VERSION "0.2.1"
+  VERSION "0.3.0"
   DESCRIPTION "An open-source C++ utility library for reseach use."
   LANGUAGES "CXX"
 )
@@ -23,17 +23,17 @@ CHECK_INCLUDE_FILE_CXX("xmmintrin.h" CPP_UTILITY_HAS_SPINLOCK_HINT)
 # Build targets
 #--------------------------------------------------------------------------------------#
 
-if(NOT TARGET cpp_utility::cpp_utility)
+if(NOT TARGET dbgroup::${PROJECT_NAME})
   # build as a header-only library
-  add_library(cpp_utility INTERFACE)
-  add_library(cpp_utility::cpp_utility ALIAS cpp_utility)
-  target_compile_features(cpp_utility INTERFACE
+  add_library(${PROJECT_NAME} INTERFACE)
+  add_library(dbgroup::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
+  target_compile_features(${PROJECT_NAME} INTERFACE
     "cxx_std_17"
   )
-  target_include_directories(cpp_utility INTERFACE
+  target_include_directories(${PROJECT_NAME} INTERFACE
     "${CPP_UTILITY_SOURCE_DIR}/include"
   )
-  target_compile_definitions(cpp_utility INTERFACE
+  target_compile_definitions(${PROJECT_NAME} INTERFACE
     $<$<BOOL:${CPP_UTILITY_HAS_SPINLOCK_HINT}>:CPP_UTILITY_HAS_SPINLOCK_HINT>
   )
 endif()

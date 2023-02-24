@@ -22,10 +22,10 @@
 #include <cstdint>
 
 /// the number of threads for testing.
-constexpr size_t kThreadNum = CPP_UTILITY_TEST_THREAD_NUM;
+constexpr size_t kThreadNum = DBGROUP_TEST_THREAD_NUM;
 
 /// a fixed seed value to reproduce unit tests.
-constexpr size_t kRandomSeed = CPP_UTILITY_TEST_RANDOM_SEED;
+constexpr size_t kRandomSeed = DBGROUP_TEST_RANDOM_SEED;
 
 #endif  // CPP_UTILITY_TEST_COMMON_HPP
 
