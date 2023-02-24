@@ -61,11 +61,11 @@ class PessimisticLock
     while (true) {
       for (size_t i = 1; true; ++i) {
         auto expected = lock_.load(std::memory_order_relaxed);
-        if (!(expected & (~kSLockMask))) {
+        if ((expected & ~kSLockMask) == kNoLocks) {
           const auto desired = expected + kSLock;  // increment read-counter
-          const auto cas_success = lock_.compare_exchange_weak(
+          const auto success = lock_.compare_exchange_weak(
               expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
-          if (cas_success) return;
+          if (success) return;
         }
         if (i >= kRetryNum) break;
 
@@ -102,11 +102,11 @@ class PessimisticLock
   {
     while (true) {
       for (size_t i = 1; true; ++i) {
-        auto expected = kNoLocks;
-        if (!lock_.load(std::memory_order_acquire)) {
-          const auto cas_success = lock_.compare_exchange_weak(
+        auto expected = lock_.load(std::memory_order_acquire);
+        if (expected == kNoLocks) {
+          const auto success = lock_.compare_exchange_weak(
               expected, kXLock, std::memory_order_acquire, std::memory_order_relaxed);
-          if (cas_success) return;
+          if (success) return;
         }
         if (i >= kRetryNum) break;
 
@@ -150,11 +150,11 @@ class PessimisticLock
     while (true) {
       for (size_t i = 1; true; ++i) {
         auto expected = lock_.load(std::memory_order_relaxed);
-        if (!(expected & (~kSIXLockMask))) {
+        if ((expected & ~kSIXLockMask) == kNoLocks) {
           const auto desired = expected | kSIXLock;
-          const auto cas_success = lock_.compare_exchange_weak(
+          const auto success = lock_.compare_exchange_weak(
               expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
-          if (cas_success) return;
+          if (success) return;
         }
         if (i >= kRetryNum) break;
 
@@ -176,11 +176,11 @@ class PessimisticLock
   {
     while (true) {
       for (size_t i = 1; true; ++i) {
-        auto expected = kSIXLock;
-        if (!(lock_.load(std::memory_order_acquire) & (~kSIXLock))) {
-          const auto cas_success = lock_.compare_exchange_weak(
+        auto expected = lock_.load(std::memory_order_acquire);
+        if (expected == kSIXLock) {
+          const auto success = lock_.compare_exchange_weak(
               expected, kXLock, std::memory_order_acquire, std::memory_order_relaxed);
-          if (cas_success) return;
+          if (success) return;
         }
         if (i >= kRetryNum) break;
 
