@@ -47,7 +47,7 @@ function(ADD_DBGROUP_TEST DBGROUP_TEST_TARGET)
     DBGROUP_TEST_RANDOM_SEED=${DBGROUP_TEST_RANDOM_SEED}
   )
   target_link_libraries(${DBGROUP_TEST_TARGET} PRIVATE
-    cpp_utility
+    dbgroup::cpp_utility
     GTest::gtest_main
     Threads::Threads
   )

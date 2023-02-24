@@ -19,6 +19,7 @@ misc-*,
 modernize-*,
 -modernize-use-trailing-return-type,
 readability-*,
+-readability-avoid-const-params-in-decls,
 -readability-braces-around-statements,
 performance-*,'
 WarningsAsErrors: ''

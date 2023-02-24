@@ -17,6 +17,7 @@
 #ifndef CPP_UTILITY_RANDOM_ZIPF_HPP
 #define CPP_UTILITY_RANDOM_ZIPF_HPP
 
+// C++ standard libraries
 #include <array>
 #include <cassert>
 #include <cmath>
@@ -35,11 +36,9 @@ namespace dbgroup::random
  * @brief A class to generate random values according to Zipf's law.
  *
  */
-template <class IntType>
+template <class IntType = size_t>
 class ZipfDistribution
 {
-  static_assert(std::is_integral_v<IntType>);
-
  public:
   /*####################################################################################
    * Public constructors and assignment operators
@@ -77,8 +76,9 @@ class ZipfDistribution
   }
 
   ZipfDistribution(const ZipfDistribution &) = default;
-  auto operator=(const ZipfDistribution &obj) -> ZipfDistribution & = default;
   ZipfDistribution(ZipfDistribution &&) noexcept = default;
+
+  auto operator=(const ZipfDistribution &obj) -> ZipfDistribution & = default;
   auto operator=(ZipfDistribution &&) noexcept -> ZipfDistribution & = default;
 
   /*####################################################################################
@@ -175,6 +175,12 @@ class ZipfDistribution
   }
 
   /*####################################################################################
+   * Static assertions
+   *##################################################################################*/
+
+  static_assert(std::is_integral_v<IntType>);
+
+  /*####################################################################################
    * Internal member variables
    *##################################################################################*/
 
@@ -195,11 +201,9 @@ class ZipfDistribution
  * @brief A class to generate random values according to Zipf's law approximately.
  *
  */
-template <class IntType>
+template <class IntType = size_t>
 class ApproxZipfDistribution
 {
-  static_assert(std::is_integral_v<IntType>);
-
  public:
   /*####################################################################################
    * Public constructors and assignment operators
@@ -242,8 +246,9 @@ class ApproxZipfDistribution
   }
 
   constexpr ApproxZipfDistribution(const ApproxZipfDistribution &) = default;
-  constexpr auto operator=(const ApproxZipfDistribution &obj) -> ApproxZipfDistribution & = default;
   constexpr ApproxZipfDistribution(ApproxZipfDistribution &&) noexcept = default;
+
+  constexpr auto operator=(const ApproxZipfDistribution &obj) -> ApproxZipfDistribution & = default;
   constexpr auto operator=(ApproxZipfDistribution &&) noexcept
       -> ApproxZipfDistribution & = default;
 
@@ -380,6 +385,12 @@ class ApproxZipfDistribution
     if (pow_ == 0.0) return (1 + log(n) + log(n + 1)) * 0.5;          // NOLINT
     return (pow(n + 1, pow_) + pow(n, pow_) - 2) / (2 * pow_) + 0.5;  // NOLINT
   }
+
+  /*####################################################################################
+   * Static assertions
+   *##################################################################################*/
+
+  static_assert(std::is_integral_v<IntType>);
 
   /*####################################################################################
    * Internal member variables

@@ -17,11 +17,13 @@
 #ifndef CPP_UTILITY_OPTIMISTIC_LOCK_HPP
 #define CPP_UTILITY_OPTIMISTIC_LOCK_HPP
 
+// C++ standard libraries
 #include <atomic>
 #include <chrono>
 #include <thread>
 
-#include "common.hpp"
+// local sources
+#include "lock/common.hpp"
 
 namespace dbgroup::lock
 {
