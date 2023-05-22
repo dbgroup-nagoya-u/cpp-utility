@@ -35,6 +35,7 @@ namespace dbgroup::random
 /**
  * @brief A class to generate random values according to Zipf's law.
  *
+ * @tparam IntType A class of generated random values.
  */
 template <class IntType = size_t>
 class ZipfDistribution
@@ -200,6 +201,7 @@ class ZipfDistribution
 /**
  * @brief A class to generate random values according to Zipf's law approximately.
  *
+ * @tparam IntType A class of generated random values.
  */
 template <class IntType = size_t>
 class ApproxZipfDistribution
