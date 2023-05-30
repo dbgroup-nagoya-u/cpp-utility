@@ -50,6 +50,8 @@
     "endl",
     "gtest",
     "iostream",
+    "JPNP",
+    "KAKENHI",
     "NOLINT",
     "pthread",
     "Wextra",
