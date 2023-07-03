@@ -23,11 +23,13 @@ sudo apt update && sudo apt install -y build-essential cmake
 
 ### Build Options
 
+- `DBGROUP_MAX_THREAD_NUM`: The maximum number of worker threads (default `1024`).
+
 #### Parameters for Unit Testing
 
-- `CPP_UTILITY_BUILD_TESTS`: Build unit tests if `ON`: default `OFF`.
-- `CPP_UTILITY_TEST_THREAD_NUM`: The number of threads to run unit tests: default `8`.
-- `CPP_UTILITY_TEST_RANDOM_SEED`: A fixed seed value to reproduce the results of unit tests: default `0`.
+- `CPP_UTILITY_BUILD_TESTS`: Build unit tests if `ON` (default `OFF`).
+- `CPP_UTILITY_TEST_THREAD_NUM`: The number of threads to run unit tests (default `8`).
+- `CPP_UTILITY_TEST_RANDOM_SEED`: A fixed seed value to reproduce the results of unit tests (default `0`).
 
 ### Build and Run Unit Tests
 
