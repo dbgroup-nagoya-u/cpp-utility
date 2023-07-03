@@ -20,6 +20,12 @@ include(CheckIncludeFileCXX)
 CHECK_INCLUDE_FILE_CXX("xmmintrin.h" CPP_UTILITY_HAS_SPINLOCK_HINT)
 
 #--------------------------------------------------------------------------------------#
+# Build parameters
+#--------------------------------------------------------------------------------------#
+
+set(DBGROUP_MAX_THREAD_NUM "1024" CACHE STRING "The maximum number of worker threads.")
+
+#--------------------------------------------------------------------------------------#
 # Build targets
 #--------------------------------------------------------------------------------------#
 
@@ -35,6 +41,7 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
   )
   target_compile_definitions(${PROJECT_NAME} INTERFACE
     $<$<BOOL:${CPP_UTILITY_HAS_SPINLOCK_HINT}>:CPP_UTILITY_HAS_SPINLOCK_HINT>
+    DBGROUP_MAX_THREAD_NUM=${DBGROUP_MAX_THREAD_NUM}
   )
 endif()
 
