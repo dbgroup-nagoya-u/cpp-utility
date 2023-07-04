@@ -6,7 +6,7 @@ This class manages thread IDs in a single process and has two APIs.
 
 The `IDManager::GetThreadID` function returns a unique thread ID in [0, `DBGROUP_MAX_THREAD_NUM`). Since the assigned thread ID is maintained in the thread's local storage, this function always returns the same ID for the same thread. Note that the capacity of IDs is static (i.e., `DBGROUP_MAX_THREAD_NUM`), so some threads may be blocked if all IDs are reserved. In this case, the threads must wait for the previous threads to exit.
 
-The `IDManager::GetHeartBeat` function returns a `std::shared_ptr<std::atomic_bool>` instance to allow you to check the alive monitoring of a particular thread. The contained flag is `true` until the corresponding thread exits.
+The `IDManager::GetHeartBeat` function returns a `std::weak_ptr<size_t>` instance to allow you to check the alive monitoring of a particular thread. The `expired` function returns `false` until the corresponding thread exits.
 
 ## Usage Example
 
@@ -26,7 +26,7 @@ main(  //
     -> int
 {
   size_t id{0};
-  std::shared_ptr<std::atomic_bool> heartbeat{};
+  std::weak_ptr<size_t> heartbeat{};
   std::atomic_bool assigned{false};
   std::mutex mtx{};
 
@@ -46,14 +46,14 @@ main(  //
 
   // check the thread ID and aliveness
   std::cout << "id: " << id << std::endl  //
-            << "thread alive: " << heartbeat->load() << std::endl;
+            << "thread alive: " << !heartbeat.expired() << std::endl;
 
   // the worker thread exits
   lock.unlock();
   t.join();
 
   // check the heartbeat stops
-  std::cout << "thread alive: " << heartbeat->load() << std::endl;
+  std::cout << "thread alive: " << !heartbeat.expired() << std::endl;
 
   return 0;
 }

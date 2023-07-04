@@ -119,7 +119,7 @@ TEST_F(IDManagerFixture, ThreadHeartBeatsShowProperBoolValues)
 {
   std::mutex mtx{};
   std::atomic_size_t cnt{0};
-  std::array<std::shared_ptr<std::atomic_bool>, kMaxThreadNum> hbs{};
+  std::array<std::weak_ptr<size_t>, kMaxThreadNum> hbs{};
   std::vector<std::thread> threads{};
   threads.reserve(kMaxThreadNum);
 
@@ -139,7 +139,7 @@ TEST_F(IDManagerFixture, ThreadHeartBeatsShowProperBoolValues)
       std::this_thread::sleep_for(std::chrono::microseconds{1});
     }
     for (auto &&flag : hbs) {
-      EXPECT_TRUE(flag->load(std::memory_order_relaxed));
+      EXPECT_FALSE(flag.expired());
     }
   }
   for (auto &&t : threads) {
@@ -147,7 +147,7 @@ TEST_F(IDManagerFixture, ThreadHeartBeatsShowProperBoolValues)
   }
 
   for (auto &&flag : hbs) {
-    EXPECT_FALSE(flag->load(std::memory_order_relaxed));
+    EXPECT_TRUE(flag.expired());
   }
 }
 

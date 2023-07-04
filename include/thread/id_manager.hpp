@@ -63,17 +63,17 @@ class IDManager
   GetThreadID()  //
       -> size_t
   {
-    return GetHeartBeater()->GetID();
+    return GetHeartBeater().GetID();
   }
 
   /**
-   * @return a shared pointer object to check heart beats of the current thread.
+   * @return a weak pointer object to check heart beats of the current thread.
    */
   static auto
   GetHeartBeat()  //
-      -> std::shared_ptr<std::atomic_bool>
+      -> std::weak_ptr<size_t>
   {
-    return GetHeartBeater()->GetHeartBeat();
+    return GetHeartBeater().GetHeartBeat();
   }
 
  private:
@@ -99,10 +99,7 @@ class IDManager
      *
      * @param id the assigned thread ID.
      */
-    explicit HeartBeater(const size_t id) : id_{id}
-    {
-      heart_beat_ = std::make_shared<std::atomic_bool>(true);
-    }
+    constexpr HeartBeater() = default;
 
     HeartBeater(const HeartBeater &) = delete;
     HeartBeater(HeartBeater &&) noexcept = delete;
@@ -120,9 +117,8 @@ class IDManager
      * This destructor removes the heart beat and thread reservation flags.
      */
     ~HeartBeater()
-    {
-      heart_beat_->store(false, std::memory_order_relaxed);
-      id_vec_[id_].store(false, std::memory_order_relaxed);
+    {  //
+      id_vec_[*id_].store(false, std::memory_order_relaxed);
     }
 
     /*##################################################################################
@@ -130,13 +126,24 @@ class IDManager
      *################################################################################*/
 
     /**
+     * @retval true if this object has a unique thread ID.
+     * @retval false otherwise.
+     */
+    [[nodiscard]] auto
+    HasID() const  //
+        -> bool
+    {
+      return id_.use_count() > 0;
+    }
+
+    /**
      * @return the assigned ID for this object.
      */
-    [[nodiscard]] constexpr auto
+    [[nodiscard]] auto
     GetID() const  //
         -> size_t
     {
-      return id_;
+      return *id_;
     }
 
     /**
@@ -144,9 +151,24 @@ class IDManager
      */
     [[nodiscard]] auto
     GetHeartBeat() const  //
-        -> std::shared_ptr<std::atomic_bool>
+        -> std::weak_ptr<size_t>
     {
-      return std::shared_ptr<std::atomic_bool>{heart_beat_};
+      return std::weak_ptr<size_t>{id_};
+    }
+
+    /*##################################################################################
+     * Public setters
+     *################################################################################*/
+
+    /**
+     * @brief Set a unique thread ID to this object.
+     *
+     * @param id the thread ID to be assigned.
+     */
+    void
+    SetID(const size_t id)
+    {
+      id_ = std::make_shared<size_t>(id);
     }
 
    private:
@@ -155,10 +177,7 @@ class IDManager
      *################################################################################*/
 
     /// The assigned ID for this object.
-    size_t id_{};
-
-    /// Instance to indicate that the corresponding thread is alive.
-    std::shared_ptr<std::atomic_bool> heart_beat_{};
+    std::shared_ptr<size_t> id_{};
   };
 
   /*####################################################################################
@@ -186,20 +205,20 @@ class IDManager
    * When a thread calls this function for the first time, it prepares its unique ID and
    * heart beat manager.
    *
-   * @return const std::unique_ptr<HeartBeater>&
+   * @return the reference to a heart beater.
    */
   static auto
   GetHeartBeater()  //
-      -> const std::unique_ptr<HeartBeater> &
+      -> const HeartBeater &
   {
-    thread_local std::unique_ptr<HeartBeater> hb{};
-    if (!hb) {
+    thread_local HeartBeater hb{};
+    if (!hb.HasID()) {
       auto id = std::hash<std::thread::id>{}(std::this_thread::get_id()) % kMaxThreadNum;
       while (true) {
         auto &dst = id_vec_[id];
         auto reserved = dst.load(std::memory_order_relaxed);
         if (!reserved && dst.compare_exchange_strong(reserved, true, std::memory_order_relaxed)) {
-          hb = std::make_unique<HeartBeater>(id);
+          hb.SetID(id);
           break;
         }
 
