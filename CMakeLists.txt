@@ -23,7 +23,7 @@ CHECK_INCLUDE_FILE_CXX("xmmintrin.h" CPP_UTILITY_HAS_SPINLOCK_HINT)
 # Build parameters
 #--------------------------------------------------------------------------------------#
 
-set(DBGROUP_MAX_THREAD_NUM "1024" CACHE STRING "The maximum number of worker threads.")
+set(DBGROUP_MAX_THREAD_NUM "256" CACHE STRING "The maximum number of worker threads.")
 
 #--------------------------------------------------------------------------------------#
 # Build targets

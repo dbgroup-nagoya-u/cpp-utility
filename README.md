@@ -3,12 +3,12 @@
 ![Ubuntu-20.04](https://github.com/dbgroup-nagoya-u/cpp-utility/workflows/Ubuntu-20.04/badge.svg?branch=main)
 
 - [Build](#build)
-    - [Prerequisites](#prerequisites)
-    - [Build Options](#build-options)
-    - [Build and Run Unit Tests](#build-and-run-unit-tests)
+  - [Prerequisites](#prerequisites)
+  - [Build Options](#build-options)
+  - [Build and Run Unit Tests](#build-and-run-unit-tests)
 - [Usage](#usage)
-    - [Linking by CMake](#linking-by-cmake)
-    - [Example Usage](#example-usage)
+  - [Linking by CMake](#linking-by-cmake)
+  - [Example Usage](#example-usage)
 - [Acknowledgments](#acknowledgments)
 
 ## Build
@@ -23,7 +23,7 @@ sudo apt update && sudo apt install -y build-essential cmake
 
 ### Build Options
 
-- `DBGROUP_MAX_THREAD_NUM`: The maximum number of worker threads (default `1024`).
+- `DBGROUP_MAX_THREAD_NUM`: The maximum number of worker threads (default `256`).
 
 #### Parameters for Unit Testing
 
