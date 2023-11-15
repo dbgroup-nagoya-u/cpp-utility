@@ -23,7 +23,27 @@ CHECK_INCLUDE_FILE_CXX("xmmintrin.h" CPP_UTILITY_HAS_SPINLOCK_HINT)
 # Build parameters
 #--------------------------------------------------------------------------------------#
 
-set(DBGROUP_MAX_THREAD_NUM "256" CACHE STRING "The maximum number of worker threads.")
+set(DBGROUP_MAX_THREAD_NUM "" CACHE STRING "The maximum number of worker threads.")
+
+#--------------------------------------------------------------------------------------#
+# Configuration
+#--------------------------------------------------------------------------------------#
+
+if ("${DBGROUP_MAX_THREAD_NUM}" STREQUAL "")
+  message("[${PROJECT_NAME}] DBGROUP_MAX_THREAD_NUM is not set, so check the number of CPU cores.")
+
+  # check the number of logical cores
+  include(ProcessorCount)
+  ProcessorCount(CPP_UTILITY_MAX_CORES)
+  if(NOT CPP_UTILITY_MAX_CORES EQUAL 0)
+    message("[${PROJECT_NAME}] The detected number of cores: ${CPP_UTILITY_MAX_CORES}")
+    set(DBGROUP_MAX_THREAD_NUM "(2 * ${CPP_UTILITY_MAX_CORES})" CACHE STRING "The number of worker threads." FORCE)
+  else()
+    message(WARNING "[${PROJECT_NAME}] The number of cores could not be detected.")
+    set(DBGROUP_MAX_THREAD_NUM "256" CACHE STRING "The number of worker threads." FORCE)
+  endif()
+endif()
+message("[${PROJECT_NAME}] Use ${DBGROUP_MAX_THREAD_NUM} as the maximum number of worker threads.")
 
 #--------------------------------------------------------------------------------------#
 # Build targets
