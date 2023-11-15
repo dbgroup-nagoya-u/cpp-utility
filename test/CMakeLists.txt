@@ -11,11 +11,29 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 
 #--------------------------------------------------------------------------------------#
+# Build parameters
+#--------------------------------------------------------------------------------------#
+
+set(DBGROUP_TEST_THREAD_NUM "" CACHE STRING "The number of worker threads for testing.")
+set(DBGROUP_TEST_RANDOM_SEED "0" CACHE STRING "A fixed seed value to reproduce unit tests.")
+
+#--------------------------------------------------------------------------------------#
 # Configurations for testing
 #--------------------------------------------------------------------------------------#
 
-set(DBGROUP_TEST_THREAD_NUM "8" CACHE STRING "The number of worker threads for testing.")
-set(DBGROUP_TEST_RANDOM_SEED "0" CACHE STRING "A fixed seed value to reproduce unit tests.")
+if ("${DBGROUP_TEST_THREAD_NUM}" STREQUAL "")
+  message("[${PROJECT_NAME}:test] DBGROUP_TEST_THREAD_NUM is not set, so use defaults.")
+
+  # check the number of logical cores
+  include(ProcessorCount)
+  ProcessorCount(DBGROUP_TEST_MAX_CORES)
+  if(DBGROUP_TEST_MAX_CORES LESS 8)
+    set(DBGROUP_TEST_THREAD_NUM "2" CACHE STRING "The number of worker threads for testing." FORCE)
+  else()
+    set(DBGROUP_TEST_THREAD_NUM "8" CACHE STRING "The number of worker threads for testing." FORCE)
+  endif()
+endif()
+message("[${PROJECT_NAME}:test] Use ${DBGROUP_TEST_THREAD_NUM} as the number of worker threads for testing.")
 
 #--------------------------------------------------------------------------------------#
 # Build unit tests
