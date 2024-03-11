@@ -2,11 +2,10 @@
 # Configure GoogleTest
 #------------------------------------------------------------------------------#
 
-include(FetchContent)
 FetchContent_Declare(
   googletest
   GIT_REPOSITORY "https://github.com/google/googletest.git"
-  GIT_TAG "58d77fa8070e8cec2dc1ed015d66b454c8d78850" # v1.12.1
+  GIT_TAG "f8d7d77c06936315286eb55f8de22cd23c188571" # v1.14.0
 )
 FetchContent_MakeAvailable(googletest)
 
@@ -14,26 +13,17 @@ FetchContent_MakeAvailable(googletest)
 # Build parameters
 #------------------------------------------------------------------------------#
 
-set(DBGROUP_TEST_THREAD_NUM "" CACHE STRING "The number of worker threads for testing.")
-set(DBGROUP_TEST_RANDOM_SEED "0" CACHE STRING "A fixed seed value to reproduce unit tests.")
+set(
+  DBGROUP_TEST_THREAD_NUM
+  "2" CACHE STRING
+  "The number of worker threads for testing."
+)
 
-#------------------------------------------------------------------------------#
-# Configurations for testing
-#------------------------------------------------------------------------------#
-
-if ("${DBGROUP_TEST_THREAD_NUM}" STREQUAL "")
-  message("[${PROJECT_NAME}:test] DBGROUP_TEST_THREAD_NUM is not set, so use defaults.")
-
-  # check the number of logical cores
-  include(ProcessorCount)
-  ProcessorCount(DBGROUP_TEST_MAX_CORES)
-  if(DBGROUP_TEST_MAX_CORES LESS 8)
-    set(DBGROUP_TEST_THREAD_NUM "2" CACHE STRING "The number of worker threads for testing." FORCE)
-  else()
-    set(DBGROUP_TEST_THREAD_NUM "8" CACHE STRING "The number of worker threads for testing." FORCE)
-  endif()
-endif()
-message("[${PROJECT_NAME}:test] Use ${DBGROUP_TEST_THREAD_NUM} as the number of worker threads for testing.")
+set(
+  DBGROUP_TEST_RANDOM_SEED
+  "0" CACHE STRING
+  "A fixed seed value to reproduce unit tests."
+)
 
 #------------------------------------------------------------------------------#
 # Build unit tests
@@ -65,7 +55,7 @@ function(ADD_DBGROUP_TEST DBGROUP_TEST_TARGET)
     DBGROUP_TEST_RANDOM_SEED=${DBGROUP_TEST_RANDOM_SEED}
   )
   target_link_libraries(${DBGROUP_TEST_TARGET} PRIVATE
-    dbgroup::cpp_utility
+    dbgroup::${PROJECT_NAME}
     GTest::gtest_main
     Threads::Threads
   )

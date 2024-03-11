@@ -33,6 +33,9 @@
   "testMate.cpp.test.runtimeLimit": 60,
   "testMate.cpp.test.executables": "build/*/test/*_test",
   // cmake settings
+  "[cmake]": {
+    "editor.autoIndent": "brackets",
+  },
   "cmake.configureOnOpen": true,
   "cmake.buildDirectory": "${workspaceRoot}/build/${buildType}",
   "cmake.generator": "Ninja",
