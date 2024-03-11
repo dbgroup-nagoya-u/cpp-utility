@@ -22,6 +22,7 @@
 #include <array>
 #include <chrono>
 #include <mutex>
+#include <thread>
 
 // external sources
 #include "gtest/gtest.h"
