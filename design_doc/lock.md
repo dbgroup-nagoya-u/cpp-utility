@@ -26,9 +26,9 @@ stateDiagram-v2
 
 We maintain the internal lock state according to the following table. The first/second bits represent an exclusive lock and a shared-with-intent-exclusive lock, respectively. When these bits are set, a thread has acquired either X or SIX locks. The remaining bits maintain the number of threads that have acquired shared locks.
 
-| 63-2 | 1 | 0 |
+| 63 | 62 | 61-0 |
 |:-:|:-:|:-:|
-| a shared lock counter | an SIX-lock flag | an X-lock flag|
+| an X lock flag | an SIX lock flag | a shared lock counter |
 
 ### Usage Example
 
@@ -102,4 +102,4 @@ We maintain the internal lock state according to the following table. The bottom
 
 | 63-18 | 17 | 16 | 15-0 |
 |:-:|:-:|:-:|:-:|
-| a version value | an X-lock flag | an SIX-lock flag | a shared lock counter |
+| a version value | an X lock flag | an SIX lock flag | a shared lock counter |

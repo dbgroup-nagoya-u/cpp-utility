@@ -27,12 +27,24 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
     "The maximum number of worker threads."
   )
 
+  set(
+    CPP_UTILITY_SPINLOCK_RETRY_NUM
+    "10" CACHE STRING
+    "The number of spinlock retries."
+  )
+
+  set(
+    CPP_UTILITY_BACKOFF_TIME
+    "10" CACHE STRING
+    "A back-off time interval in microseconds."
+  )
+
   #----------------------------------------------------------------------------#
   # Configuration
   #----------------------------------------------------------------------------#
 
   # check SSE support for spinlock hints
-  CHECK_INCLUDE_FILE_CXX("xmmintrin.h" CPP_UTILITY_HAS_SPINLOCK_HINT)
+  CHECK_INCLUDE_FILE_CXX("x86intrin.h" CPP_UTILITY_HAS_SPINLOCK_HINT)
 
   # set the default number of threads if needed
   if ("${DBGROUP_MAX_THREAD_NUM}" STREQUAL "")
@@ -64,17 +76,29 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
   #----------------------------------------------------------------------------#
 
   # build as a header-only library
-  add_library(${PROJECT_NAME} INTERFACE)
+  add_library(${PROJECT_NAME} STATIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lock/pessimistic_lock.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/lock/optimistic_lock.cpp"
+  )
   add_library(dbgroup::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
-  target_compile_features(${PROJECT_NAME} INTERFACE
+  target_compile_features(${PROJECT_NAME} PRIVATE
     "cxx_std_17"
   )
-  target_include_directories(${PROJECT_NAME} INTERFACE
+  target_compile_options(${PROJECT_NAME} PRIVATE
+    -Wall
+    -Wextra
+    $<$<STREQUAL:${CMAKE_BUILD_TYPE},"Release">:"-O2 -march=native">
+    $<$<STREQUAL:${CMAKE_BUILD_TYPE},"RelWithDebInfo">:"-g3 -Og -pg">
+    $<$<STREQUAL:${CMAKE_BUILD_TYPE},"Debug">:"-g3 -O0 -pg">
+  )
+  target_include_directories(${PROJECT_NAME} PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
   )
-  target_compile_definitions(${PROJECT_NAME} INTERFACE
+  target_compile_definitions(${PROJECT_NAME} PUBLIC
     $<$<BOOL:${CPP_UTILITY_HAS_SPINLOCK_HINT}>:CPP_UTILITY_HAS_SPINLOCK_HINT>
     DBGROUP_MAX_THREAD_NUM=${DBGROUP_MAX_THREAD_NUM}
+    CPP_UTILITY_SPINLOCK_RETRY_NUM=${CPP_UTILITY_SPINLOCK_RETRY_NUM}
+    CPP_UTILITY_BACKOFF_TIME=${CPP_UTILITY_BACKOFF_TIME}
   )
 
   #----------------------------------------------------------------------------#

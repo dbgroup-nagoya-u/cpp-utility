@@ -14,16 +14,12 @@
  * limitations under the License.
  */
 
-#ifndef CPP_UTILITY_OPTIMISTIC_LOCK_HPP
-#define CPP_UTILITY_OPTIMISTIC_LOCK_HPP
+#ifndef CPP_UTILITY_LOCK_OPTIMISTIC_LOCK_HPP
+#define CPP_UTILITY_LOCK_OPTIMISTIC_LOCK_HPP
 
 // C++ standard libraries
 #include <atomic>
-#include <chrono>
-#include <thread>
-
-// local sources
-#include "lock/common.hpp"
+#include <cstdint>
 
 namespace dbgroup::lock
 {
@@ -49,342 +45,142 @@ class OptimisticLock
   ~OptimisticLock() = default;
 
   /*############################################################################
-   * Public getters
+   * Optimistic read APIs
    *##########################################################################*/
+
   /**
-   * @return a current version value.
+   * @return The current version value.
+   *
+   * @note This function does not give up reading a version value and continues
+   * with spinlock and back-off.
    */
-  [[nodiscard]] auto
-  GetVersion() const  //
-      -> uint64_t
-  {
-    while (true) {
-      for (size_t i = 1; true; ++i) {
-        const auto expected = lock_.load(std::memory_order_acquire);
-        if ((expected & kXLock) == 0) return expected & kAllBitsMask;
-        if (i >= kRetryNum) break;
-
-        CPP_UTILITY_SPINLOCK_HINT
-      }
-
-      std::this_thread::sleep_for(kShortSleep);
-    }
-  }
+  [[nodiscard]] auto GetVersion() const  //
+      -> uint64_t;
 
   /**
-   * @param expected an expected version value.
-   * @retval true if the given version value is the same as a current one.
+   * @param expected An expected version value.
+   * @retval true if the given version value is the same as the current one.
    * @retval false otherwise.
    */
-  [[nodiscard]] auto
-  HasSameVersion(const uint64_t expected) const  //
-      -> bool
-  {
-    std::atomic_thread_fence(std::memory_order_release);
-    const auto desired = lock_.load(std::memory_order_relaxed) & kSIXAndSBitsMask;
-    return expected == desired;
-  }
+  [[nodiscard]] auto HasSameVersion(  //
+      const uint64_t expected) const  //
+      -> bool;
+
+  /*############################################################################
+   * Pessimistic lock APIs
+   *##########################################################################*/
 
   /**
    * @brief Get a shared lock.
    *
-   * NOTE: this function does not give up acquiring locks and continues spinlock.
+   * @note This function does not give up acquiring a lock and continues with
+   * spinlock and back-off.
    */
-  void
-  LockS()
-  {
-    while (true) {
-      for (size_t i = 1; true; ++i) {
-        auto expected = lock_.load(std::memory_order_relaxed);
-        if ((expected & ~kXBitMask) == kNoLocks) {
-          const auto desired = expected + kSLock;  // increment read-counter
-          const auto success = lock_.compare_exchange_weak(
-              expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
-          if (success) return;
-        }
-        if (i >= kRetryNum) break;
-
-        CPP_UTILITY_SPINLOCK_HINT
-      }
-
-      std::this_thread::sleep_for(kShortSleep);
-    }
-  }
+  void LockS();
 
   /**
-   * @brief Get a shared lock if version is same.
+   * @brief Get a shared lock if a given version is the same as the current one.
    *
-   * @param ver an expected version value (turned off by kSIXAndSBitsMask).
-   * @retval true if the given version value is the same as a current one.
-   * @retval false otherwise.
+   * @param ver An expected version value.
+   * @retval true if a shared lock is acquired.
+   * @retval false if the current version value is different from the given one.
+   * @note This function does not give up acquiring a lock and continues with
+   * spinlock and back-off.
    */
-  [[nodiscard]] auto
-  TryLockS(const uint64_t ver)  //
-      -> bool
-  {
-    while (true) {
-      for (size_t i = 1; true; ++i) {
-        auto expected = lock_.load(std::memory_order_relaxed);
-        if ((expected & ~kXBitMask) == kNoLocks) {
-          expected = (expected & ~kSIXAndSBitsMask) | ver;
-          const auto desired = expected + kSLock;
-          const auto success =
-              lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed);
-          if (success) return true;
-        }
-        if ((expected & kSIXAndSBitsMask) != ver) return false;
-        if (i >= kRetryNum) break;
-
-        CPP_UTILITY_SPINLOCK_HINT
-      }
-
-      std::this_thread::sleep_for(kShortSleep);
-    }
-  }
+  [[nodiscard]] auto TryLockS(  //
+      const uint64_t ver)       //
+      -> bool;
 
   /**
    * @brief Release a shared lock.
    *
+   * @note If a thread calls this function without acquiring an S lock, it will
+   * corrupt an internal lock state.
    */
-  void
-  UnlockS()
-  {
-    auto expected = lock_.load(std::memory_order_relaxed);
-    auto desired = expected - kSLock;     // decrement read-counter
-    while (!lock_.compare_exchange_weak(  //
-        expected, desired, std::memory_order_release, std::memory_order_relaxed)) {
-      desired = expected - kSLock;
-      CPP_UTILITY_SPINLOCK_HINT
-    }
-  }
+  void UnlockS();
 
   /**
    * @brief Get an exclusive lock.
    *
-   * NOTE: this function does not give up acquiring locks and continues spinlock.
+   * @note This function does not give up acquiring a lock and continues with
+   * spinlock and back-off.
    */
-  void
-  LockX()
-  {
-    while (true) {
-      for (size_t i = 1; true; ++i) {
-        auto expected = lock_.load(std::memory_order_relaxed);
-        if ((expected & ~kAllBitsMask) == kNoLocks) {
-          const auto desired = expected | kXLock;
-          const auto success = lock_.compare_exchange_weak(
-              expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
-          if (success) return;
-        }
-        if (i >= kRetryNum) break;
-
-        CPP_UTILITY_SPINLOCK_HINT
-      }
-
-      std::this_thread::sleep_for(kShortSleep);
-    }
-  }
+  void LockX();
 
   /**
-   * @brief Get an exclusive lock if version is same.
+   * @brief Get an X lock if a given version is the same as the current one.
    *
-   * @param ver an expected version value (turned off by kSIXAndSBitsMask).
-   * @retval true if the given version value is the same as a current one.
+   * @param ver An expected version value.
+   * @retval true if the given version value is the same as the current one.
    * @retval false otherwise.
    */
-  [[nodiscard]] auto
-  TryLockX(const uint64_t ver)  //
-      -> bool
-  {
-    const auto desired = ver | kXLock;
-    while (true) {
-      for (size_t i = 1; true; ++i) {
-        auto expected = lock_.load(std::memory_order_relaxed);
-        if ((expected & ~kAllBitsMask) == kNoLocks) {
-          expected = ver;
-          const auto success = lock_.compare_exchange_weak(
-              expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
-          if (success) return true;
-        }
-        if ((expected & kSIXAndSBitsMask) != ver) return false;
-        if (i >= kRetryNum) break;
-
-        CPP_UTILITY_SPINLOCK_HINT
-      }
-
-      std::this_thread::sleep_for(kShortSleep);
-    }
-  }
+  [[nodiscard]] auto TryLockX(  //
+      const uint64_t ver)       //
+      -> bool;
 
   /**
    * @brief Downgrade an X lock to an SIX lock.
    *
-   * @retval version value after downgrade from an X lock to an SIX lock.
-   *
-   * NOTE: if a thread that does not have an exclusive lock calls this function, it will
-   * corrupt an internal lock status.
+   * @retval A version value after downgrades.
+   * @note If a thread calls this function without acquiring an X lock, it will
+   * corrupt an internal lock state.
    */
-  auto
-  DowngradeToSIX()  //
-      -> uint64_t
-  {
-    const auto old_ver = lock_.fetch_add(kXLock + kSIXLock, std::memory_order_release);
-    return (old_ver + kXLock + kSIXLock) & kAllBitsMask;
-  }
+  auto DowngradeToSIX()  //
+      -> uint64_t;
 
   /**
    * @brief Release an exclusive lock.
    *
-   * @retval version value after an exclusive lock release.
+   * @return A version value after an exclusive lock release.
+   * @note If a thread calls this function without acquiring an X lock, it will
+   * corrupt an internal lock state.
    */
-  auto
-  UnlockX()  //
-      -> uint64_t
-  {
-    const auto old_ver = lock_.fetch_add(kXLock, std::memory_order_release);
-    return (old_ver + kXLock) & kAllBitsMask;
-  }
+  auto UnlockX()  //
+      -> uint64_t;
 
   /**
-   * @brief Get a shared lock with an intent-exclusive lock.
+   * @brief Get a shared-with-intent-exclusive lock.
    *
-   * NOTE: this function does not give up acquiring locks and continues spinlock.
+   * @note This function does not give up acquiring a lock and continues with
+   * spinlock and back-off.
    */
-  void
-  LockSIX()
-  {
-    while (true) {
-      for (size_t i = 1; true; ++i) {
-        auto expected = lock_.load(std::memory_order_relaxed);
-        if ((expected & ~kXAndSIXBitsMask) == kNoLocks) {
-          const auto desired = expected | kSIXLock;
-          const auto success = lock_.compare_exchange_weak(
-              expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
-          if (success) return;
-        }
-        if (i >= kRetryNum) break;
-
-        CPP_UTILITY_SPINLOCK_HINT
-      }
-
-      std::this_thread::sleep_for(kShortSleep);
-    }
-  }
+  void LockSIX();
 
   /**
-   * @brief Get a shared lock with an intent-exclusive lock if version is same.
+   * @brief Get an SIX lock if a given version is the same as the current one.
    *
-   * @param ver an expected version value (turned off by kSIXAndSBitsMask).
-   * @retval true if the given version value is the same as a current one.
+   * @param ver an expected version value.
+   * @retval true if the given version value is the same as the current one.
    * @retval false otherwise.
    */
-  [[nodiscard]] auto
-  TryLockSIX(const uint64_t ver)  //
-      -> bool
-  {
-    while (true) {
-      for (size_t i = 1; true; ++i) {
-        auto expected = lock_.load(std::memory_order_relaxed);
-        if ((expected & ~kXAndSIXBitsMask) == kNoLocks) {
-          expected = (expected & (~kSBitsMask)) | ver;
-          const auto desired = expected | kSIXLock;
-          const auto success =
-              lock_.compare_exchange_weak(expected, desired, std::memory_order_relaxed);
-          if (success) return true;
-        }
-        if ((expected & kSIXAndSBitsMask) != ver) return false;
-        if (i >= kRetryNum) break;
-
-        CPP_UTILITY_SPINLOCK_HINT
-      }
-
-      std::this_thread::sleep_for(kShortSleep);
-    }
-  }
+  [[nodiscard]] auto TryLockSIX(const uint64_t ver)  //
+      -> bool;
 
   /**
    * @brief Upgrade an SIX lock to an X lock.
    *
-   * NOTE: if a thread that does not have a shared lock with an intent-exclusive lock
-   * calls this function, it will corrupt an internal lock status.
+   * @note If a thread calls this function without acquiring an SIX lock, it
+   * will corrupt an internal lock state.
    */
-  void
-  UpgradeToX()
-  {
-    auto expected = lock_.load(std::memory_order_relaxed);
-    const auto desired = (expected & kSBitsMask) + kSIXLock;
-    while (true) {
-      for (size_t i = 1; true; ++i) {
-        if ((expected & ~kSBitsMask) == kNoLocks) {
-          const auto success = lock_.compare_exchange_weak(
-              expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
-          if (success) return;
-        }
-        if (i >= kRetryNum) break;
-
-        CPP_UTILITY_SPINLOCK_HINT
-        expected = lock_.load(std::memory_order_relaxed);
-      }
-
-      std::this_thread::sleep_for(kShortSleep);
-    }
-  }
+  void UpgradeToX();
 
   /**
-   * @brief Release a shared lock with an intent-exclusive lock.
+   * @brief Release a shared-with-intent-exclusive lock.
    *
+   * @note If a thread calls this function without acquiring an SIX lock, it
+   * will corrupt an internal lock state.
    */
-  void
-  UnlockSIX()
-  {
-    lock_.fetch_sub(kSIXLock, std::memory_order_release);
-  }
+  void UnlockSIX();
 
  private:
-  /*############################################################################
-   * Internal constants
-   *##########################################################################*/
-
-  /// a lock status for no locks.
-  static constexpr uint64_t kNoLocks = 0b000UL;
-
-  /// a lock status for shared locks.
-  static constexpr uint64_t kSLock = 0b001UL;
-
-  /// a lock status for exclusive lock.
-  static constexpr uint64_t kXLock = 0b010UL << 16UL;
-
-  /// a lock status for shared locks with intent-exclusive lock.
-  static constexpr uint64_t kSIXLock = 0b001UL << 16UL;
-
-  /// a bit mask for removing an S-lock flags.
-  static constexpr uint64_t kSBitsMask = (~0UL) << 16UL;
-
-  /// a bit mask for removing an X-lock flag.
-  static constexpr uint64_t kXBitMask = ~(0b010UL << 16UL);
-
-  /// a bit mask for removing SIX/X-lock flags.
-  static constexpr uint64_t kXAndSIXBitsMask = ~(0b011UL << 16UL);
-
-  /// a bit mask for removing S/SIX-lock flags.
-  static constexpr uint64_t kSIXAndSBitsMask = (~0UL) << 17UL;
-
-  /// a bit mask for removing S/SIX/X-lock flags.
-  static constexpr uint64_t kAllBitsMask = (~0UL) << 18UL;
-
-  /// the maximum number of retries for preventing busy loops.
-  static constexpr size_t kRetryNum = 10UL;
-
-  /// a sleep time for preventing busy loops.
-  static constexpr auto kShortSleep = std::chrono::microseconds{10};
-
   /*############################################################################
    * Internal member variables
    *##########################################################################*/
 
-  /// an actual lock status.
-  std::atomic<uint64_t> lock_{0};
+  /// @brief The current lock state.
+  std::atomic_uint64_t lock_{0};
 };
 
 }  // namespace dbgroup::lock
 
-#endif  // CPP_UTILITY_OPTIMISTIC_LOCK_HPP
+#endif  // CPP_UTILITY_LOCK_OPTIMISTIC_LOCK_HPP

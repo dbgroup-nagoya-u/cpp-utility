@@ -14,16 +14,11 @@
  * limitations under the License.
  */
 
-#ifndef CPP_UTILITY_PESSIMISTIC_LOCK_HPP
-#define CPP_UTILITY_PESSIMISTIC_LOCK_HPP
+#ifndef CPP_UTILITY_LOCK_PESSIMISTIC_LOCK_HPP
+#define CPP_UTILITY_LOCK_PESSIMISTIC_LOCK_HPP
 
 // C++ standard libraries
 #include <atomic>
-#include <chrono>
-#include <thread>
-
-// local sources
-#include "lock/common.hpp"
 
 namespace dbgroup::lock
 {
@@ -55,197 +50,76 @@ class PessimisticLock
   /**
    * @brief Get a shared lock.
    *
-   * NOTE: this function does not give up acquiring locks and continues spinlock.
+   * @note This function does not give up acquiring a lock and continues with
+   * spinlock and back-off.
    */
-  void
-  LockS()
-  {
-    while (true) {
-      for (size_t i = 1; true; ++i) {
-        auto expected = lock_.load(std::memory_order_relaxed);
-        if ((expected & ~kSLockMask) == kNoLocks) {
-          const auto desired = expected + kSLock;  // increment read-counter
-          const auto success = lock_.compare_exchange_weak(
-              expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
-          if (success) return;
-        }
-        if (i >= kRetryNum) break;
-
-        CPP_UTILITY_SPINLOCK_HINT
-      }
-
-      std::this_thread::sleep_for(kShortSleep);
-    }
-  }
+  void LockS();
 
   /**
    * @brief Release a shared lock.
    *
+   * @note If a thread calls this function without acquiring an S lock, it will
+   * corrupt an internal lock state.
    */
-  void
-  UnlockS()
-  {
-    auto expected = lock_.load(std::memory_order_relaxed);
-    auto desired = expected - kSLock;     // decrement read-counter
-    while (!lock_.compare_exchange_weak(  //
-        expected, desired, std::memory_order_release, std::memory_order_relaxed)) {
-      desired = expected - kSLock;
-      CPP_UTILITY_SPINLOCK_HINT
-    }
-  }
+  void UnlockS();
 
   /**
    * @brief Get an exclusive lock.
    *
-   * NOTE: this function does not give up acquiring locks and continues spinlock.
+   * @note This function does not give up acquiring a lock and continues with
+   * spinlock and back-off.
    */
-  void
-  LockX()
-  {
-    while (true) {
-      for (size_t i = 1; true; ++i) {
-        auto expected = lock_.load(std::memory_order_acquire);
-        if (expected == kNoLocks) {
-          const auto success = lock_.compare_exchange_weak(
-              expected, kXLock, std::memory_order_acquire, std::memory_order_relaxed);
-          if (success) return;
-        }
-        if (i >= kRetryNum) break;
-
-        CPP_UTILITY_SPINLOCK_HINT
-      }
-
-      std::this_thread::sleep_for(kShortSleep);
-    }
-  }
+  void LockX();
 
   /**
    * @brief Downgrade an X lock to an SIX lock.
    *
-   * NOTE: if a thread that does not have an exclusive lock calls this function, it will
-   * corrupt an internal lock status.
+   * @note If a thread calls this function without acquiring an X lock, it will
+   * corrupt an internal lock state.
    */
-  void
-  DowngradeToSIX()
-  {
-    lock_.store(kSIXLock, std::memory_order_release);
-  }
+  void DowngradeToSIX();
 
   /**
    * @brief Release an exclusive lock.
    *
+   * @note If a thread calls this function without acquiring an X lock, it will
+   * corrupt an internal lock state.
    */
-  void
-  UnlockX()
-  {
-    lock_.store(kNoLocks, std::memory_order_release);
-  }
+  void UnlockX();
 
   /**
-   * @brief Get a shared lock with an intent-exclusive lock.
+   * @brief Get a shared-with-intent-exclusive lock.
    *
-   * NOTE: this function does not give up acquiring locks and continues spinlock.
+   * @note This function does not give up acquiring a lock and continues with
+   * spinlock and back-off.
    */
-  void
-  LockSIX()
-  {
-    while (true) {
-      for (size_t i = 1; true; ++i) {
-        auto expected = lock_.load(std::memory_order_relaxed);
-        if ((expected & ~kSIXLockMask) == kNoLocks) {
-          const auto desired = expected | kSIXLock;
-          const auto success = lock_.compare_exchange_weak(
-              expected, desired, std::memory_order_acquire, std::memory_order_relaxed);
-          if (success) return;
-        }
-        if (i >= kRetryNum) break;
-
-        CPP_UTILITY_SPINLOCK_HINT
-      }
-
-      std::this_thread::sleep_for(kShortSleep);
-    }
-  }
+  void LockSIX();
 
   /**
    * @brief Upgrade an SIX lock to an X lock.
    *
-   * NOTE: if a thread that does not have a shared lock with an intent-exclusive lock
-   * calls this function, it will corrupt an internal lock status.
+   * @note If a thread calls this function without acquiring an SIX lock, it
+   * will corrupt an internal lock state.
    */
-  void
-  UpgradeToX()
-  {
-    while (true) {
-      for (size_t i = 1; true; ++i) {
-        auto expected = lock_.load(std::memory_order_acquire);
-        if (expected == kSIXLock) {
-          const auto success = lock_.compare_exchange_weak(
-              expected, kXLock, std::memory_order_acquire, std::memory_order_relaxed);
-          if (success) return;
-        }
-        if (i >= kRetryNum) break;
-
-        CPP_UTILITY_SPINLOCK_HINT
-      }
-
-      std::this_thread::sleep_for(kShortSleep);
-    }
-  }
+  void UpgradeToX();
 
   /**
-   * @brief Release a shared lock with an intent-exclusive lock.
+   * @brief Release a shared-with-intent-exclusive lock.
    *
+   * @note If a thread calls this function without acquiring an SIX lock, it
+   * will corrupt an internal lock state.
    */
-  void
-  UnlockSIX()
-  {
-    auto expected = lock_.load(std::memory_order_relaxed);
-    auto desired = expected - kSIXLock;
-    while (!lock_.compare_exchange_weak(  //
-        expected, desired, std::memory_order_release, std::memory_order_relaxed)) {
-      desired = expected - kSIXLock;
-      CPP_UTILITY_SPINLOCK_HINT
-    }
-  }
+  void UnlockSIX();
 
  private:
-  /*############################################################################
-   * Internal constants
-   *##########################################################################*/
-
-  /// a lock status for no locks.
-  static constexpr uint64_t kNoLocks = 0b000UL;
-
-  /// a lock status for exclusive locks.
-  static constexpr uint64_t kXLock = 0b001UL;
-
-  /// a lock status for shared locks with intent-exclusive locks.
-  static constexpr uint64_t kSIXLock = 0b010UL;
-
-  /// a lock status for shared locks.
-  static constexpr uint64_t kSLock = 0b100UL;
-
-  /// a bit mask for removing SIX/X-lock flags.
-  static constexpr uint64_t kSIXLockMask = ~0b011UL;
-
-  /// a bit mask for removing an X-lock flag.
-  static constexpr uint64_t kSLockMask = ~0b001UL;
-
-  /// the maximum number of retries for preventing busy loops.
-  static constexpr size_t kRetryNum = 10UL;
-
-  /// a sleep time for preventing busy loops.
-  static constexpr auto kShortSleep = std::chrono::microseconds{10};
-
   /*############################################################################
    * Internal member variables
    *##########################################################################*/
 
-  /// an internal lock status.
-  std::atomic<uint64_t> lock_{0};
+  /// @brief The current lock state.
+  std::atomic_uint64_t lock_{0};
 };
 
 }  // namespace dbgroup::lock
 
-#endif  // CPP_UTILITY_PESSIMISTIC_LOCK_HPP
+#endif  // CPP_UTILITY_LOCK_PESSIMISTIC_LOCK_HPP

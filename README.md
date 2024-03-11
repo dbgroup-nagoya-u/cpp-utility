@@ -24,6 +24,8 @@ sudo apt update && sudo apt install -y build-essential cmake
 ### Build Options
 
 - `DBGROUP_MAX_THREAD_NUM`: The maximum number of worker threads (defaults to the number of logical cores x2).
+- `CPP_UTILITY_SPINLOCK_RETRY_NUM`: The number of spinlock retries (default `10`).
+- `CPP_UTILITY_BACKOFF_TIME`: A back-off time interval in microseconds (default `10`).
 
 #### Parameters for Unit Testing
 
