@@ -44,24 +44,24 @@ ctest -C Release --output-on-failure
 
 ### Linking by CMake
 
-1. Add this library to your build in `CMakeLists.txt`.
+Add this library to your build in `CMakeLists.txt`.
 
-    ```cmake
-    FetchContent_Declare(
-        cpp-utility
-        GIT_REPOSITORY "https://github.com/dbgroup-nagoya-u/cpp-utility.git"
-        GIT_TAG "<commit_tag_>"
-    )
-    FetchContent_MakeAvailable(cpp-utility)
+```cmake
+FetchContent_Declare(
+    cpp-utility
+    GIT_REPOSITORY "https://github.com/dbgroup-nagoya-u/cpp-utility.git"
+    GIT_TAG "<commit_tag_you_want_to_use>"
+)
+FetchContent_MakeAvailable(cpp-utility)
 
-    add_executable(
-      <target_bin_name>
-      [<source> ...]
-    )
-    target_link_libraries(<target_bin_name> PRIVATE
-      dbgroup::cpp-utility
-    )
-    ```
+add_executable(
+    <target_bin_name>
+    [<source> ...]
+)
+target_link_libraries(<target_bin_name> PRIVATE
+    dbgroup::cpp-utility
+)
+```
 
 ### Example Usage
 
