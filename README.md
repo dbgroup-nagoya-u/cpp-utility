@@ -1,6 +1,6 @@
 # C++ Utility Library
 
-![Ubuntu-20.04](https://github.com/dbgroup-nagoya-u/cpp-utility/workflows/Ubuntu-20.04/badge.svg?branch=main)
+[![Ubuntu 22.04](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/ubuntu_22.yaml/badge.svg)](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/ubuntu_22.yaml) [![Ubuntu 20.04](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/ubuntu_20.yaml/badge.svg)](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/ubuntu_20.yaml) [![macOS](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/mac.yaml/badge.svg)](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/mac.yaml)
 
 - [Build](#build)
     - [Prerequisites](#prerequisites)
