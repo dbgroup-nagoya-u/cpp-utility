@@ -1,4 +1,4 @@
-name: Ubuntu-20.04
+name: Unit Tests on Ubuntu
 
 on:
   push:
@@ -8,14 +8,17 @@ on:
 
 env:
   BUILD_TYPE: Release
-  THREAD_NUM: 2
 
 jobs:
   unit_test:
-    runs-on: ubuntu-20.04
     timeout-minutes: 10
-    steps:
 
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-20.04]
+    runs-on: ${{ matrix.os }}
+
+    steps:
     - name: Clone Main Repository
       uses: actions/checkout@v4
 
@@ -26,12 +29,15 @@ jobs:
     - name: Configure CMake
       shell: bash
       working-directory: ${{github.workspace}}/build
-      run: cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DCPP_UTILITY_BUILD_TESTS=ON
+      run: >
+        cmake ${GITHUB_WORKSPACE}
+        -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
+        -DCPP_UTILITY_BUILD_TESTS=ON
 
     - name: Build
       shell: bash
       working-directory: ${{github.workspace}}/build
-      run: cmake --build . --parallel ${THREAD_NUM} --config ${BUILD_TYPE}
+      run: cmake --build . --parallel --config ${BUILD_TYPE}
 
     - name: Test
       shell: bash
