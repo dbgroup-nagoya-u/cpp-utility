@@ -19,14 +19,10 @@
 
 // C++ standard libraries
 #include <array>
-#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <exception>
 #include <random>
-#include <stdexcept>
-#include <string>
 #include <type_traits>
 #include <vector>
 
@@ -50,31 +46,22 @@ class ZipfDistribution
    *
    * This always returns zero.
    */
-  ZipfDistribution() { UpdateCDF(); };
+  ZipfDistribution();
 
   /**
    * @brief Construct a new Zipf distribution with given parameters.
    *
-   * This distribution will generate random values within [`min`, `max`] according to
-   * Zipf's law with a skew paramter `alpha`.
+   * This distribution will generate random values within [`min`, `max`]
+   * according to Zipf's law with a skew paramter `alpha`.
    *
-   * @param min the minimum value to be generated.
-   * @param max the maximum value to be generated.
-   * @param alpha a skew parameter (zero means uniform distribution).
+   * @param min The minimum value to be generated.
+   * @param max The maximum value to be generated.
+   * @param alpha A skew parameter (zero means uniform distribution).
    */
   ZipfDistribution(  //
       const IntType min,
       const IntType max,
-      const double alpha)
-      : min_{min}, max_{max}, alpha_{alpha}
-  {
-    if (max < min) {
-      std::string err_msg = "ERROR: the maximum value must be greater than the minimum one.";
-      throw std::runtime_error{err_msg};
-    }
-
-    UpdateCDF();
-  }
+      const double alpha);
 
   ZipfDistribution(const ZipfDistribution &) = default;
   ZipfDistribution(ZipfDistribution &&) noexcept = default;
@@ -93,11 +80,12 @@ class ZipfDistribution
    *##########################################################################*/
 
   /**
-   * @param id a target ID in [0, `bin_num`).
+   * @param id A target ID in [0, `bin_num`).
    * @return A CDF value of the given ID.
    */
   [[nodiscard]] constexpr auto
-  GetCDF(const IntType id) const  //
+  GetCDF(                      //
+      const IntType id) const  //
       -> double
   {
     return zipf_cdf_.at(id);
@@ -108,12 +96,13 @@ class ZipfDistribution
    *##########################################################################*/
 
   /**
-   * @param g a random value generator.
-   * @return a random value according to Zipf's law.
+   * @param g A random value generator.
+   * @return A random value according to Zipf's law.
    */
   template <class RandEngine>
   [[nodiscard]] auto
-  operator()(RandEngine &g) const  //
+  operator()(               //
+      RandEngine &g) const  //
       -> IntType
   {
     thread_local std::uniform_real_distribution<double> uniform_dist{0.0, 1.0};
@@ -149,52 +138,32 @@ class ZipfDistribution
   /**
    * @brief Compute CDF values for this Zipf distribution.
    */
-  void
-  UpdateCDF()
-  {
-    const auto bin_num = max_ - min_ + 1;
-    if (bin_num <= 1) {
-      zipf_cdf_ = {1.0};
-      return;
-    }
-
-    // compute a base probability
-    auto base_prob = 0.0;
-    for (IntType i = 1; i < bin_num + 1; ++i) {
-      base_prob += 1.0 / pow(i, alpha_);
-    }
-    base_prob = 1.0 / base_prob;
-
-    // create a CDF according to Zipf's law
-    zipf_cdf_.reserve(bin_num);
-    zipf_cdf_.emplace_back(base_prob);
-    for (IntType i = 1; i < bin_num; ++i) {
-      const auto ith_prob = zipf_cdf_.at(i - 1) + base_prob / pow(i + 1, alpha_);
-      zipf_cdf_.emplace_back(ith_prob);
-    }
-    zipf_cdf_.at(bin_num - 1) = 1.0;
-  }
+  void UpdateCDF();
 
   /*############################################################################
    * Static assertions
    *##########################################################################*/
 
-  static_assert(std::is_integral_v<IntType>);
+  // Assume the use of integer types.
+  static_assert(std::is_same_v<IntType, uint32_t>     //
+                || std::is_same_v<IntType, uint64_t>  //
+                || std::is_same_v<IntType, int32_t>   //
+                || std::is_same_v<IntType, int64_t>);
 
   /*############################################################################
    * Internal member variables
    *##########################################################################*/
 
-  /// the minimum value to be generated.
+  /// @brief The minimum value to be generated.
   IntType min_{0};
 
-  /// the maximum value to be generated.
+  /// @brief The maximum value to be generated.
   IntType max_{0};
 
-  /// a skew parameter (zero means uniform distribution).
+  /// @brief A skew parameter (zero means uniform distribution).
   double alpha_{0.0};
 
-  /// a cumulative distribution function according to Zipf's law.
+  /// @brief A cumulative distribution function according to Zipf's law.
   std::vector<double> zipf_cdf_{};
 };
 
@@ -216,36 +185,22 @@ class ApproxZipfDistribution
    *
    * This always returns zero.
    */
-  ApproxZipfDistribution() { UpdateCDF(); }
+  ApproxZipfDistribution();
 
   /**
    * @brief Construct a new Zipf distribution with given parameters.
    *
-   * This distribution will generate random values within [`min`, `max`] according to
-   * Zipf's law with a skew paramter `alpha`.
+   * This distribution will generate random values within [`min`, `max`]
+   * according to Zipf's law with a skew paramter `alpha`.
    *
-   * @param min the minimum value to be generated.
-   * @param max the maximum value to be generated.
-   * @param alpha a skew parameter (zero means uniform distribution).
+   * @param min The minimum value to be generated.
+   * @param max The maximum value to be generated.
+   * @param alpha A skew parameter (zero means uniform distribution).
    */
   ApproxZipfDistribution(  //
       const IntType min,
       const IntType max,
-      const double alpha)
-      : min_{min},
-        max_{max},
-        alpha_{alpha},
-        n_{max_ - min_ + 1},
-        pow_{1.0 - alpha_},
-        denom_{GetHarmonicNum(n_)}
-  {
-    if (max < min) {
-      std::string err_msg = "ERROR: the maximum value must be greater than the minimum one.";
-      throw std::runtime_error{err_msg};
-    }
-
-    UpdateCDF();
-  }
+      const double alpha);
 
   constexpr ApproxZipfDistribution(const ApproxZipfDistribution &) = default;
   constexpr ApproxZipfDistribution(ApproxZipfDistribution &&) noexcept = default;
@@ -265,14 +220,15 @@ class ApproxZipfDistribution
    *##########################################################################*/
 
   /**
-   * @param id a target ID in [0, `bin_num`).
+   * @param id A target ID in [0, `bin_num`).
    * @return A CDF value of the given ID.
    */
   [[nodiscard]] constexpr auto
-  GetCDF(const IntType id) const  //
+  GetCDF(                      //
+      const IntType id) const  //
       -> double
   {
-    if (id < kExactBinNum) return zipf_cdf_.at(id);
+    if (id < static_cast<IntType>(kExactBinNum)) return zipf_cdf_.at(id);
     return GetHarmonicNum(id + 1) / denom_;
   }
 
@@ -281,12 +237,13 @@ class ApproxZipfDistribution
    *##########################################################################*/
 
   /**
-   * @param g a random value generator.
-   * @return a random value according to Zipf's law.
+   * @param g A random value generator.
+   * @return A random value according to Zipf's law.
    */
   template <class RandEngine>
   [[nodiscard]] auto
-  operator()(RandEngine &g) const  //
+  operator()(               //
+      RandEngine &g) const  //
       -> IntType
   {
     thread_local std::uniform_real_distribution<double> uniform_dist{0.0, 1.0};
@@ -319,7 +276,8 @@ class ApproxZipfDistribution
    * Internal constants
    *##########################################################################*/
 
-  static constexpr int64_t kExactBinNum = 100;
+  /// @brief The number of bins for approximation.
+  static constexpr size_t kExactBinNum = 100;
 
   /*############################################################################
    * Internal utility functions
@@ -328,60 +286,15 @@ class ApproxZipfDistribution
   /**
    * @brief Compute CDF values for this Zipf distribution.
    */
-  void
-  UpdateCDF()
-  {
-    if (n_ <= 1) {
-      zipf_cdf_ = {1.0};
-      return;
-    }
-
-    if (n_ <= kExactBinNum) {
-      // compute a base probability exactly
-      auto base_prob = 0.0;
-      for (IntType i = 1; i < n_ + 1; ++i) {
-        base_prob += 1.0 / pow(i, alpha_);
-      }
-      base_prob = 1.0 / base_prob;
-
-      // create an exact CDF according to Zipf's law
-      zipf_cdf_.at(0) = base_prob;
-      for (IntType i = 1; i < kExactBinNum; ++i) {
-        const auto ith_prob = zipf_cdf_.at(i - 1) + base_prob / pow(i + 1, alpha_);
-        zipf_cdf_.at(i) = ith_prob;
-      }
-      zipf_cdf_.at(n_ - 1) = 1.0;
-    } else {
-      // compute a base probability approximately
-      constexpr size_t kSkipSize = 100;
-      auto base_prob = 0.0;
-      IntType i = 1;
-      while (i < kExactBinNum + 1) {  // compute exact values
-        base_prob += 1.0 / pow(i++, alpha_);
-      }
-      while (i < n_ + 1) {  // compute approximate values
-        const auto low = 1.0 / pow(i, alpha_);
-        i += kSkipSize;
-        const auto high = 1.0 / pow(i, alpha_);
-        base_prob += (low + high) * kSkipSize / 2;
-      }
-      base_prob = 1.0 / base_prob;
-
-      // create a CDF according to Zipf's law
-      zipf_cdf_.at(0) = base_prob;
-      for (IntType j = 1; j < kExactBinNum; ++j) {
-        const auto ith_prob = zipf_cdf_.at(j - 1) + base_prob / pow(j + 1, alpha_);
-        zipf_cdf_.at(j) = ith_prob;
-      }
-    }
-  }
+  void UpdateCDF();
 
   /**
-   * @param n the number of partial elements in the p-serires.
-   * @return an approximate partial sum of the p-series.
+   * @param n The number of partial elements in the p-serires.
+   * @return An approximate partial sum of the p-series.
    */
   [[nodiscard]] constexpr auto
-  GetHarmonicNum(const IntType n) const  //
+  GetHarmonicNum(             //
+      const IntType n) const  //
       -> double
   {
     if (pow_ == 0.0) return (1 + log(n) + log(n + 1)) * 0.5;          // NOLINT
@@ -392,31 +305,35 @@ class ApproxZipfDistribution
    * Static assertions
    *##########################################################################*/
 
-  static_assert(std::is_integral_v<IntType>);
+  // Assume the use of integer types.
+  static_assert(std::is_same_v<IntType, uint32_t>     //
+                || std::is_same_v<IntType, uint64_t>  //
+                || std::is_same_v<IntType, int32_t>   //
+                || std::is_same_v<IntType, int64_t>);
 
   /*############################################################################
    * Internal member variables
    *##########################################################################*/
 
-  /// the minimum value to be generated.
+  /// @brief The minimum value to be generated.
   IntType min_{0};
 
-  /// the maximum value to be generated.
+  /// @brief The maximum value to be generated.
   IntType max_{0};
 
-  /// a skew parameter (zero means uniform distribution).
+  /// @brief A skew parameter (zero means uniform distribution).
   double alpha_{0.0};
 
-  /// the number of bins in this Zipf distribution.
+  /// @brief The number of bins in this Zipf distribution.
   IntType n_{1};
 
-  /// equal to `1 - alpha_`.
+  /// @brief Equal to `1 - alpha_`.
   double pow_{1.0};
 
-  /// equal to `GetHarmonicNum(n_)`.
+  /// @brief Equal to `GetHarmonicNum(n_)`.
   double denom_{1.0};
 
-  /// a cumulative distribution function according to Zipf's law.
+  /// @brief A cumulative distribution function according to Zipf's law.
   std::array<double, kExactBinNum> zipf_cdf_{};
 };
 

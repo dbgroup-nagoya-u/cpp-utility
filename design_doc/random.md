@@ -4,6 +4,8 @@
 
 This class generates random values according to Zipf's law. This class can accurately simulate the Zipf distribution, but it may take some time to construct an accurate cumulative distribution function.
 
+Note that `IntType` must be 32/64-bit integers, such as `size_t` and `int64_t`.
+
 ## `ApproxZipfDistribution<IntType>`
 
 This class approximates the Zipf distribution using Chlebus's approximation formula for a partial sum of the divergent p-series[^1]. Note that this approximation works well when the following conditions are satisfied:
@@ -16,6 +18,8 @@ Thus, we compute exact CDFs with $k < 100$ and use them for the corresponding qu
 The following figure shows the comparison between approximate and exact CDFs.
 
 <img src="figures/comparison_exact_approx_zipf.svg" width="540px">
+
+Note that `IntType` must be 32/64-bit integers, such as `size_t` and `int64_t`.
 
 ## Usage Example
 
