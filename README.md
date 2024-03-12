@@ -13,8 +13,6 @@
 
 ## Build
 
-**Note**: this is a header-only library. You can use this without pre-build.
-
 ### Prerequisites
 
 ```bash
@@ -37,27 +35,24 @@ sudo apt update && sudo apt install -y build-essential cmake
 
 ```bash
 mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCPP_UTILITY_BUILD_TESTS=ON ..
-make -j
-ctest -C Release
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCPP_UTILITY_BUILD_TESTS=ON
+cmake --build . --parallel --config Release
+ctest -C Release --output-on-failure
 ```
 
 ## Usage
 
 ### Linking by CMake
 
-1. Download the files in any way you prefer (e.g., `git submodule`).
-
-    ```bash
-    cd <your_project_workspace>
-    mkdir external
-    git submodule add https://github.com/dbgroup-nagoya-u/cpp-utility.git external/cpp-utility
-    ```
-
 1. Add this library to your build in `CMakeLists.txt`.
 
     ```cmake
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/external/cpp-utility")
+    FetchContent_Declare(
+        cpp-utility
+        GIT_REPOSITORY "https://github.com/dbgroup-nagoya-u/cpp-utility.git"
+        GIT_TAG "<commit_tag_>"
+    )
+    FetchContent_MakeAvailable(cpp-utility)
 
     add_executable(
       <target_bin_name>
