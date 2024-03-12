@@ -1,22 +1,19 @@
-name: Unit Tests on Ubuntu
+name: Unit Tests
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
 
 env:
   BUILD_TYPE: Release
 
 jobs:
   unit_test:
+    runs-on: ${{ inputs.os }}
     timeout-minutes: 10
-
-    strategy:
-      matrix:
-        os: [ubuntu-22.04, ubuntu-20.04]
-    runs-on: ${{ matrix.os }}
 
     steps:
     - name: Clone Main Repository
