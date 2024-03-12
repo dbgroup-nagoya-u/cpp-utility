@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Database Group, Nagoya University
+ * Copyright 2024 Database Group, Nagoya University
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,32 +14,25 @@
  * limitations under the License.
  */
 
-#ifndef CPP_UTILITY_TEST_COMMON_HPP
-#define CPP_UTILITY_TEST_COMMON_HPP
+#ifndef CPP_UTILITY_THREAD_COMMON_HPP
+#define CPP_UTILITY_THREAD_COMMON_HPP
 
-#include <cassert>
+// C++ standard libraries
+#include <atomic>
 #include <cstddef>
-#include <cstdint>
 
-/// the number of threads for testing.
-constexpr size_t kThreadNum = DBGROUP_TEST_THREAD_NUM;
-
-/// a fixed seed value to reproduce unit tests.
-constexpr size_t kRandomSeed = DBGROUP_TEST_RANDOM_SEED;
-
-#endif  // CPP_UTILITY_TEST_COMMON_HPP
-
-namespace dbgroup::lock::test
+namespace dbgroup::thread
 {
 /*##############################################################################
- * Internal enum and constants
+ * Global constants
  *############################################################################*/
 
-enum LockType {
-  kFree,
-  kSLock,
-  kXLock,
-  kSIXLock,
-};
+/// @brief An alias of the relaxed memory order.
+constexpr std::memory_order kRelaxed = std::memory_order_relaxed;
 
-}  // namespace dbgroup::lock::test
+/// @brief The maximum number of threads used in a process.
+constexpr size_t kMaxThreadNum = DBGROUP_MAX_THREAD_NUM;
+
+}  // namespace dbgroup::thread
+
+#endif  // CPP_UTILITY_THREAD_COMMON_HPP

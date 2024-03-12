@@ -18,19 +18,14 @@
 #define CPP_UTILITY_THREAD_ID_MANAGER_HPP
 
 // C++ standard libraries
-#include <atomic>
 #include <cstddef>
-#include <cstdint>
 #include <memory>
-#include <thread>
-#include <type_traits>
-#include <vector>
+
+// local sources
+#include "common.hpp"
 
 namespace dbgroup::thread
 {
-
-/// The maximum number of threads used in a process.
-constexpr size_t kMaxThreadNum = DBGROUP_MAX_THREAD_NUM;
 
 /**
  * @brief A singleton class for managing IDs for each thread.
@@ -39,9 +34,9 @@ constexpr size_t kMaxThreadNum = DBGROUP_MAX_THREAD_NUM;
 class IDManager
 {
  public:
-  /*####################################################################################
+  /*############################################################################
    * No constructors and destructor
-   *##################################################################################*/
+   *##########################################################################*/
 
   IDManager() = delete;
   ~IDManager() = delete;
@@ -52,34 +47,26 @@ class IDManager
   auto operator=(const IDManager &) -> IDManager & = delete;
   auto operator=(IDManager &&) noexcept -> IDManager & = delete;
 
-  /*####################################################################################
+  /*############################################################################
    * Public static utilities
-   *##################################################################################*/
+   *##########################################################################*/
 
   /**
-   * @return the unique thread ID in [0, DBGROUP_MAX_THREAD_NUM).
+   * @return The unique thread ID in [0, DBGROUP_MAX_THREAD_NUM).
    */
-  static auto
-  GetThreadID()  //
-      -> size_t
-  {
-    return GetHeartBeater().GetID();
-  }
+  [[nodiscard]] static auto GetThreadID()  //
+      -> size_t;
 
   /**
-   * @return a weak pointer object to check heart beats of the current thread.
+   * @return A weak pointer object to check heart beats of the current thread.
    */
-  static auto
-  GetHeartBeat()  //
-      -> std::weak_ptr<size_t>
-  {
-    return GetHeartBeater().GetHeartBeat();
-  }
+  [[nodiscard]] static auto GetHeartBeat()  //
+      -> std::weak_ptr<size_t>;
 
  private:
-  /*####################################################################################
+  /*############################################################################
    * Internal classes
-   *##################################################################################*/
+   *##########################################################################*/
 
   /**
    * @brief A class for managing heart beats of threads.
@@ -90,15 +77,10 @@ class IDManager
   class HeartBeater
   {
    public:
-    /*##################################################################################
+    /*##########################################################################
      * Public constructors and assignment operators
-     *################################################################################*/
+     *########################################################################*/
 
-    /**
-     * @brief Construct a new object.
-     *
-     * @param id the assigned thread ID.
-     */
     constexpr HeartBeater() = default;
 
     HeartBeater(const HeartBeater &) = delete;
@@ -107,136 +89,75 @@ class IDManager
     auto operator=(const HeartBeater &obj) -> HeartBeater & = delete;
     auto operator=(HeartBeater &&) noexcept -> HeartBeater & = delete;
 
-    /*##################################################################################
+    /*##########################################################################
      * Public destructor
-     *################################################################################*/
+     *########################################################################*/
 
     /**
      * @brief Destroy the object.
      *
      * This destructor removes the heart beat and thread reservation flags.
      */
-    ~HeartBeater()
-    {  //
-      id_vec_[*id_].store(false, std::memory_order_relaxed);
-    }
+    ~HeartBeater();
 
-    /*##################################################################################
+    /*##########################################################################
      * Public getters
-     *################################################################################*/
+     *########################################################################*/
 
     /**
      * @retval true if this object has a unique thread ID.
      * @retval false otherwise.
      */
-    [[nodiscard]] auto
-    HasID() const  //
-        -> bool
-    {
-      return id_.use_count() > 0;
-    }
+    [[nodiscard]] auto HasID() const  //
+        -> bool;
 
     /**
-     * @return the assigned ID for this object.
+     * @return The assigned ID for this object.
      */
-    [[nodiscard]] auto
-    GetID() const  //
-        -> size_t
-    {
-      return *id_;
-    }
+    [[nodiscard]] auto GetID() const  //
+        -> size_t;
 
     /**
-     * @return a shared pointer object to check heart beats of this object.
+     * @return A weak pointer object to check heart beats of this object.
      */
-    [[nodiscard]] auto
-    GetHeartBeat() const  //
-        -> std::weak_ptr<size_t>
-    {
-      return std::weak_ptr<size_t>{id_};
-    }
+    [[nodiscard]] auto GetHeartBeat() const  //
+        -> std::weak_ptr<size_t>;
 
-    /*##################################################################################
+    /*##########################################################################
      * Public setters
-     *################################################################################*/
+     *########################################################################*/
 
     /**
      * @brief Set a unique thread ID to this object.
      *
-     * @param id the thread ID to be assigned.
+     * @param id The thread ID to be assigned.
      */
-    void
-    SetID(const size_t id)
-    {
-      id_ = std::make_shared<size_t>(id);
-    }
+    void SetID(  //
+        const size_t id);
 
    private:
-    /*##################################################################################
+    /*##########################################################################
      * Internal member variables
-     *################################################################################*/
+     *########################################################################*/
 
-    /// The assigned ID for this object.
+    /// @brief The assigned ID for this object.
     std::shared_ptr<size_t> id_{};
   };
 
-  /*####################################################################################
+  /*############################################################################
    * Internal static utilities
-   *##################################################################################*/
-
-  /**
-   * @return an initialized atomic_bool array.
-   */
-  static auto
-  Initialize()  //
-      -> std::unique_ptr<std::atomic_bool[]>
-  {
-    auto &&vec = std::make_unique<std::atomic_bool[]>(kMaxThreadNum);
-    for (size_t i = 0; i < kMaxThreadNum; ++i) {
-      vec[i].store(false, std::memory_order_relaxed);
-    }
-
-    return std::move(vec);
-  }
+   *##########################################################################*/
 
   /**
    * @brief Get the reference to a heart beater.
    *
-   * When a thread calls this function for the first time, it prepares its unique ID and
-   * heart beat manager.
+   * When a thread calls this function for the first time, it prepares its
+   * unique ID and heart beat manager.
    *
-   * @return the reference to a heart beater.
+   * @return The reference to a heart beater.
    */
-  static auto
-  GetHeartBeater()  //
-      -> const HeartBeater &
-  {
-    thread_local HeartBeater hb{};
-    if (!hb.HasID()) {
-      auto id = std::hash<std::thread::id>{}(std::this_thread::get_id()) % kMaxThreadNum;
-      while (true) {
-        auto &dst = id_vec_[id];
-        auto reserved = dst.load(std::memory_order_relaxed);
-        if (!reserved && dst.compare_exchange_strong(reserved, true, std::memory_order_relaxed)) {
-          hb.SetID(id);
-          break;
-        }
-
-        if (++id >= kMaxThreadNum) {
-          id = 0;
-        }
-      }
-    }
-
-    return hb;
-  }
-
-  /*####################################################################################
-   * Internal class variables
-   *##################################################################################*/
-
-  /// A bool array for managing reservation states of thread IDs.
-  static inline std::unique_ptr<std::atomic_bool[]> id_vec_ = Initialize();  // NOLINT
+  [[nodiscard]] static auto GetHeartBeater()  //
+      -> const HeartBeater &;
 };
 
 }  // namespace dbgroup::thread

@@ -1,6 +1,6 @@
 # C++ Utility Library
 
-![Ubuntu-20.04](https://github.com/dbgroup-nagoya-u/cpp-utility/workflows/Ubuntu-20.04/badge.svg?branch=main)
+[![Ubuntu 22.04](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/ubuntu_22.yaml/badge.svg)](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/ubuntu_22.yaml) [![Ubuntu 20.04](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/ubuntu_20.yaml/badge.svg)](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/ubuntu_20.yaml) [![macOS](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/mac.yaml/badge.svg)](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/mac.yaml)
 
 - [Build](#build)
     - [Prerequisites](#prerequisites)
@@ -13,8 +13,6 @@
 
 ## Build
 
-**Note**: this is a header-only library. You can use this without pre-build.
-
 ### Prerequisites
 
 ```bash
@@ -24,47 +22,46 @@ sudo apt update && sudo apt install -y build-essential cmake
 ### Build Options
 
 - `DBGROUP_MAX_THREAD_NUM`: The maximum number of worker threads (defaults to the number of logical cores x2).
+- `CPP_UTILITY_SPINLOCK_RETRY_NUM`: The number of spinlock retries (default `10`).
+- `CPP_UTILITY_BACKOFF_TIME`: A back-off time interval in microseconds (default `10`).
 
 #### Parameters for Unit Testing
 
 - `CPP_UTILITY_BUILD_TESTS`: Build unit tests if `ON` (default `OFF`).
-- `CPP_UTILITY_TEST_THREAD_NUM`: The number of threads to run unit tests (default `8`).
+- `CPP_UTILITY_TEST_THREAD_NUM`: The number of threads to run unit tests (default `2`).
 - `CPP_UTILITY_TEST_RANDOM_SEED`: A fixed seed value to reproduce the results of unit tests (default `0`).
 
 ### Build and Run Unit Tests
 
 ```bash
 mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release -DCPP_UTILITY_BUILD_TESTS=ON ..
-make -j
-ctest -C Release
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCPP_UTILITY_BUILD_TESTS=ON
+cmake --build . --parallel --config Release
+ctest -C Release --output-on-failure
 ```
 
 ## Usage
 
 ### Linking by CMake
 
-1. Download the files in any way you prefer (e.g., `git submodule`).
+Add this library to your build in `CMakeLists.txt`.
 
-    ```bash
-    cd <your_project_workspace>
-    mkdir external
-    git submodule add https://github.com/dbgroup-nagoya-u/cpp-utility.git external/cpp-utility
-    ```
+```cmake
+FetchContent_Declare(
+    cpp-utility
+    GIT_REPOSITORY "https://github.com/dbgroup-nagoya-u/cpp-utility.git"
+    GIT_TAG "<commit_tag_you_want_to_use>"
+)
+FetchContent_MakeAvailable(cpp-utility)
 
-1. Add this library to your build in `CMakeLists.txt`.
-
-    ```cmake
-    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/external/cpp-utility")
-
-    add_executable(
-      <target_bin_name>
-      [<source> ...]
-    )
-    target_link_libraries(<target_bin_name> PRIVATE
-      dbgroup::cpp-utility
-    )
-    ```
+add_executable(
+    <target_bin_name>
+    [<source> ...]
+)
+target_link_libraries(<target_bin_name> PRIVATE
+    dbgroup::cpp-utility
+)
+```
 
 ### Example Usage
 

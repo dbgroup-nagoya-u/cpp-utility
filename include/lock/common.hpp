@@ -14,11 +14,43 @@
  * limitations under the License.
  */
 
-#ifndef CPP_UTILITY_SPINLOCK_HINT
+#ifndef CPP_UTILITY_LOCK_COMMON_HPP
+#define CPP_UTILITY_LOCK_COMMON_HPP
+
+// C++ standard libraries
+#include <atomic>
+#include <chrono>
+#include <cstddef>
+
+// define spinlock hints if exist
 #ifdef CPP_UTILITY_HAS_SPINLOCK_HINT
-#include <xmmintrin.h>
-#define CPP_UTILITY_SPINLOCK_HINT _mm_pause();  // NOLINT
+#include <x86intrin.h>
+#define CPP_UTILITY_SPINLOCK_HINT _mm_pause();
 #else
 #define CPP_UTILITY_SPINLOCK_HINT /* do nothing */
 #endif
-#endif
+
+namespace dbgroup::lock
+{
+/*##############################################################################
+ * Global constants
+ *############################################################################*/
+
+/// @brief An alias of the release memory order.
+constexpr std::memory_order kRelease = std::memory_order_release;
+
+/// @brief An alias of the acquire memory order.
+constexpr std::memory_order kAcquire = std::memory_order_acquire;
+
+/// @brief An alias of the relaxed memory order.
+constexpr std::memory_order kRelaxed = std::memory_order_relaxed;
+
+/// @brief The maximum number of retries for preventing busy loops.
+constexpr size_t kRetryNum{CPP_UTILITY_SPINLOCK_RETRY_NUM};
+
+/// @brief A back-off time interval for preventing busy loops.
+constexpr std::chrono::microseconds kBackOffTime{CPP_UTILITY_BACKOFF_TIME};
+
+}  // namespace dbgroup::lock
+
+#endif  // CPP_UTILITY_LOCK_COMMON_HPP
