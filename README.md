@@ -37,7 +37,7 @@ sudo apt update && sudo apt install -y build-essential cmake
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DCPP_UTILITY_BUILD_TESTS=ON
 cmake --build . --parallel --config Release
-ctest -C Release --output-on-failure
+ctest -C Release
 ```
 
 ## Usage

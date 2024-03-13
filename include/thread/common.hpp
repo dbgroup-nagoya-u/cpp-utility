@@ -27,11 +27,20 @@ namespace dbgroup::thread
  * Global constants
  *############################################################################*/
 
+/// @brief An alias of the acquire memory order.
+constexpr std::memory_order kAcquire = std::memory_order_acquire;
+
+/// @brief An alias of the release memory order.
+constexpr std::memory_order kRelease = std::memory_order_release;
+
 /// @brief An alias of the relaxed memory order.
 constexpr std::memory_order kRelaxed = std::memory_order_relaxed;
 
 /// @brief The maximum number of threads used in a process.
 constexpr size_t kMaxThreadNum = DBGROUP_MAX_THREAD_NUM;
+
+/// @brief The expected cache-line size.
+constexpr size_t kCashLineSize = 64;
 
 }  // namespace dbgroup::thread
 

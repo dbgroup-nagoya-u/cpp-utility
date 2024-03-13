@@ -1,6 +1,10 @@
 # `::dbgroup::lock`
 
-## `PessimisticLock`
+- [class PessimisticLock](#class-pessimisticlock)
+    - [Example of Usages](#example-of-usages)
+- [class OptimisticLock](#class-optimisticlock)
+
+## class PessimisticLock
 
 We have implemented three types of locks: a shared lock (`S`), an exclusive lock (`X`), and a shared-with-intent-exclusive lock (`SIX`). The following table summarizes the compatibility between these locks. The check mark (`x`) indicates that there is no conflict between the corresponding locks.
 
@@ -30,7 +34,7 @@ We maintain the internal lock state according to the following table. The first/
 |:-:|:-:|:-:|
 | an X lock flag | an SIX lock flag | a shared lock counter |
 
-### Usage Example
+### Example of Usages
 
 ```cpp
 // C++ standard libraries
@@ -80,7 +84,7 @@ main(  //
 }
 ```
 
-## `OptimisticLock`
+## class OptimisticLock
 
 In our implementation, we use a *version-check* functionality for optimistic locking. You can get a version value with `GetVersion` and check its validity with `HasSameVersion`. The following code is a quick example of version-based retries.
 

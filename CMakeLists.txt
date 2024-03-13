@@ -7,7 +7,7 @@ endif()
 
 # project information
 project(cpp_utility
-  VERSION "0.4.0"
+  VERSION "0.5.0"
   DESCRIPTION "An open-source C++ utility library for reseach use."
   LANGUAGES "CXX"
 )
@@ -81,6 +81,9 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lock/optimistic_lock.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/random/zipf.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/thread/id_manager.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/thread/epoch_manager.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/thread/component/epoch.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/thread/component/epoch_guard.cpp"
   )
   add_library(dbgroup::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
   target_compile_features(${PROJECT_NAME} PUBLIC

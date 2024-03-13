@@ -1,6 +1,10 @@
 # `::dbgroup::thread`
 
-## `IDManager`
+- [class IDManager](#class-idmanager)
+    - [Example of Usages](#example-of-usages)
+- [class EpochManager](#class-epochmanager)
+
+## class IDManager
 
 This class manages thread IDs in a single process and has two APIs.
 
@@ -8,7 +12,7 @@ The `IDManager::GetThreadID` function returns a unique thread ID in [0, `DBGROUP
 
 The `IDManager::GetHeartBeat` function returns a `std::weak_ptr<size_t>` instance to allow you to check the alive monitoring of a particular thread. The `expired` function returns `false` until the corresponding thread exits.
 
-## Usage Example
+### Example of Usages
 
 ```cpp
 // C++ standard libraries
@@ -66,3 +70,11 @@ id: 462
 thread alive: 1
 thread alive: 0
 ```
+
+## class EpochManager
+
+This class supports epoch management for multithreaded software.
+
+A class object has a unique global epoch, and a coordinator thread can advance it using the `ForwardGlobalEpoch` function. Worker threads can obtain the current epoch using the `GetCurrentEpoch` functions.
+
+The `CreateEpochGuard` function provides epoch protection for each thread with the scoped locking pattern. Worker threads can obtain the oldest protected epoch with the `GetMinEpoch` function, and the `GetProtectedEpochs` function provides all protected epochs for finer epoch management.
