@@ -82,6 +82,7 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
     "${CMAKE_CURRENT_SOURCE_DIR}/src/random/zipf.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/thread/id_manager.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/thread/component/epoch.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/thread/component/epoch_guard.cpp"
   )
   add_library(dbgroup::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
   target_compile_features(${PROJECT_NAME} PUBLIC
