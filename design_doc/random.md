@@ -1,16 +1,16 @@
-# `::dbgroup::random`
+# ::dbgroup::random
 
-- [ZipfDistribution](#zipfdistribution)
-- [ApproxZipfDistribution](#approxzipfdistribution)
+- [class ZipfDistribution](#class-zipfdistribution)
+- [class ApproxZipfDistribution](#class-approxzipfdistribution)
     - [Example of Usages](#example-of-usages)
 
-## ZipfDistribution
+## class ZipfDistribution
 
 This class generates random values according to Zipf's law. This class can accurately simulate the Zipf distribution, but it may take some time to construct an accurate cumulative distribution function.
 
 Note that a template `IntType` must be 32/64-bit integers, such as `size_t` and `int64_t`.
 
-## ApproxZipfDistribution
+## class ApproxZipfDistribution
 
 This class approximates the Zipf distribution using Chlebus's approximation formula for a partial sum of the divergent p-series[^1]. Note that this approximation works well when the following conditions are satisfied:
 

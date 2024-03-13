@@ -1,10 +1,10 @@
-# `::dbgroup::thread`
+# ::dbgroup::thread
 
-- [IDManager](#idmanager)
+- [class IDManager](#class-idmanager)
     - [Example of Usages](#example-of-usages)
-- [EpochManager](#epochmanager)
+- [class EpochManager](#class-epochmanager)
 
-## IDManager
+## class IDManager
 
 This class manages thread IDs in a single process and has two APIs.
 
@@ -71,10 +71,10 @@ thread alive: 1
 thread alive: 0
 ```
 
-## EpochManager
+## class EpochManager
 
 This class supports epoch management for multithreaded software.
 
-The class object has a unique global epoch, and a coordinator thread can advance it using the `ForwardGlobalEpoch` function. Worker threads can obtain the current epoch using the `GetCurrentEpoch` functions.
+A class object has a unique global epoch, and a coordinator thread can advance it using the `ForwardGlobalEpoch` function. Worker threads can obtain the current epoch using the `GetCurrentEpoch` functions.
 
 The `CreateEpochGuard` function provides epoch protection for each thread with the scoped locking pattern. Worker threads can obtain the oldest protected epoch with the `GetMinEpoch` function, and the `GetProtectedEpochs` function provides all protected epochs for finer epoch management.

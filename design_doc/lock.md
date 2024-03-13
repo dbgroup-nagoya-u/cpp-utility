@@ -1,10 +1,10 @@
-# `::dbgroup::lock`
+# ::dbgroup::lock
 
-- [PessimisticLock](#pessimisticlock)
+- [class PessimisticLock](#class-pessimisticlock)
     - [Example of Usages](#example-of-usages)
-- [OptimisticLock](#optimisticlock)
+- [class OptimisticLock](#class-optimisticlock)
 
-## PessimisticLock
+## class PessimisticLock
 
 We have implemented three types of locks: a shared lock (`S`), an exclusive lock (`X`), and a shared-with-intent-exclusive lock (`SIX`). The following table summarizes the compatibility between these locks. The check mark (`x`) indicates that there is no conflict between the corresponding locks.
 
@@ -84,7 +84,7 @@ main(  //
 }
 ```
 
-## OptimisticLock
+## class OptimisticLock
 
 In our implementation, we use a *version-check* functionality for optimistic locking. You can get a version value with `GetVersion` and check its validity with `HasSameVersion`. The following code is a quick example of version-based retries.
 
