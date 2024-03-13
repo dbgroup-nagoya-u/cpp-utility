@@ -1,12 +1,16 @@
 # `::dbgroup::random`
 
-## `ZipfDistribution<IntType>`
+- [ZipfDistribution](#zipfdistribution)
+- [ApproxZipfDistribution](#approxzipfdistribution)
+    - [Example of Usages](#example-of-usages)
+
+## ZipfDistribution
 
 This class generates random values according to Zipf's law. This class can accurately simulate the Zipf distribution, but it may take some time to construct an accurate cumulative distribution function.
 
-Note that `IntType` must be 32/64-bit integers, such as `size_t` and `int64_t`.
+Note that a template `IntType` must be 32/64-bit integers, such as `size_t` and `int64_t`.
 
-## `ApproxZipfDistribution<IntType>`
+## ApproxZipfDistribution
 
 This class approximates the Zipf distribution using Chlebus's approximation formula for a partial sum of the divergent p-series[^1]. Note that this approximation works well when the following conditions are satisfied:
 
@@ -19,9 +23,9 @@ The following figure shows the comparison between approximate and exact CDFs.
 
 <img src="figures/comparison_exact_approx_zipf.svg" width="540px">
 
-Note that `IntType` must be 32/64-bit integers, such as `size_t` and `int64_t`.
+Note that a template `IntType` must be 32/64-bit integers, such as `size_t` and `int64_t`.
 
-## Usage Example
+### Example of Usages
 
 ```cpp
 // C++ standard libraries

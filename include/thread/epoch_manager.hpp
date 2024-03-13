@@ -86,7 +86,7 @@ class EpochManager
   ~EpochManager();
 
   /*############################################################################
-   * Public getters
+   * Public APIs
    *##########################################################################*/
 
   /**
@@ -113,10 +113,6 @@ class EpochManager
    */
   [[nodiscard]] auto GetProtectedEpochs()  //
       -> std::pair<EpochGuard, const std::vector<size_t> &>;
-
-  /*############################################################################
-   * Public utility functions
-   *##########################################################################*/
 
   /**
    * @brief Create a guard instance based on the scoped locking pattern.
