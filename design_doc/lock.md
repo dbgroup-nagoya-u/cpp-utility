@@ -1,4 +1,4 @@
-# ::dbgroup::lock
+# `::dbgroup::lock`
 
 - [class PessimisticLock](#class-pessimisticlock)
     - [Example of Usages](#example-of-usages)

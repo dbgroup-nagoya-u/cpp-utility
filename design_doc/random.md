@@ -1,4 +1,4 @@
-# ::dbgroup::random
+# `::dbgroup::random`
 
 - [class ZipfDistribution](#class-zipfdistribution)
 - [class ApproxZipfDistribution](#class-approxzipfdistribution)

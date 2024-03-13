@@ -1,4 +1,4 @@
-# ::dbgroup::thread
+# `::dbgroup::thread`
 
 - [class IDManager](#class-idmanager)
     - [Example of Usages](#example-of-usages)
