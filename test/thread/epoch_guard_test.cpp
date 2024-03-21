@@ -15,7 +15,7 @@
  */
 
 // the correspnding header
-#include "thread/component/epoch_guard.hpp"
+#include "thread/epoch_guard.hpp"
 
 // C++ standard libraries
 #include <atomic>
@@ -29,11 +29,17 @@
 // library headers
 #include "thread/component/epoch.hpp"
 
-namespace dbgroup::thread::component::test
+namespace dbgroup::thread::test
 {
 class EpochGuardFixture : public ::testing::Test
 {
  protected:
+  /*############################################################################
+   * Type aliases
+   *##########################################################################*/
+
+  using Epoch = component::Epoch;
+
   /*############################################################################
    * Constants
    *##########################################################################*/
@@ -102,4 +108,4 @@ TEST_F(EpochGuardFixture, MoveAssignmentKeepEpochProtected)
   EXPECT_EQ(0, epoch_->GetProtectedEpoch());
 }
 
-}  // namespace dbgroup::thread::component::test
+}  // namespace dbgroup::thread::test

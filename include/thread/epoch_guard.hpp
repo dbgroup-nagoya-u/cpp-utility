@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-#ifndef DBGROUP_THREAD_COMPONENT_EPOCH_GUARD_HPP
-#define DBGROUP_THREAD_COMPONENT_EPOCH_GUARD_HPP
+#ifndef DBGROUP_THREAD_EPOCH_GUARD_HPP
+#define DBGROUP_THREAD_EPOCH_GUARD_HPP
 
 // local sources
 #include "thread/component/epoch.hpp"
 
-namespace dbgroup::thread::component
+namespace dbgroup::thread
 {
 /**
  * @brief A class to protect epochs based on the scoped locking pattern.
@@ -28,6 +28,12 @@ namespace dbgroup::thread::component
  */
 class EpochGuard
 {
+  /*############################################################################
+   * Type aliases
+   *##########################################################################*/
+
+  using Epoch = component::Epoch;
+
  public:
   /*############################################################################
    * Public constructors and assignment operators
@@ -103,6 +109,6 @@ class EpochGuard
   Epoch *epoch_{nullptr};
 };
 
-}  // namespace dbgroup::thread::component
+}  // namespace dbgroup::thread
 
-#endif  // DBGROUP_THREAD_COMPONENT_EPOCH_GUARD_HPP
+#endif  // DBGROUP_THREAD_EPOCH_GUARD_HPP

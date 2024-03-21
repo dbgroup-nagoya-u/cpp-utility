@@ -15,9 +15,9 @@
  */
 
 // the correspnding header
-#include "thread/component/epoch_guard.hpp"
+#include "thread/epoch_guard.hpp"
 
-namespace dbgroup::thread::component
+namespace dbgroup::thread
 {
 EpochGuard::EpochGuard(  //
     Epoch *epoch)
@@ -40,4 +40,4 @@ EpochGuard::GetProtectedEpoch() const  //
   return epoch_->GetProtectedEpoch();
 }
 
-}  // namespace dbgroup::thread::component
+}  // namespace dbgroup::thread

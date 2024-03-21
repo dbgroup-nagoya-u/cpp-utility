@@ -27,7 +27,7 @@
 #include <vector>
 
 // local sources
-#include "thread/component/epoch_guard.hpp"
+#include "thread/epoch_guard.hpp"
 #include "thread/id_manager.hpp"
 
 namespace dbgroup::thread
@@ -43,7 +43,6 @@ class EpochManager
    *##########################################################################*/
 
   using Epoch = component::Epoch;
-  using EpochGuard = component::EpochGuard;
 
  public:
   /*############################################################################
@@ -231,9 +230,6 @@ class EpochManager
   /*############################################################################
    * Internal constants
    *##########################################################################*/
-
-  /// @brief The expected maximum number of threads.
-  static constexpr size_t kMaxThreadNum = ::dbgroup::thread::kMaxThreadNum;
 
   /// @brief A bitmask for extracting lower bits from epochs.
   static constexpr size_t kLowerMask = kCapacity - 1UL;
