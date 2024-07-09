@@ -205,8 +205,9 @@ class ApproxZipfDistribution
   constexpr ApproxZipfDistribution(const ApproxZipfDistribution &) = default;
   constexpr ApproxZipfDistribution(ApproxZipfDistribution &&) noexcept = default;
 
-  constexpr auto operator=(const ApproxZipfDistribution &obj) -> ApproxZipfDistribution & = default;
-  constexpr auto operator=(ApproxZipfDistribution &&) noexcept
+  constexpr auto operator=(const ApproxZipfDistribution &obj)  //
+      -> ApproxZipfDistribution & = default;
+  constexpr auto operator=(ApproxZipfDistribution &&) noexcept  //
       -> ApproxZipfDistribution & = default;
 
   /*############################################################################

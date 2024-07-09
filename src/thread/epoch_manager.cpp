@@ -178,10 +178,12 @@ EpochManager::RemoveOutDatedLists(  //
       continue;
     }
 
-    // remove the out-dated list
-    prev->next = current->next;
-    delete current;
-    current = prev->next;
+    if (prev != current) {
+      // remove the out-dated list
+      prev->next = current->next;
+      delete current;
+      current = prev->next;
+    }
   }
 }
 

@@ -16,6 +16,7 @@
 
 #include "lock/pessimistic_lock.hpp"
 
+// C++ standard libraries
 #include <chrono>
 #include <future>
 #include <thread>
@@ -36,8 +37,8 @@ namespace dbgroup::lock::test
 constexpr bool kExpectSucceed = true;
 constexpr bool kExpectFail = false;
 constexpr size_t kWaitTimeMill = 100;
-constexpr auto kThreadNumForLockS = 1E2;
-constexpr auto kWriteNumPerThread = 1E5;
+constexpr size_t kThreadNumForLockS = 1E2;
+constexpr size_t kWriteNumPerThread = 1E5;
 
 /*##############################################################################
  * Fixture definition

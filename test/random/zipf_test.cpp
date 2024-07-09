@@ -16,13 +16,18 @@
 
 #include "random/zipf.hpp"
 
+// C++ standard libraries
 #include <algorithm>
 #include <cmath>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
-#include "common.hpp"
+// external libraries
 #include "gtest/gtest.h"
+
+// local sources
+#include "common.hpp"
 
 namespace dbgroup::random::test
 {
@@ -90,7 +95,7 @@ class ZipfDistributionFixture : public ::testing::Test
     for (size_t i = 0; i <= kMaxAlphaUL; ++i) {
       const auto min = uniform_dist(rand_engine);
       const auto max = min + kSmallBinNum - 1;
-      const auto alpha = i / static_cast<double>(kAlphaUnitUL);
+      const auto alpha = static_cast<double>(i) / static_cast<double>(kAlphaUnitUL);
       const ZipfDist_t zipf_dist{min, max, alpha};
 
       const auto generated_ids = RunZipfEngine(zipf_dist, min, max, rand_engine());
@@ -148,7 +153,7 @@ class ZipfDistributionFixture : public ::testing::Test
   VerifyApproxZipf()
   {
     for (size_t i = 0; i <= kMaxAlphaUL; ++i) {
-      const auto alpha = i / static_cast<double>(kAlphaUnitUL);
+      const auto alpha = static_cast<double>(i) / static_cast<double>(kAlphaUnitUL);
       ZipfDist_t zipf{0, kLargeBinNum - 1, alpha};
       ApproxZipf_t approx_zipf{0, kLargeBinNum - 1, alpha};
 
@@ -203,7 +208,7 @@ class ZipfDistributionFixture : public ::testing::Test
     const auto base_prob = static_cast<double>(freq_dist[0]) / kRepeatNum;
     for (size_t k = 2; k <= kSmallBinNum; ++k) {
       const auto kth_prob = static_cast<double>(freq_dist[k - 1]) / kRepeatNum;
-      const auto error = abs(kth_prob - base_prob / pow(k, alpha));
+      const auto error = abs(kth_prob - base_prob / pow(static_cast<double>(k), alpha));
 
       EXPECT_LT(error, kAllowableError);
     }
