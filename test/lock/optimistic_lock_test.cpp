@@ -39,6 +39,7 @@ constexpr bool kExpectFail = false;
 constexpr size_t kWaitTimeMill = 100;
 constexpr size_t kThreadNumForLockS = 1E2;
 constexpr size_t kWriteNumPerThread = 1E5;
+constexpr size_t kVerUnit = 0b010UL << 17UL;
 
 class OptimisticLockFixture : public ::testing::Test
 {
@@ -78,7 +79,9 @@ class OptimisticLockFixture : public ::testing::Test
 
     t_.join();
 
+    const size_t inc = static_cast<size_t>(lock_type == kXLock);
     ASSERT_EQ(lock_.HasSameVersion(version), lock_type != kXLock);
+    ASSERT_EQ(version + kVerUnit * inc, lock_.GetVersion());
   }
 
   void
@@ -99,7 +102,9 @@ class OptimisticLockFixture : public ::testing::Test
 
     t_.join();
 
+    const size_t inc = 1 + static_cast<size_t>(lock_type == kXLock);
     ASSERT_FALSE(lock_.HasSameVersion(version));
+    ASSERT_EQ(version + kVerUnit * inc, lock_.GetVersion());
   }
 
   void
@@ -120,7 +125,9 @@ class OptimisticLockFixture : public ::testing::Test
 
     t_.join();
 
+    const size_t inc = static_cast<size_t>(lock_type == kXLock);
     ASSERT_EQ(lock_.HasSameVersion(version), lock_type != kXLock);
+    ASSERT_EQ(version + kVerUnit * inc, lock_.GetVersion());
   }
 
   void
@@ -153,6 +160,9 @@ class OptimisticLockFixture : public ::testing::Test
     lock_.UnlockSIX();
 
     t_.join();
+
+    const size_t inc = 1 + static_cast<size_t>(lock_type == kXLock);
+    ASSERT_EQ(version + kVerUnit * inc, lock_.GetVersion());
   }
 
   void
@@ -172,6 +182,7 @@ class OptimisticLockFixture : public ::testing::Test
     t_.join();
 
     ASSERT_FALSE(lock_.HasSameVersion(version));
+    ASSERT_EQ(version + kVerUnit, lock_.GetVersion());
   }
 
   void
@@ -241,6 +252,7 @@ class OptimisticLockFixture : public ::testing::Test
     ASSERT_EQ(counter_, kThreadNum * kWriteNumPerThread);
     lock_.UnlockS();
     ASSERT_FALSE(lock_.HasSameVersion(version));
+    ASSERT_EQ(version + kVerUnit * counter_, lock_.GetVersion());
   }
 
   /*############################################################################
