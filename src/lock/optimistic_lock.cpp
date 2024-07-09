@@ -233,7 +233,7 @@ void
 OptimisticLock::UpgradeToX()
 {
   auto expected = lock_.load(kRelaxed);
-  const auto desired = expected & ~kSMask;
+  const auto desired = (expected & kVersionMask) | kXLock;
   while (true) {
     for (size_t i = 1; true; ++i) {
       if ((expected & kSMask) == kNoLocks
