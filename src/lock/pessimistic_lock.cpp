@@ -54,18 +54,12 @@ namespace dbgroup::lock
 void
 PessimisticLock::LockS()
 {
-  while (true) {
-    for (size_t i = 1; true; ++i) {
-      auto expected = lock_.load(kRelaxed);
-      if ((expected & kXLock) == kNoLocks
-          && lock_.compare_exchange_weak(expected, expected + kSLock, kAcquire, kRelaxed)) {
-        return;
-      }
-      if (i >= kRetryNum) break;
-      CPP_UTILITY_SPINLOCK_HINT
-    }
-    std::this_thread::sleep_for(kBackOffTime);
-  }
+  auto f = [](std::atomic_uint64_t *lock) -> bool {
+    auto cur = lock->load(kRelaxed);
+    return (cur & kXLock) == kNoLocks
+           && lock->compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed);
+  };
+  SpinWithBackoff(&f, &lock_);
 }
 
 void
@@ -77,18 +71,11 @@ PessimisticLock::UnlockS()
 void
 PessimisticLock::LockX()
 {
-  while (true) {
-    for (size_t i = 1; true; ++i) {
-      auto expected = lock_.load(kAcquire);
-      if (expected == kNoLocks
-          && lock_.compare_exchange_weak(expected, kXLock, kAcquire, kRelaxed)) {
-        return;
-      }
-      if (i >= kRetryNum) break;
-      CPP_UTILITY_SPINLOCK_HINT
-    }
-    std::this_thread::sleep_for(kBackOffTime);
-  }
+  auto f = [](std::atomic_uint64_t *lock) -> bool {
+    auto cur = lock->load(kRelaxed);
+    return cur == kNoLocks && lock->compare_exchange_weak(cur, cur | kXLock, kAcquire, kRelaxed);
+  };
+  SpinWithBackoff(&f, &lock_);
 }
 
 void
@@ -106,35 +93,22 @@ PessimisticLock::UnlockX()
 void
 PessimisticLock::LockSIX()
 {
-  while (true) {
-    for (size_t i = 1; true; ++i) {
-      auto expected = lock_.load(kRelaxed);
-      if ((expected & kSIXAndXMask) == kNoLocks
-          && lock_.compare_exchange_weak(expected, expected | kSIXLock, kAcquire, kRelaxed)) {
-        return;
-      }
-      if (i >= kRetryNum) break;
-      CPP_UTILITY_SPINLOCK_HINT
-    }
-    std::this_thread::sleep_for(kBackOffTime);
-  }
+  auto f = [](std::atomic_uint64_t *lock) -> bool {
+    auto cur = lock->load(kRelaxed);
+    return (cur & kSIXAndXMask) == kNoLocks
+           && lock->compare_exchange_weak(cur, cur | kSIXLock, kAcquire, kRelaxed);
+  };
+  SpinWithBackoff(&f, &lock_);
 }
 
 void
 PessimisticLock::UpgradeToX()
 {
-  while (true) {
-    for (size_t i = 1; true; ++i) {
-      auto expected = lock_.load(kAcquire);
-      if (expected == kSIXLock
-          && lock_.compare_exchange_weak(expected, kXLock, kAcquire, kRelaxed)) {
-        return;
-      }
-      if (i >= kRetryNum) break;
-      CPP_UTILITY_SPINLOCK_HINT
-    }
-    std::this_thread::sleep_for(kBackOffTime);
-  }
+  auto f = [](std::atomic_uint64_t *lock) -> bool {
+    auto cur = lock->load(kRelaxed);
+    return cur == kSIXLock && lock->compare_exchange_weak(cur, kXLock, kAcquire, kRelaxed);
+  };
+  SpinWithBackoff(&f, &lock_);
 }
 
 void

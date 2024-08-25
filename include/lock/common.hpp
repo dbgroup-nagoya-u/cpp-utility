@@ -21,6 +21,8 @@
 #include <atomic>
 #include <chrono>
 #include <cstddef>
+#include <functional>
+#include <thread>
 
 // define spinlock hints if exist
 #ifdef CPP_UTILITY_HAS_SPINLOCK_HINT
@@ -50,6 +52,34 @@ constexpr size_t kRetryNum{CPP_UTILITY_SPINLOCK_RETRY_NUM};
 
 /// @brief A back-off time interval for preventing busy loops.
 constexpr std::chrono::microseconds kBackOffTime{CPP_UTILITY_BACKOFF_TIME};
+
+/*##############################################################################
+ * Internal utilities
+ *############################################################################*/
+
+/**
+ * @brief Execute a given procedure with spinning and backoff.
+ *
+ * @param proc A target procedure.
+ * @param args Arguments for executing a given procedure.
+ * @tparam Func A function pointer.
+ * @tparam Args A parameter pack for calling a given function.
+ */
+template <class Func, class... Args>
+void
+SpinWithBackoff(  //
+    const Func* const proc,
+    Args... args)
+{
+  while (true) {
+    for (size_t i = 0; true; ++i) {
+      if ((*proc)(args...)) return;
+      if (i >= kRetryNum) break;
+      CPP_UTILITY_SPINLOCK_HINT
+    }
+    std::this_thread::sleep_for(kBackOffTime);
+  }
+}
 
 }  // namespace dbgroup::lock
 
