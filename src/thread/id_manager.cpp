@@ -15,7 +15,7 @@
  */
 
 // corresponding header
-#include "thread/id_manager.hpp"
+#include "dbgroup/thread/id_manager.hpp"
 
 // C++ standard libraries
 #include <atomic>
@@ -25,7 +25,7 @@
 #include <vector>
 
 // local sources
-#include "thread/common.hpp"
+#include "dbgroup/thread/common.hpp"
 
 namespace dbgroup::thread
 {

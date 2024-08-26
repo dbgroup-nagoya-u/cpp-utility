@@ -15,7 +15,7 @@
  */
 
 // the correspnding header
-#include "thread/component/epoch.hpp"
+#include "dbgroup/thread/component/epoch.hpp"
 
 // C++ standard libraries
 #include <atomic>
@@ -23,7 +23,7 @@
 #include <limits>
 
 // local sources
-#include "thread/common.hpp"
+#include "dbgroup/thread/common.hpp"
 
 namespace dbgroup::thread::component
 {

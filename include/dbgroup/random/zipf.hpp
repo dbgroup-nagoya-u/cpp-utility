@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef CPP_UTILITY_RANDOM_ZIPF_HPP
-#define CPP_UTILITY_RANDOM_ZIPF_HPP
+#ifndef CPP_UTILITY_DBGROUP_RANDOM_ZIPF_HPP_
+#define CPP_UTILITY_DBGROUP_RANDOM_ZIPF_HPP_
 
 // C++ standard libraries
 #include <array>
@@ -340,4 +340,4 @@ class ApproxZipfDistribution
 
 }  // namespace dbgroup::random
 
-#endif  // CPP_UTILITY_RANDOM_ZIPF_HPP
+#endif  // CPP_UTILITY_DBGROUP_RANDOM_ZIPF_HPP_

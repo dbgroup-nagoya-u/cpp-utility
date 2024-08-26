@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef DBGROUP_THREAD_EPOCH_MANAGER_HPP
-#define DBGROUP_THREAD_EPOCH_MANAGER_HPP
+#ifndef CPP_UTILITY_DBGROUP_THREAD_EPOCH_MANAGER_HPP_
+#define CPP_UTILITY_DBGROUP_THREAD_EPOCH_MANAGER_HPP_
 
 // C++ standard libraries
 #include <array>
@@ -27,8 +27,8 @@
 #include <vector>
 
 // local sources
-#include "thread/epoch_guard.hpp"
-#include "thread/id_manager.hpp"
+#include "dbgroup/thread/epoch_guard.hpp"
+#include "dbgroup/thread/id_manager.hpp"
 
 namespace dbgroup::thread
 {
@@ -281,4 +281,4 @@ class EpochManager
 
 }  // namespace dbgroup::thread
 
-#endif  // DBGROUP_THREAD_EPOCH_MANAGER_HPP
+#endif  // CPP_UTILITY_DBGROUP_THREAD_EPOCH_MANAGER_HPP_

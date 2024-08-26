@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef CPP_UTILITY_TEST_COMMON_HPP
-#define CPP_UTILITY_TEST_COMMON_HPP
+#ifndef CPP_UTILITY_TEST_COMMON_HPP_
+#define CPP_UTILITY_TEST_COMMON_HPP_
 
 #include <cassert>
 #include <cstddef>
@@ -26,8 +26,6 @@ constexpr size_t kThreadNum = DBGROUP_TEST_THREAD_NUM;
 
 /// a fixed seed value to reproduce unit tests.
 constexpr size_t kRandomSeed = DBGROUP_TEST_RANDOM_SEED;
-
-#endif  // CPP_UTILITY_TEST_COMMON_HPP
 
 namespace dbgroup::lock::test
 {
@@ -43,3 +41,5 @@ enum LockType {
 };
 
 }  // namespace dbgroup::lock::test
+
+#endif  // CPP_UTILITY_TEST_COMMON_HPP_

@@ -14,60 +14,37 @@
  * limitations under the License.
  */
 
-#ifndef CPP_UTILITY_LOCK_OPTIMISTIC_LOCK_HPP
-#define CPP_UTILITY_LOCK_OPTIMISTIC_LOCK_HPP
+#ifndef CPP_UTILITY_DBGROUP_LOCK_PESSIMISTIC_LOCK_HPP_
+#define CPP_UTILITY_DBGROUP_LOCK_PESSIMISTIC_LOCK_HPP_
 
 // C++ standard libraries
 #include <atomic>
-#include <cstdint>
 
 namespace dbgroup::lock
 {
-class OptimisticLock
+class PessimisticLock
 {
  public:
   /*############################################################################
    * Public constructors and assignment operators
    *##########################################################################*/
 
-  constexpr OptimisticLock() = default;
+  constexpr PessimisticLock() = default;
 
-  OptimisticLock(const OptimisticLock&) = delete;
-  OptimisticLock(OptimisticLock&&) = delete;
+  PessimisticLock(const PessimisticLock&) = delete;
+  PessimisticLock(PessimisticLock&&) = delete;
 
-  auto operator=(const OptimisticLock&) -> OptimisticLock& = delete;
-  auto operator=(OptimisticLock&&) -> OptimisticLock& = delete;
+  auto operator=(const PessimisticLock&) -> PessimisticLock& = delete;
+  auto operator=(PessimisticLock&&) -> PessimisticLock& = delete;
 
   /*############################################################################
    * Public destructors
    *##########################################################################*/
 
-  ~OptimisticLock() = default;
+  ~PessimisticLock() = default;
 
   /*############################################################################
-   * Optimistic read APIs
-   *##########################################################################*/
-
-  /**
-   * @return The current version value.
-   *
-   * @note This function does not give up reading a version value and continues
-   * with spinlock and back-off.
-   */
-  [[nodiscard]] auto GetVersion() const  //
-      -> uint64_t;
-
-  /**
-   * @param expected An expected version value.
-   * @retval true if the given version value is the same as the current one.
-   * @retval false otherwise.
-   */
-  [[nodiscard]] auto HasSameVersion(  //
-      const uint64_t expected) const  //
-      -> bool;
-
-  /*############################################################################
-   * Pessimistic lock APIs
+   * Public utility functions
    *##########################################################################*/
 
   /**
@@ -77,19 +54,6 @@ class OptimisticLock
    * spinlock and back-off.
    */
   void LockS();
-
-  /**
-   * @brief Get a shared lock if a given version is the same as the current one.
-   *
-   * @param ver An expected version value.
-   * @retval true if a shared lock is acquired.
-   * @retval false if the current version value is different from the given one.
-   * @note This function does not give up acquiring a lock and continues with
-   * spinlock and back-off.
-   */
-  [[nodiscard]] auto TryLockS(  //
-      const uint64_t ver)       //
-      -> bool;
 
   /**
    * @brief Release a shared lock.
@@ -108,35 +72,20 @@ class OptimisticLock
   void LockX();
 
   /**
-   * @brief Get an X lock if a given version is the same as the current one.
-   *
-   * @param ver An expected version value.
-   * @retval true if the given version value is the same as the current one.
-   * @retval false otherwise.
-   */
-  [[nodiscard]] auto TryLockX(  //
-      const uint64_t ver)       //
-      -> bool;
-
-  /**
    * @brief Downgrade an X lock to an SIX lock.
    *
-   * @retval A version value after downgrades.
    * @note If a thread calls this function without acquiring an X lock, it will
    * corrupt an internal lock state.
    */
-  auto DowngradeToSIX()  //
-      -> uint64_t;
+  void DowngradeToSIX();
 
   /**
    * @brief Release an exclusive lock.
    *
-   * @return A version value after an exclusive lock release.
    * @note If a thread calls this function without acquiring an X lock, it will
    * corrupt an internal lock state.
    */
-  auto UnlockX()  //
-      -> uint64_t;
+  void UnlockX();
 
   /**
    * @brief Get a shared-with-intent-exclusive lock.
@@ -145,16 +94,6 @@ class OptimisticLock
    * spinlock and back-off.
    */
   void LockSIX();
-
-  /**
-   * @brief Get an SIX lock if a given version is the same as the current one.
-   *
-   * @param ver an expected version value.
-   * @retval true if the given version value is the same as the current one.
-   * @retval false otherwise.
-   */
-  [[nodiscard]] auto TryLockSIX(const uint64_t ver)  //
-      -> bool;
 
   /**
    * @brief Upgrade an SIX lock to an X lock.
@@ -183,4 +122,4 @@ class OptimisticLock
 
 }  // namespace dbgroup::lock
 
-#endif  // CPP_UTILITY_LOCK_OPTIMISTIC_LOCK_HPP
+#endif  // CPP_UTILITY_DBGROUP_LOCK_PESSIMISTIC_LOCK_HPP_

@@ -15,7 +15,7 @@
  */
 
 // corresponding header
-#include "random/zipf.hpp"
+#include "dbgroup/random/zipf.hpp"
 
 // C++ standard libraries
 #include <cmath>

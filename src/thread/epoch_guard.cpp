@@ -15,7 +15,7 @@
  */
 
 // the correspnding header
-#include "thread/epoch_guard.hpp"
+#include "dbgroup/thread/epoch_guard.hpp"
 
 namespace dbgroup::thread
 {

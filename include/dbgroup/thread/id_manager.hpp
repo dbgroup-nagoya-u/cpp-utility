@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-#ifndef CPP_UTILITY_THREAD_ID_MANAGER_HPP
-#define CPP_UTILITY_THREAD_ID_MANAGER_HPP
+#ifndef CPP_UTILITY_DBGROUP_THREAD_ID_MANAGER_HPP_
+#define CPP_UTILITY_DBGROUP_THREAD_ID_MANAGER_HPP_
 
 // C++ standard libraries
 #include <cstddef>
 #include <memory>
 
 // local sources
-#include "common.hpp"
+#include "dbgroup/thread/common.hpp"
 
 namespace dbgroup::thread
 {
@@ -162,4 +162,4 @@ class IDManager
 
 }  // namespace dbgroup::thread
 
-#endif  // CPP_UTILITY_THREAD_ID_MANAGER_HPP
+#endif  // CPP_UTILITY_DBGROUP_THREAD_ID_MANAGER_HPP_
