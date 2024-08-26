@@ -15,7 +15,7 @@
  */
 
 // the correspnding header
-#include "thread/component/epoch.hpp"
+#include "dbgroup/thread/component/epoch.hpp"
 
 // C++ standard libraries
 #include <atomic>

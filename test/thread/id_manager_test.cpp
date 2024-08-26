@@ -15,7 +15,7 @@
  */
 
 // the corresponding header
-#include "thread/id_manager.hpp"
+#include "dbgroup/thread/id_manager.hpp"
 
 // C++ standard libraries
 #include <algorithm>

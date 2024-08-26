@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "lock/pessimistic_lock.hpp"
+#include "dbgroup/lock/pessimistic_lock.hpp"
 
 // C++ standard libraries
 #include <chrono>

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef CPP_UTILITY_LOCK_COMMON_HPP
-#define CPP_UTILITY_LOCK_COMMON_HPP
+#ifndef CPP_UTILITY_DBGROUP_LOCK_COMMON_HPP_
+#define CPP_UTILITY_DBGROUP_LOCK_COMMON_HPP_
 
 // C++ standard libraries
 #include <atomic>
@@ -83,4 +83,4 @@ SpinWithBackoff(  //
 
 }  // namespace dbgroup::lock
 
-#endif  // CPP_UTILITY_LOCK_COMMON_HPP
+#endif  // CPP_UTILITY_DBGROUP_LOCK_COMMON_HPP_

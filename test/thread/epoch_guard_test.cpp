@@ -15,7 +15,7 @@
  */
 
 // the correspnding header
-#include "thread/epoch_guard.hpp"
+#include "dbgroup/thread/epoch_guard.hpp"
 
 // C++ standard libraries
 #include <atomic>
@@ -27,7 +27,7 @@
 #include "gtest/gtest.h"
 
 // library headers
-#include "thread/component/epoch.hpp"
+#include "dbgroup/thread/component/epoch.hpp"
 
 namespace dbgroup::thread::test
 {

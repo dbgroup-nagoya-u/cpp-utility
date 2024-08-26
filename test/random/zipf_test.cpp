@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "random/zipf.hpp"
+#include "dbgroup/random/zipf.hpp"
 
 // C++ standard libraries
 #include <algorithm>

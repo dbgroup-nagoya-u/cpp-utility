@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef CPP_UTILITY_THREAD_COMMON_HPP
-#define CPP_UTILITY_THREAD_COMMON_HPP
+#ifndef CPP_UTILITY_DBGROUP_THREAD_COMMON_HPP_
+#define CPP_UTILITY_DBGROUP_THREAD_COMMON_HPP_
 
 // C++ standard libraries
 #include <atomic>
@@ -44,4 +44,4 @@ constexpr size_t kCashLineSize = 64;
 
 }  // namespace dbgroup::thread
 
-#endif  // CPP_UTILITY_THREAD_COMMON_HPP
+#endif  // CPP_UTILITY_DBGROUP_THREAD_COMMON_HPP_

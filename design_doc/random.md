@@ -32,7 +32,7 @@ Note that a template `IntType` must be 32/64-bit integers, such as `size_t` and 
 #include <iostream>
 
 // our libraries
-#include "random/zipf.hpp"
+#include "dbgroup/random/zipf.hpp"
 
 auto
 main(  //

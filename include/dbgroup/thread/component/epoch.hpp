@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef DBGROUP_THREAD_COMPONENT_EPOCH_HPP
-#define DBGROUP_THREAD_COMPONENT_EPOCH_HPP
+#ifndef CPP_UTILITY_DBGROUP_THREAD_COMPONENT_EPOCH_HPP_
+#define CPP_UTILITY_DBGROUP_THREAD_COMPONENT_EPOCH_HPP_
 
 // C++ standard libraries
 #include <atomic>
@@ -109,4 +109,4 @@ class Epoch
 
 }  // namespace dbgroup::thread::component
 
-#endif  // DBGROUP_THREAD_COMPONENT_EPOCH_HPP
+#endif  // CPP_UTILITY_DBGROUP_THREAD_COMPONENT_EPOCH_HPP_

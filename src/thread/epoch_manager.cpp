@@ -15,7 +15,7 @@
  */
 
 // the correspnding header
-#include "thread/epoch_manager.hpp"
+#include "dbgroup/thread/epoch_manager.hpp"
 
 // C++ standard libraries
 #include <algorithm>
@@ -27,7 +27,7 @@
 #include <vector>
 
 // local sources
-#include "thread/id_manager.hpp"
+#include "dbgroup/thread/id_manager.hpp"
 
 namespace dbgroup::thread
 {

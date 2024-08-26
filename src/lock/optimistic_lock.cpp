@@ -15,7 +15,7 @@
  */
 
 // corresponding header
-#include "lock/optimistic_lock.hpp"
+#include "dbgroup/lock/optimistic_lock.hpp"
 
 // C++ standard libraries
 #include <atomic>
@@ -23,7 +23,7 @@
 #include <thread>
 
 // local sources
-#include "lock/common.hpp"
+#include "dbgroup/lock/common.hpp"
 
 namespace
 {

@@ -43,7 +43,7 @@ We maintain the internal lock state according to the following table. The first/
 #include <vector>
 
 // our libraries
-#include "lock/pessimistic_lock.hpp"
+#include "dbgroup/lock/pessimistic_lock.hpp"
 
 auto
 main(  //

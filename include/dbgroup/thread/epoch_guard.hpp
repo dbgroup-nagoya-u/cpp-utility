@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-#ifndef DBGROUP_THREAD_EPOCH_GUARD_HPP
-#define DBGROUP_THREAD_EPOCH_GUARD_HPP
+#ifndef CPP_UTILITY_DBGROUP_THREAD_EPOCH_GUARD_HPP_
+#define CPP_UTILITY_DBGROUP_THREAD_EPOCH_GUARD_HPP_
 
 // local sources
-#include "thread/component/epoch.hpp"
+#include "dbgroup/thread/component/epoch.hpp"
 
 namespace dbgroup::thread
 {
@@ -111,4 +111,4 @@ class EpochGuard
 
 }  // namespace dbgroup::thread
 
-#endif  // DBGROUP_THREAD_EPOCH_GUARD_HPP
+#endif  // CPP_UTILITY_DBGROUP_THREAD_EPOCH_GUARD_HPP_
