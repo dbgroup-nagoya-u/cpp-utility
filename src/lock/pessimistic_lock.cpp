@@ -54,12 +54,13 @@ namespace dbgroup::lock
 void
 PessimisticLock::LockS()
 {
-  auto f = [](std::atomic_uint64_t *lock) -> bool {
-    auto cur = lock->load(kRelaxed);
-    return (cur & kXLock) == kNoLocks
-           && lock->compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed);
-  };
-  SpinWithBackoff(&f, &lock_);
+  SpinWithBackoff(
+      [](std::atomic_uint64_t *lock) -> bool {
+        auto cur = lock->load(kRelaxed);
+        return (cur & kXLock) == kNoLocks
+               && lock->compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed);
+      },
+      &lock_);
 }
 
 void
@@ -71,11 +72,13 @@ PessimisticLock::UnlockS()
 void
 PessimisticLock::LockX()
 {
-  auto f = [](std::atomic_uint64_t *lock) -> bool {
-    auto cur = lock->load(kRelaxed);
-    return cur == kNoLocks && lock->compare_exchange_weak(cur, cur | kXLock, kAcquire, kRelaxed);
-  };
-  SpinWithBackoff(&f, &lock_);
+  SpinWithBackoff(
+      [](std::atomic_uint64_t *lock) -> bool {
+        auto cur = lock->load(kRelaxed);
+        return cur == kNoLocks
+               && lock->compare_exchange_weak(cur, cur | kXLock, kAcquire, kRelaxed);
+      },
+      &lock_);
 }
 
 void
@@ -93,22 +96,24 @@ PessimisticLock::UnlockX()
 void
 PessimisticLock::LockSIX()
 {
-  auto f = [](std::atomic_uint64_t *lock) -> bool {
-    auto cur = lock->load(kRelaxed);
-    return (cur & kSIXAndXMask) == kNoLocks
-           && lock->compare_exchange_weak(cur, cur | kSIXLock, kAcquire, kRelaxed);
-  };
-  SpinWithBackoff(&f, &lock_);
+  SpinWithBackoff(
+      [](std::atomic_uint64_t *lock) -> bool {
+        auto cur = lock->load(kRelaxed);
+        return (cur & kSIXAndXMask) == kNoLocks
+               && lock->compare_exchange_weak(cur, cur | kSIXLock, kAcquire, kRelaxed);
+      },
+      &lock_);
 }
 
 void
 PessimisticLock::UpgradeToX()
 {
-  auto f = [](std::atomic_uint64_t *lock) -> bool {
-    auto cur = lock->load(kRelaxed);
-    return cur == kSIXLock && lock->compare_exchange_weak(cur, kXLock, kAcquire, kRelaxed);
-  };
-  SpinWithBackoff(&f, &lock_);
+  SpinWithBackoff(
+      [](std::atomic_uint64_t *lock) -> bool {
+        auto cur = lock->load(kRelaxed);
+        return cur == kSIXLock && lock->compare_exchange_weak(cur, kXLock, kAcquire, kRelaxed);
+      },
+      &lock_);
 }
 
 void
