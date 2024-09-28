@@ -66,6 +66,7 @@
     "KAKENHI",
     "NOLINT",
     "pthread",
+    "qnode",
     "Wextra",
     "xmmintrin",
     "zipf"

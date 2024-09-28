@@ -19,6 +19,7 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <memory>
 
 namespace dbgroup::lock
 {
@@ -35,11 +36,11 @@ class MCSLock
 
   constexpr MCSLock() = default;
 
-  MCSLock(const MCSLock&) = delete;
-  MCSLock(MCSLock&&) = delete;
+  MCSLock(const MCSLock &) = delete;
+  MCSLock(MCSLock &&) = delete;
 
-  auto operator=(const MCSLock&) -> MCSLock& = delete;
-  auto operator=(MCSLock&&) -> MCSLock& = delete;
+  auto operator=(const MCSLock &) -> MCSLock & = delete;
+  auto operator=(MCSLock &&) -> MCSLock & = delete;
 
   /*############################################################################
    * Public destructors
@@ -54,84 +55,93 @@ class MCSLock
   /**
    * @brief Get a shared lock.
    *
+   * @return A queue node for releasing this lock.
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  void LockS();
+  auto LockS()  //
+      -> MCSLock *;
 
   /**
    * @brief Release a shared lock.
    *
+   * @param qnode The queue node corresponding to this lock.
    * @note If a thread calls this function without acquiring an S lock, it will
    * corrupt an internal lock state.
    */
-  void UnlockS();
+  void UnlockS(  //
+      MCSLock *qnode);
 
   /**
    * @brief Get an exclusive lock.
    *
+   * @return A queue node for releasing this lock.
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  void LockX();
+  auto LockX()  //
+      -> MCSLock *;
 
   /**
    * @brief Downgrade an X lock to an SIX lock.
    *
+   * @param qnode The queue node corresponding to this lock.
    * @note If a thread calls this function without acquiring an X lock, it will
    * corrupt an internal lock state.
    */
-  void DowngradeToSIX();
+  void DowngradeToSIX(  //
+      MCSLock *qnode);
 
   /**
    * @brief Release an exclusive lock.
    *
+   * @param qnode The queue node corresponding to this lock.
    * @note If a thread calls this function without acquiring an X lock, it will
    * corrupt an internal lock state.
    */
-  void UnlockX();
+  void UnlockX(  //
+      MCSLock *qnode);
 
   /**
    * @brief Get a shared-with-intent-exclusive lock.
    *
+   * @return A queue node for releasing this lock.
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  void LockSIX();
+  auto LockSIX()  //
+      -> MCSLock *;
 
   /**
    * @brief Upgrade an SIX lock to an X lock.
    *
+   * @param qnode The queue node corresponding to this lock.
    * @note If a thread calls this function without acquiring an SIX lock, it
    * will corrupt an internal lock state.
    */
-  void UpgradeToX();
+  void UpgradeToX(  //
+      MCSLock *qnode);
 
   /**
    * @brief Release a shared-with-intent-exclusive lock.
    *
+   * @param qnode The queue node corresponding to this lock.
    * @note If a thread calls this function without acquiring an SIX lock, it
    * will corrupt an internal lock state.
    */
-  void UnlockSIX();
+  void UnlockSIX(  //
+      MCSLock *qnode);
 
  private:
-  /*############################################################################
-   * Internal APIs
-   *##########################################################################*/
-
-  /**
-   * @return A queue node for acquiring an exclusive lock.
-   */
-  static auto GetNode()  //
-      -> MCSLock*;
-
   /*############################################################################
    * Internal member variables
    *##########################################################################*/
 
   /// @brief The current lock state.
   std::atomic_uint64_t lock_{0};
+
+  /// @brief A thread local queue node container.
+  static inline std::unique_ptr<MCSLock> tls_node_{};
 };
 
 }  // namespace dbgroup::lock
