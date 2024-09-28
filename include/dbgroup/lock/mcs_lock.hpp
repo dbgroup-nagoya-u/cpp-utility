@@ -141,7 +141,7 @@ class MCSLock
   std::atomic_uint64_t lock_{0};
 
   /// @brief A thread local queue node container.
-  static inline std::unique_ptr<MCSLock> tls_node_{};
+  static thread_local inline std::unique_ptr<MCSLock> tls_node_{};
 };
 
 }  // namespace dbgroup::lock
