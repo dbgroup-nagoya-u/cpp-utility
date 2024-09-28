@@ -158,7 +158,7 @@ class PessimisticLockFixture : public ::testing::Test
     }
 
     // check the counter of shared locks is correctly managed
-    for (auto&& t : threads) {
+    for (auto &&t : threads) {
       t.join();
     }
     TryLock(kXLock, kExpectSucceed);
@@ -192,7 +192,7 @@ class PessimisticLockFixture : public ::testing::Test
 
     // release the shared lock, and then wait for the incrementors
     lock_.UnlockS();
-    for (auto&& t : threads) {
+    for (auto &&t : threads) {
       t.join();
     }
 
@@ -267,7 +267,7 @@ class PessimisticLockFixture : public ::testing::Test
   {
     // try to get an exclusive lock by another thread
     std::promise<void> p{};
-    auto&& f = p.get_future();
+    auto &&f = p.get_future();
     t_ = std::thread{&PessimisticLockFixture::LockWorker, this, lock_type, std::move(p)};
 
     // after short sleep, give up on acquiring the lock
@@ -292,7 +292,7 @@ class PessimisticLockFixture : public ::testing::Test
 
     // try to get an exclusive lock by another thread
     std::promise<void> p{};
-    auto&& f = p.get_future();
+    auto &&f = p.get_future();
     t_ = std::thread{upgrade_worker, std::move(p)};
 
     // after short sleep, give up on acquiring the lock
