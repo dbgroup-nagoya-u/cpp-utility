@@ -19,6 +19,7 @@
 // C++ standard libraries
 #include <chrono>
 #include <future>
+#include <stdexcept>
 #include <thread>
 #include <vector>
 
@@ -89,60 +90,6 @@ class MCSLockFixture : public ::testing::Test
 
     t_.join();
   }
-
-  // void
-  // VerifyLockSIXWith(const LockType lock_type)
-  // {
-  //   const auto expected_rc =
-  //       (lock_type == kXLock || lock_type == kSIXLock) ? kExpectFail : kExpectSucceed;
-
-  //   GetLock(lock_type);
-  //   TryLock(kSIXLock, expected_rc);
-  //   ReleaseLock(lock_type);
-
-  //   t_.join();
-  // }
-
-  // void
-  // VerifyDowngradeToSIX(const LockType lock_type)
-  // {
-  //   lock_.LockX();
-  //   lock_.DowngradeToSIX();
-
-  //   switch (lock_type) {
-  //     case kSLock:
-  //       TryLock(kSLock, kExpectSucceed);
-  //       break;
-
-  //     case kXLock:
-  //       TryLock(kXLock, kExpectFail);
-  //       break;
-
-  //     case kSIXLock:
-  //       TryLock(kSIXLock, kExpectFail);
-  //       break;
-
-  //     default:
-  //       break;
-  //   }
-
-  //   lock_.UnlockSIX();
-
-  //   t_.join();
-  // }
-
-  // void
-  // VerifyUpgradeToXWith(const LockType lock_type)
-  // {
-  //   const auto expected_rc = (lock_type == kSLock) ? kExpectFail : kExpectSucceed;
-
-  //   lock_.LockSIX();  // this lock is going to be released in TryUpgrade
-  //   GetLock(lock_type);
-  //   TryUpgrade(expected_rc);
-  //   ReleaseLock(lock_type);
-
-  //   t_.join();
-  // }
 
   // void
   // VerifyLockSWithMultiThread()
@@ -220,9 +167,8 @@ class MCSLockFixture : public ::testing::Test
       case kXLock:
         return lock_.LockX();
 
-        // case kSIXLock:
-        //   lock_.LockSIX();
-        //   break;
+      case kSIXLock:
+        throw std::runtime_error{"This lock does not have SIX locks."};
 
       case kFree:
       default:
@@ -245,9 +191,8 @@ class MCSLockFixture : public ::testing::Test
         lock_.UnlockX(lock_guard);
         break;
 
-        // case kSIXLock:
-        //   lock_.UnlockSIX();
-        //   break;
+      case kSIXLock:
+        throw std::runtime_error{"This lock does not have SIX locks."};
 
       case kFree:
       default:
@@ -286,31 +231,6 @@ class MCSLockFixture : public ::testing::Test
     }
   }
 
-  // void
-  // TryUpgrade(const bool expect_success)
-  // {
-  //   auto upgrade_worker = [this](std::promise<void> p) -> void {
-  //     lock_.UpgradeToX();
-  //     p.set_value();
-  //     lock_.UnlockX();
-  //   };
-
-  //   // try to get an exclusive lock by another thread
-  //   std::promise<void> p{};
-  //   auto &&f = p.get_future();
-  //   t_ = std::thread{upgrade_worker, std::move(p)};
-
-  //   // after short sleep, give up on acquiring the lock
-  //   const auto rc = f.wait_for(std::chrono::milliseconds{kWaitTimeMill});
-
-  //   // verify status to check locking is succeeded
-  //   if (expect_success) {
-  //     ASSERT_EQ(rc, std::future_status::ready);
-  //   } else {
-  //     ASSERT_EQ(rc, std::future_status::timeout);
-  //   }
-  // }
-
   /*############################################################################
    * Internal member variables
    *##########################################################################*/
@@ -347,13 +267,6 @@ class MCSLockFixture : public ::testing::Test
 //   VerifyLockSWith(kXLock);
 // }
 
-// TEST_F(  //
-//     MCSLockFixture,
-//     LockSWithSIXLockSucceed)
-// {
-//   VerifyLockSWith(kSIXLock);
-// }
-
 TEST_F(  //
     MCSLockFixture,
     LockXWithoutLocksSucceed)
@@ -374,76 +287,6 @@ TEST_F(  //
 {
   VerifyLockXWith(kXLock);
 }
-
-// TEST_F(  //
-//     MCSLockFixture,
-//     LockXWithSIXLockFail)
-// {
-//   VerifyLockXWith(kSIXLock);
-// }
-
-// TEST_F(  //
-//     MCSLockFixture,
-//     LockSIXWithoutLocksSucceed)
-// {
-//   VerifyLockSIXWith(kFree);
-// }
-
-// TEST_F(  //
-//     MCSLockFixture,
-//     LockSIXWithSLockSucceed)
-// {
-//   VerifyLockSIXWith(kSLock);
-// }
-
-// TEST_F(  //
-//     MCSLockFixture,
-//     LockSIXWithXLockFail)
-// {
-//   VerifyLockSIXWith(kXLock);
-// }
-
-// TEST_F(  //
-//     MCSLockFixture,
-//     LockSIXWithSIXLockFail)
-// {
-//   VerifyLockSIXWith(kSIXLock);
-// }
-
-// TEST_F(  //
-//     MCSLockFixture,
-//     LockSAfterDowngradeToSIXSucceed)
-// {
-//   VerifyDowngradeToSIX(kSLock);
-// }
-
-// TEST_F(  //
-//     MCSLockFixture,
-//     LockXAfterDowngradeToSIXFail)
-// {
-//   VerifyDowngradeToSIX(kXLock);
-// }
-
-// TEST_F(  //
-//     MCSLockFixture,
-//     LockSIXAfterDowngradeToSIXFail)
-// {
-//   VerifyDowngradeToSIX(kSIXLock);
-// }
-
-// TEST_F(  //
-//     MCSLockFixture,
-//     UpgradeToXWithoutLocksSucceed)
-// {
-//   VerifyUpgradeToXWith(kFree);
-// }
-
-// TEST_F(  //
-//     MCSLockFixture,
-//     UpgradeToXWithSLockFail)
-// {
-//   VerifyUpgradeToXWith(kSLock);
-// }
 
 // TEST_F(  //
 //     MCSLockFixture,

@@ -40,9 +40,6 @@ constexpr uint64_t kNull = 0;
 /// @brief The begin bit position of shared locks.
 constexpr uint64_t kSPos = 47;
 
-/// @brief The bit position of  a shared-with-intent-exclusive lock.
-constexpr uint64_t kSIXPos = 62;
-
 /// @brief The bet position of an exclusive lock.
 constexpr uint64_t kXPos = 63;
 
@@ -51,9 +48,6 @@ constexpr uint64_t kNoLocks = 0b000;
 
 /// @brief A lock state representing a shared lock.
 constexpr uint64_t kSLock = 1UL << kSPos;
-
-/// @brief A lock state representing a shared-with-intent-exclusive lock.
-constexpr uint64_t kSIXLock = 1UL << kSIXPos;
 
 /// @brief A lock state representing an exclusive lock.
 constexpr uint64_t kXLock = 1UL << kXPos;
@@ -64,11 +58,8 @@ constexpr uint64_t kPtrMask = kSLock - 1UL;
 /// @brief A bit mask for extracting a lock state.
 constexpr uint64_t kLockMask = ~kPtrMask;
 
-/// @brief A bit mask for extracting an SIX/X-lock state.
-constexpr uint64_t kSIXAndXMask = kSIXLock | kXLock;
-
 /// @brief A bit mask for extracting a sharedlock state.
-constexpr uint64_t kSMask = kLockMask & ~kSIXAndXMask;
+constexpr uint64_t kSMask = kLockMask & ~kXLock;
 
 }  // namespace
 
@@ -118,13 +109,6 @@ MCSLock::LockX()  //
 }
 
 void
-MCSLock::DowngradeToSIX(  //
-    MCSLock *qnode)
-{
-  throw std::runtime_error{"not implemented yet."};
-}
-
-void
 MCSLock::UnlockX(  //
     MCSLock *qnode)
 {
@@ -153,27 +137,6 @@ MCSLock::UnlockX(  //
   if ((next->lock_.fetch_sub(kXLock, kRelease) & kSMask) == 0) {
     tls_node_.reset(qnode);
   }
-}
-
-auto
-MCSLock::LockSIX()  //
-    -> MCSLock *
-{
-  throw std::runtime_error{"not implemented yet."};
-}
-
-void
-MCSLock::UpgradeToX(  //
-    MCSLock *qnode)
-{
-  throw std::runtime_error{"not implemented yet."};
-}
-
-void
-MCSLock::UnlockSIX(  //
-    MCSLock *qnode)
-{
-  throw std::runtime_error{"not implemented yet."};
 }
 
 }  // namespace dbgroup::lock
