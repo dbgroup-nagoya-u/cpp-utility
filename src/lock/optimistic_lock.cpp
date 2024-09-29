@@ -78,7 +78,7 @@ OptimisticLock::GetVersion() const  //
     *cur = lock->load(kAcquire);
     return (*cur & kXLock) == 0;
   };
-  SpinWithBackoff(&f, &lock_, &cur);
+  SpinWithBackoff(f, &lock_, &cur);
   return cur & kVersionMask;
 }
 
@@ -99,12 +99,13 @@ OptimisticLock::HasSameVersion(  //
 void
 OptimisticLock::LockS()
 {
-  auto f = [](std::atomic_uint64_t *lock) -> bool {
-    auto cur = lock->load(kRelaxed);
-    return (cur & kXLock) == kNoLocks
-           && lock->compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed);
-  };
-  SpinWithBackoff(&f, &lock_);
+  SpinWithBackoff(
+      [](std::atomic_uint64_t *lock) -> bool {
+        auto cur = lock->load(kRelaxed);
+        return (cur & kXLock) == kNoLocks
+               && lock->compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed);
+      },
+      &lock_);
 }
 
 auto
@@ -113,12 +114,13 @@ OptimisticLock::TryLockS(  //
     -> bool
 {
   uint64_t cur;
-  auto f = [](std::atomic_uint64_t *lock, uint64_t *cur, uint64_t ver) -> bool {
-    *cur = lock->load(kRelaxed);
-    return (*cur & kXAndVersionMask) != ver
-           || lock->compare_exchange_weak(*cur, *cur + kSLock, kAcquire, kRelaxed);
-  };
-  SpinWithBackoff(&f, &lock_, &cur, ver);
+  SpinWithBackoff(
+      [](std::atomic_uint64_t *lock, uint64_t *cur, uint64_t ver) -> bool {
+        *cur = lock->load(kRelaxed);
+        return (*cur & kXAndVersionMask) != ver
+               || lock->compare_exchange_weak(*cur, *cur + kSLock, kAcquire, kRelaxed);
+      },
+      &lock_, &cur, ver);
   return (cur & kXAndVersionMask) == ver;
 }
 
@@ -131,12 +133,13 @@ OptimisticLock::UnlockS()
 void
 OptimisticLock::LockX()
 {
-  auto f = [](std::atomic_uint64_t *lock) -> bool {
-    auto cur = lock->load(kRelaxed);
-    return (cur & kAllLockMask) == kNoLocks
-           && lock->compare_exchange_weak(cur, cur | kXLock, kAcquire, kRelaxed);
-  };
-  SpinWithBackoff(&f, &lock_);
+  SpinWithBackoff(
+      [](std::atomic_uint64_t *lock) -> bool {
+        auto cur = lock->load(kRelaxed);
+        return (cur & kAllLockMask) == kNoLocks
+               && lock->compare_exchange_weak(cur, cur | kXLock, kAcquire, kRelaxed);
+      },
+      &lock_);
 }
 
 auto
@@ -145,13 +148,14 @@ OptimisticLock::TryLockX(  //
     -> bool
 {
   uint64_t cur;
-  auto f = [](std::atomic_uint64_t *lock, uint64_t *cur, uint64_t ver) -> bool {
-    *cur = lock->load(kRelaxed);
-    return (*cur & kXAndVersionMask) != ver
-           || ((*cur & kSAndSIXMask) == kNoLocks
-               && lock->compare_exchange_weak(*cur, *cur | kXLock, kAcquire, kRelaxed));
-  };
-  SpinWithBackoff(&f, &lock_, &cur, ver);
+  SpinWithBackoff(
+      [](std::atomic_uint64_t *lock, uint64_t *cur, uint64_t ver) -> bool {
+        *cur = lock->load(kRelaxed);
+        return (*cur & kXAndVersionMask) != ver
+               || ((*cur & kSAndSIXMask) == kNoLocks
+                   && lock->compare_exchange_weak(*cur, *cur | kXLock, kAcquire, kRelaxed));
+      },
+      &lock_, &cur, ver);
   return (cur & kXAndVersionMask) == ver;
 }
 
@@ -174,12 +178,13 @@ OptimisticLock::UnlockX()  //
 void
 OptimisticLock::LockSIX()
 {
-  auto f = [](std::atomic_uint64_t *lock) -> bool {
-    auto cur = lock->load(kRelaxed);
-    return (cur & kSIXAndXMask) == kNoLocks
-           && lock->compare_exchange_weak(cur, cur | kSIXLock, kAcquire, kRelaxed);
-  };
-  SpinWithBackoff(&f, &lock_);
+  SpinWithBackoff(
+      [](std::atomic_uint64_t *lock) -> bool {
+        auto cur = lock->load(kRelaxed);
+        return (cur & kSIXAndXMask) == kNoLocks
+               && lock->compare_exchange_weak(cur, cur | kSIXLock, kAcquire, kRelaxed);
+      },
+      &lock_);
 }
 
 auto
@@ -188,25 +193,28 @@ OptimisticLock::TryLockSIX(  //
     -> bool
 {
   uint64_t cur;
-  auto f = [](std::atomic_uint64_t *lock, uint64_t *cur, uint64_t ver) -> bool {
-    *cur = lock->load(kRelaxed);
-    return (*cur & kXAndVersionMask) != ver
-           || ((*cur & kSIXLock) == kNoLocks
-               && lock->compare_exchange_weak(*cur, *cur | kSIXLock, kAcquire, kRelaxed));
-  };
-  SpinWithBackoff(&f, &lock_, &cur, ver);
+  SpinWithBackoff(
+      [](std::atomic_uint64_t *lock, uint64_t *cur, uint64_t ver) -> bool {
+        *cur = lock->load(kRelaxed);
+        return (*cur & kXAndVersionMask) != ver
+               || ((*cur & kSIXLock) == kNoLocks
+                   && lock->compare_exchange_weak(*cur, *cur | kSIXLock, kAcquire, kRelaxed));
+      },
+      &lock_, &cur, ver);
   return (cur & kXAndVersionMask) == ver;
 }
 
 void
 OptimisticLock::UpgradeToX()
 {
-  auto f = [](std::atomic_uint64_t *lock) -> bool {
-    auto cur = lock->load(kRelaxed);
-    return (cur & kSMask) == kNoLocks
-           && lock->compare_exchange_weak(cur, (cur & kVersionMask) | kXLock, kAcquire, kRelaxed);
-  };
-  SpinWithBackoff(&f, &lock_);
+  SpinWithBackoff(
+      [](std::atomic_uint64_t *lock) -> bool {
+        auto cur = lock->load(kRelaxed);
+        return (cur & kSMask) == kNoLocks
+               && lock->compare_exchange_weak(cur, (cur & kVersionMask) | kXLock, kAcquire,
+                                              kRelaxed);
+      },
+      &lock_);
 }
 
 void

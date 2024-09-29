@@ -68,12 +68,12 @@ constexpr std::chrono::microseconds kBackOffTime{CPP_UTILITY_BACKOFF_TIME};
 template <class Func, class... Args>
 void
 SpinWithBackoff(  //
-    const Func* const proc,
+    Func proc,
     Args... args)
 {
   while (true) {
     for (size_t i = 0; true; ++i) {
-      if ((*proc)(args...)) return;
+      if (proc(args...)) return;
       if (i >= kRetryNum) break;
       CPP_UTILITY_SPINLOCK_HINT
     }

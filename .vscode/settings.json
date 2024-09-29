@@ -59,13 +59,16 @@
     "DCPP",
     "endl",
     "gtest",
+    "Herlihy",
     "immintrin",
     "intrin",
     "iostream",
     "JPNP",
     "KAKENHI",
+    "Kaufmann",
     "NOLINT",
     "pthread",
+    "qnode",
     "Wextra",
     "xmmintrin",
     "zipf"
@@ -150,6 +153,11 @@
     "typeindex": "cpp",
     "cfenv": "cpp",
     "valarray": "cpp",
-    "*.ipp": "cpp"
+    "*.ipp": "cpp",
+    "compare": "cpp",
+    "concepts": "cpp",
+    "numbers": "cpp",
+    "semaphore": "cpp",
+    "stop_token": "cpp"
   },
 }

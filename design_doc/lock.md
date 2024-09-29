@@ -3,6 +3,8 @@
 - [class PessimisticLock](#class-pessimisticlock)
     - [Example of Usages](#example-of-usages)
 - [class OptimisticLock](#class-optimisticlock)
+- [class MCSLock](#class-mcslock)
+- [References](#references)
 
 ## class PessimisticLock
 
@@ -107,3 +109,78 @@ We maintain the internal lock state according to the following table. The bottom
 | 63-18 | 17 | 16 | 15-0 |
 |:-:|:-:|:-:|:-:|
 | a version value | an X lock flag | an SIX lock flag | a shared lock counter |
+
+## class MCSLock
+
+We have implemented the MCS queue lock [^1] with a shared lock. Since this implementation does not have SIX locks, the compatibility table and state transition diagram of this lock become as follows.
+
+|| `S` | `X` |
+|:-:|:-:|:-:|
+| `S` | `x` |  |
+| `X` | | |
+
+```mermaid
+stateDiagram-v2
+    [*] --> S : LockS
+    [*] --> X : LockX
+    S --> [*] : UnlockS
+    X --> [*] : UnlockX
+```
+
+We maintain the internal lock state according to the following table. The last bit represents an exclusive lock. The following 16 bits preserve the number of threads that have acquired shared locks. The remaining bits contain the pointer of an MCS queue node.
+
+| 63 | 62-48 | 47-0 |
+|:-:|:-:|:-:|
+| an X lock flag | a shared lock counter | a queue node pointer |
+
+We have prepared lock guard instances for this lock. Since each lock API returns the corresponding lock guard, please prepare an appropriate scope to retain it.
+
+```cpp
+// C++ standard libraries
+#include <iostream>
+#include <thread>
+#include <vector>
+
+// our libraries
+#include "dbgroup/lock/mcs_lock.hpp"
+
+auto
+main(  //
+    const int argc,
+    const char *argv[])  //
+    -> int
+{
+  // create a global lock and counter
+  ::dbgroup::lock::MCSLock lock{};
+  size_t count{0};
+
+  // prepare a sample worker procedure
+  auto worker = [&]() {
+    for (size_t loop = 0; loop < 10000; ++loop) {
+      auto &&x_guard = lock.LockX();
+      ++count;
+    }
+  };
+
+  // create and run workers
+  std::vector<std::thread> threads{};
+  for (size_t i = 0; i < 8; ++i) {
+    threads.emplace_back(worker);
+  }
+
+  // wait for the workers
+  for (auto &&t : threads) {
+    t.join();
+  }
+
+  {  // check the counter
+    auto &&s_guard = lock.LockS();
+    std::cout << count << std::endl;
+  }
+  return 0;
+}
+```
+
+## References
+
+[^1]: M. Herlihy et al., “The art of multiprocessor programming,” chapter 7, Morgan Kaufmann, 2nd edition, 2021.
