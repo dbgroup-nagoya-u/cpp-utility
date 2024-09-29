@@ -31,6 +31,113 @@ class MCSLock
 {
  public:
   /*############################################################################
+   * Public inner classes
+   *##########################################################################*/
+
+  /**
+   * @brief A class for representing a guard instance for shared locks.
+   *
+   */
+  class MCSLockSGuard
+  {
+   public:
+    /*##########################################################################
+     * Public constructors and assignment operators
+     *########################################################################*/
+
+    constexpr MCSLockSGuard() = default;
+
+    /**
+     * @param lock The address of a target lock.
+     * @param qnode The corresponding queue node for unlocking.
+     */
+    constexpr MCSLockSGuard(  //
+        MCSLock *lock,
+        MCSLock *qnode)
+        : lock_{lock}, qnode_{qnode}
+    {
+    }
+
+    MCSLockSGuard(const MCSLockSGuard &) = delete;
+
+    MCSLockSGuard(  //
+        MCSLockSGuard &&) noexcept;
+
+    auto operator=(const MCSLockSGuard &) -> MCSLockSGuard & = delete;
+
+    auto operator=(                 //
+        MCSLockSGuard &&) noexcept  //
+        -> MCSLockSGuard &;
+
+    /*##########################################################################
+     * Public destructors
+     *########################################################################*/
+
+    ~MCSLockSGuard();
+
+   private:
+    /*##########################################################################
+     * Internal member variables
+     *########################################################################*/
+
+    /// @brief The address of a target lock.
+    MCSLock *lock_{nullptr};
+
+    /// @brief The corresponding queue node for unlocking.
+    MCSLock *qnode_{nullptr};
+  };
+
+  /**
+   * @brief A class for representing a guard instance for exclusive locks.
+   *
+   */
+  class MCSLockXGuard
+  {
+   public:
+    /*##########################################################################
+     * Public constructors and assignment operators
+     *########################################################################*/
+
+    constexpr MCSLockXGuard() = default;
+
+    /**
+     * @param lock The address of a target lock.
+     * @param qnode The corresponding queue node for unlocking.
+     */
+    constexpr MCSLockXGuard(  //
+        MCSLock *lock,
+        MCSLock *qnode)
+        : lock_{lock}, qnode_{qnode}
+    {
+    }
+
+    MCSLockXGuard(const MCSLockXGuard &) = delete;
+
+    MCSLockXGuard(MCSLockXGuard &&) noexcept;
+
+    auto operator=(const MCSLockXGuard &) -> MCSLockXGuard & = delete;
+
+    auto operator=(MCSLockXGuard &&) noexcept -> MCSLockXGuard &;
+
+    /*##########################################################################
+     * Public destructors
+     *########################################################################*/
+
+    ~MCSLockXGuard();
+
+   private:
+    /*##########################################################################
+     * Internal member variables
+     *########################################################################*/
+
+    /// @brief The address of a target lock.
+    MCSLock *lock_{nullptr};
+
+    /// @brief The corresponding queue node for unlocking.
+    MCSLock *qnode_{nullptr};
+  };
+
+  /*############################################################################
    * Public constructors and assignment operators
    *##########################################################################*/
 
@@ -55,12 +162,27 @@ class MCSLock
   /**
    * @brief Get a shared lock.
    *
-   * @return A queue node for releasing this lock.
+   * @return A guard instance for the acquired lock.
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  auto LockS()  //
-      -> MCSLock *;
+  [[nodiscard]] auto LockS()  //
+      -> MCSLockSGuard;
+
+  /**
+   * @brief Get an exclusive lock.
+   *
+   * @return A guard instance for the acquired lock.
+   * @note This function does not give up acquiring a lock and continues with
+   * spinlock and back-off.
+   */
+  [[nodiscard]] auto LockX()  //
+      -> MCSLockXGuard;
+
+ private:
+  /*############################################################################
+   * Internal APIs
+   *##########################################################################*/
 
   /**
    * @brief Release a shared lock.
@@ -73,16 +195,6 @@ class MCSLock
       MCSLock *qnode);
 
   /**
-   * @brief Get an exclusive lock.
-   *
-   * @return A queue node for releasing this lock.
-   * @note This function does not give up acquiring a lock and continues with
-   * spinlock and back-off.
-   */
-  auto LockX()  //
-      -> MCSLock *;
-
-  /**
    * @brief Release an exclusive lock.
    *
    * @param qnode The queue node corresponding to this lock.
@@ -92,7 +204,6 @@ class MCSLock
   void UnlockX(  //
       MCSLock *qnode);
 
- private:
   /*############################################################################
    * Internal member variables
    *##########################################################################*/

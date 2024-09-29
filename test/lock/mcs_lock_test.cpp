@@ -21,6 +21,7 @@
 #include <future>
 #include <stdexcept>
 #include <thread>
+#include <variant>
 #include <vector>
 
 // external libraries
@@ -31,6 +32,8 @@
 
 namespace dbgroup::lock::test
 {
+using Guard = std::variant<int, MCSLock::MCSLockSGuard, MCSLock::MCSLockXGuard>;
+
 /*##############################################################################
  * Global constants
  *############################################################################*/
@@ -70,11 +73,10 @@ class MCSLockFixture : public ::testing::Test
   VerifyLockSWith(const LockType lock_type)
   {
     const auto expected_rc = (lock_type == kXLock) ? kExpectFail : kExpectSucceed;
-
-    auto *guard = GetLock(lock_type);
-    TryLock(kSLock, expected_rc);
-    ReleaseLock(lock_type, guard);
-
+    {
+      auto &&guard = GetLock(lock_type);
+      TryLock(kSLock, expected_rc);
+    }
     t_.join();
   }
 
@@ -83,11 +85,10 @@ class MCSLockFixture : public ::testing::Test
       const LockType lock_type)
   {
     const auto expected_rc = (lock_type != kFree) ? kExpectFail : kExpectSucceed;
-
-    auto *guard = GetLock(lock_type);
-    TryLock(kXLock, expected_rc);
-    ReleaseLock(lock_type, guard);
-
+    {
+      auto &&guard = GetLock(lock_type);
+      TryLock(kXLock, expected_rc);
+    }
     t_.join();
   }
 
@@ -95,14 +96,10 @@ class MCSLockFixture : public ::testing::Test
   VerifyLockSWithMultiThread()
   {
     // create threads to get/release a shared lock
-    auto lock_unlock_s = [this]() {
-      auto *s_guard = lock_.LockS();
-      lock_.UnlockS(s_guard);
-    };
     std::vector<std::thread> threads{};
     threads.reserve(kThreadNumForLockS);
     for (size_t i = 0; i < kThreadNumForLockS; ++i) {
-      threads.emplace_back(lock_unlock_s);
+      threads.emplace_back([this]() { auto &&s_guard = lock_.LockS(); });
     }
 
     // check the counter of shared locks is correctly managed
@@ -117,37 +114,35 @@ class MCSLockFixture : public ::testing::Test
   void
   VerifyLockXWithMultiThread()
   {
-    // create a shared lock to prevent a counter from modifying
-    auto *s_guard = lock_.LockS();
-
-    // create incrementor threads
-    auto increment_with_lock = [&]() {
-      for (size_t i = 0; i < kWriteNumPerThread; i++) {
-        auto *x_guard = lock_.LockX();
-        ++counter_;
-        lock_.UnlockX(x_guard);
-      }
-    };
     std::vector<std::thread> threads{};
     threads.reserve(kThreadNum);
-    for (size_t i = 0; i < kThreadNum; ++i) {
-      threads.emplace_back(increment_with_lock);
+
+    {  // create a shared lock to prevent a counter from modifying
+      auto &&s_guard = lock_.LockS();
+
+      // create incrementor threads
+      for (size_t i = 0; i < kThreadNum; ++i) {
+        threads.emplace_back([this]() {
+          for (size_t i = 0; i < kWriteNumPerThread; i++) {
+            auto &&x_guard = lock_.LockX();
+            ++counter_;
+          }
+        });
+      }
+
+      // after short sleep, check that the counter has not incremented
+      std::this_thread::sleep_for(std::chrono::milliseconds(kWaitTimeMill));
+      ASSERT_EQ(counter_, 0);
     }
 
-    // after short sleep, check that the counter has not incremented
-    std::this_thread::sleep_for(std::chrono::milliseconds(kWaitTimeMill));
-    ASSERT_EQ(counter_, 0);
-
     // release the shared lock, and then wait for the incrementors
-    lock_.UnlockS(s_guard);
     for (auto &&t : threads) {
       t.join();
     }
 
     // check the counter
-    s_guard = lock_.LockS();
+    auto &&s_guard = lock_.LockS();
     ASSERT_EQ(counter_, kThreadNum * kWriteNumPerThread);
-    lock_.UnlockS(s_guard);
   }
 
   /*############################################################################
@@ -157,14 +152,14 @@ class MCSLockFixture : public ::testing::Test
   auto
   GetLock(                       //
       const LockType lock_type)  //
-      -> MCSLock *
+      -> Guard
   {
     switch (lock_type) {
       case kSLock:
-        return lock_.LockS();
+        return Guard{lock_.LockS()};
 
       case kXLock:
-        return lock_.LockX();
+        return Guard{lock_.LockX()};
 
       case kSIXLock:
         throw std::runtime_error{"This class has no SIX locks."};
@@ -173,30 +168,7 @@ class MCSLockFixture : public ::testing::Test
       default:
         break;
     }
-    return nullptr;
-  }
-
-  void
-  ReleaseLock(  //
-      const LockType lock_type,
-      MCSLock *lock_guard)
-  {
-    switch (lock_type) {
-      case kSLock:
-        lock_.UnlockS(lock_guard);
-        break;
-
-      case kXLock:
-        lock_.UnlockX(lock_guard);
-        break;
-
-      case kSIXLock:
-        throw std::runtime_error{"This class has no SIX locks."};
-
-      case kFree:
-      default:
-        break;
-    }
+    return Guard{};
   }
 
   void
@@ -204,9 +176,8 @@ class MCSLockFixture : public ::testing::Test
       const LockType lock_type,
       std::promise<void> p)
   {
-    auto *guard = GetLock(lock_type);
+    auto &&guard = GetLock(lock_type);
     p.set_value();
-    ReleaseLock(lock_type, guard);
   }
 
   void

@@ -37,20 +37,14 @@ namespace
 /// @brief The `uintptr_t` of nullptr.
 constexpr uint64_t kNull = 0;
 
-/// @brief The begin bit position of shared locks.
-constexpr uint64_t kSPos = 47;
-
-/// @brief The bet position of an exclusive lock.
-constexpr uint64_t kXPos = 63;
-
 /// @brief A lock state representing no locks.
 constexpr uint64_t kNoLocks = 0b000;
 
 /// @brief A lock state representing a shared lock.
-constexpr uint64_t kSLock = 1UL << kSPos;
+constexpr uint64_t kSLock = 1UL << 47UL;
 
 /// @brief A lock state representing an exclusive lock.
-constexpr uint64_t kXLock = 1UL << kXPos;
+constexpr uint64_t kXLock = 1UL << 63UL;
 
 /// @brief A bit mask for extracting a node pointer.
 constexpr uint64_t kPtrMask = kSLock - 1UL;
@@ -71,31 +65,31 @@ namespace dbgroup::lock
 
 auto
 MCSLock::LockS()  //
-    -> MCSLock *
+    -> MCSLockSGuard
 {
   auto *qnode = tls_node_ ? tls_node_.release() : new MCSLock{};
   qnode->lock_.store(kNull, kRelaxed);
-  const auto new_tail = reinterpret_cast<uint64_t>(qnode) | kSLock;
+  auto tail_ptr = reinterpret_cast<uint64_t>(qnode) | kSLock;
 
   auto cur = lock_.load(kRelaxed);
   while (true) {
     if (cur) {  // there are successors
       if (lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) break;
-    } else if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) {
-      return qnode;
+    } else if (lock_.compare_exchange_weak(cur, tail_ptr, kAcquire, kRelaxed)) {
+      goto end;
     }
     CPP_UTILITY_SPINLOCK_HINT
   }
 
   // wait until predecessor gives up the lock
   tls_node_.reset(qnode);
-  auto tail_ptr = cur & kPtrMask;
+  tail_ptr = cur & kPtrMask;
   qnode = reinterpret_cast<MCSLock *>(tail_ptr);
   if (cur & kXLock) {
     SpinWithBackoff(
         [](std::atomic_uint64_t *lock, uint64_t &cur, uint64_t tail) -> bool {
           cur = lock->load(kAcquire);
-          return (cur & kPtrMask) != tail || (cur & kXLock) == 0;
+          return (cur & kPtrMask) != tail || (cur & kXLock) == kNoLocks;
         },
         &lock_, cur, tail_ptr);
     if ((cur & kPtrMask) != tail_ptr) {
@@ -106,12 +100,14 @@ MCSLock::LockS()  //
         CPP_UTILITY_SPINLOCK_HINT
       }
       SpinWithBackoff(
-          [](std::atomic_uint64_t *lock) -> bool { return (lock->load(kAcquire) & kXLock) == 0; },
+          [](std::atomic_uint64_t *lock) -> bool {
+            return (lock->load(kAcquire) & kXLock) == kNoLocks;
+          },
           &(reinterpret_cast<MCSLock *>(tail_ptr)->lock_));
     }
   }
-
-  return qnode;
+end:
+  return MCSLockSGuard{this, qnode};
 }
 
 void
@@ -141,14 +137,14 @@ MCSLock::UnlockS(  //
   }
 
   auto *next = reinterpret_cast<MCSLock *>(next_ptr);
-  if ((next->lock_.fetch_sub(kSLock, kRelease) & kSMask) == 0) {
+  if ((next->lock_.fetch_sub(kSLock, kRelease) & kSMask) == kNoLocks) {
     tls_node_.reset(qnode);
   }
 }
 
 auto
 MCSLock::LockX()  //
-    -> MCSLock *
+    -> MCSLockXGuard
 {
   auto *qnode = tls_node_ ? tls_node_.release() : new MCSLock{};
   const auto new_tail = reinterpret_cast<uint64_t>(qnode) | kXLock;
@@ -164,11 +160,13 @@ MCSLock::LockX()  //
   if (tail != nullptr) {  // wait until predecessor gives up the lock
     tail->lock_.fetch_add(new_tail & kPtrMask, kRelaxed);
     SpinWithBackoff(
-        [](std::atomic_uint64_t *lock) -> bool { return (lock->load(kAcquire) & kLockMask) == 0; },
+        [](std::atomic_uint64_t *lock) -> bool {
+          return (lock->load(kAcquire) & kLockMask) == kNoLocks;
+        },
         &(qnode->lock_));
   }
 
-  return qnode;
+  return MCSLockXGuard{this, qnode};
 }
 
 void
@@ -197,8 +195,70 @@ MCSLock::UnlockX(  //
   }
 
   auto *next = reinterpret_cast<MCSLock *>(next_ptr);
-  if ((next->lock_.fetch_sub(kXLock, kRelease) & kSMask) == 0) {
+  if ((next->lock_.fetch_sub(kXLock, kRelease) & kSMask) == kNoLocks) {
     tls_node_.reset(qnode);
+  }
+}
+
+/*##############################################################################
+ * Public inner classes
+ *############################################################################*/
+
+MCSLock::MCSLockSGuard::MCSLockSGuard(  //
+    MCSLockSGuard &&obj) noexcept
+{
+  lock_ = obj.lock_;
+  qnode_ = obj.qnode_;
+  obj.qnode_ = nullptr;
+}
+
+auto
+MCSLock::MCSLockSGuard::operator=(  //
+    MCSLockSGuard &&obj) noexcept   //
+    -> MCSLockSGuard &
+{
+  if (qnode_) {
+    lock_->UnlockS(qnode_);
+  }
+  lock_ = obj.lock_;
+  qnode_ = obj.qnode_;
+  obj.qnode_ = nullptr;
+  return *this;
+}
+
+MCSLock::MCSLockSGuard::~MCSLockSGuard()
+{
+  if (qnode_) {
+    lock_->UnlockS(qnode_);
+  }
+}
+
+MCSLock::MCSLockXGuard::MCSLockXGuard(  //
+    MCSLockXGuard &&obj) noexcept
+{
+  lock_ = obj.lock_;
+  qnode_ = obj.qnode_;
+  obj.qnode_ = nullptr;
+}
+
+auto
+MCSLock::MCSLockXGuard::operator=(  //
+    MCSLockXGuard &&obj) noexcept   //
+    -> MCSLockXGuard &
+{
+  if (qnode_) {
+    lock_->UnlockX(qnode_);
+  }
+  lock_ = obj.lock_;
+  qnode_ = obj.qnode_;
+  obj.qnode_ = nullptr;
+  return *this;
+}
+
+MCSLock::MCSLockXGuard::~MCSLockXGuard()
+{
+  if (qnode_) {
+    lock_->UnlockX(qnode_);
   }
 }
 
