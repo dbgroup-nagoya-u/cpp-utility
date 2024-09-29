@@ -73,14 +73,77 @@ auto
 MCSLock::LockS()  //
     -> MCSLock *
 {
-  throw std::runtime_error{"not implemented yet."};
+  auto *qnode = tls_node_ ? tls_node_.release() : new MCSLock{};
+  qnode->lock_.store(kNull, kRelaxed);
+  const auto new_tail = reinterpret_cast<uint64_t>(qnode) | kSLock;
+
+  auto cur = lock_.load(kRelaxed);
+  while (true) {
+    if (cur) {  // there are successors
+      if (lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) break;
+    } else if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) {
+      return qnode;
+    }
+    CPP_UTILITY_SPINLOCK_HINT
+  }
+
+  // wait until predecessor gives up the lock
+  tls_node_.reset(qnode);
+  auto tail_ptr = cur & kPtrMask;
+  qnode = reinterpret_cast<MCSLock *>(tail_ptr);
+  if (cur & kXLock) {
+    SpinWithBackoff(
+        [](std::atomic_uint64_t *lock, uint64_t &cur, uint64_t tail) -> bool {
+          cur = lock->load(kAcquire);
+          return (cur & kPtrMask) != tail || (cur & kXLock) == 0;
+        },
+        &lock_, cur, tail_ptr);
+    if ((cur & kPtrMask) != tail_ptr) {
+      qnode = reinterpret_cast<MCSLock *>(tail_ptr);
+      while (true) {
+        tail_ptr = qnode->lock_.load(kRelaxed) & kPtrMask;
+        if (tail_ptr) break;
+        CPP_UTILITY_SPINLOCK_HINT
+      }
+      SpinWithBackoff(
+          [](std::atomic_uint64_t *lock) -> bool { return (lock->load(kAcquire) & kXLock) == 0; },
+          &(reinterpret_cast<MCSLock *>(tail_ptr)->lock_));
+    }
+  }
+
+  return qnode;
 }
 
 void
 MCSLock::UnlockS(  //
     MCSLock *qnode)
 {
-  throw std::runtime_error{"not implemented yet."};
+  const auto this_ptr = reinterpret_cast<uint64_t>(qnode);
+  auto next_ptr = qnode->lock_.load(kRelaxed) & kPtrMask;
+  if (next_ptr == kNull) {
+    auto cur = lock_.load(kRelaxed);
+    while ((cur & kPtrMask) == this_ptr) {
+      const auto unlock = cur - kSLock;
+      if (unlock & kSMask) {
+        if (lock_.compare_exchange_weak(cur, unlock, kRelaxed, kRelaxed)) return;
+      } else if (lock_.compare_exchange_weak(cur, kNull, kRelaxed, kRelaxed)) {
+        tls_node_.reset(qnode);
+        return;
+      }
+      CPP_UTILITY_SPINLOCK_HINT
+    }
+
+    while (true) {  // wait until successor fills in its next field
+      next_ptr = qnode->lock_.load(kRelaxed) & kPtrMask;
+      if (next_ptr) break;
+      CPP_UTILITY_SPINLOCK_HINT
+    }
+  }
+
+  auto *next = reinterpret_cast<MCSLock *>(next_ptr);
+  if ((next->lock_.fetch_sub(kSLock, kRelease) & kSMask) == 0) {
+    tls_node_.reset(qnode);
+  }
 }
 
 auto
@@ -92,14 +155,14 @@ MCSLock::LockX()  //
 
   auto cur = lock_.load(kRelaxed);
   while (true) {
-    qnode->lock_.store((cur & kSMask) | kXLock, kRelaxed);
+    qnode->lock_.store(cur & kLockMask, kRelaxed);
     if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
 
   auto *tail = reinterpret_cast<MCSLock *>(cur & kPtrMask);
   if (tail != nullptr) {  // wait until predecessor gives up the lock
-    tail->lock_.fetch_add(new_tail & kPtrMask, kRelease);
+    tail->lock_.fetch_add(new_tail & kPtrMask, kRelaxed);
     SpinWithBackoff(
         [](std::atomic_uint64_t *lock) -> bool { return (lock->load(kAcquire) & kLockMask) == 0; },
         &(qnode->lock_));
@@ -113,7 +176,7 @@ MCSLock::UnlockX(  //
     MCSLock *qnode)
 {
   const auto this_ptr = reinterpret_cast<uint64_t>(qnode);
-  auto next_ptr = qnode->lock_.load(kAcquire) & kPtrMask;
+  auto next_ptr = qnode->lock_.load(kRelaxed) & kPtrMask;
   if (next_ptr == kNull) {
     auto cur = lock_.load(kRelaxed);
     while ((cur & kPtrMask) == this_ptr) {
@@ -127,7 +190,7 @@ MCSLock::UnlockX(  //
     }
 
     while (true) {  // wait until successor fills in its next field
-      next_ptr = qnode->lock_.load(kAcquire) & kPtrMask;
+      next_ptr = qnode->lock_.load(kRelaxed) & kPtrMask;
       if (next_ptr) break;
       CPP_UTILITY_SPINLOCK_HINT
     }

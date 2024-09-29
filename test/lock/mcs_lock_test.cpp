@@ -39,7 +39,7 @@ constexpr bool kExpectSucceed = true;
 constexpr bool kExpectFail = false;
 constexpr size_t kWaitTimeMill = 100;
 constexpr size_t kThreadNumForLockS = 1E2;
-constexpr size_t kWriteNumPerThread = 1E3;
+constexpr size_t kWriteNumPerThread = 1E4;
 
 /*##############################################################################
  * Fixture definition
@@ -66,17 +66,17 @@ class MCSLockFixture : public ::testing::Test
    * Functions for verification
    *##########################################################################*/
 
-  // void
-  // VerifyLockSWith(const LockType lock_type)
-  // {
-  //   const auto expected_rc = (lock_type == kXLock) ? kExpectFail : kExpectSucceed;
+  void
+  VerifyLockSWith(const LockType lock_type)
+  {
+    const auto expected_rc = (lock_type == kXLock) ? kExpectFail : kExpectSucceed;
 
-  //   GetLock(lock_type);
-  //   TryLock(kSLock, expected_rc);
-  //   ReleaseLock(lock_type);
+    auto *guard = GetLock(lock_type);
+    TryLock(kSLock, expected_rc);
+    ReleaseLock(lock_type, guard);
 
-  //   t_.join();
-  // }
+    t_.join();
+  }
 
   void
   VerifyLockXWith(  //
@@ -84,41 +84,41 @@ class MCSLockFixture : public ::testing::Test
   {
     const auto expected_rc = (lock_type != kFree) ? kExpectFail : kExpectSucceed;
 
-    auto *x_guard = GetLock(lock_type);
+    auto *guard = GetLock(lock_type);
     TryLock(kXLock, expected_rc);
-    ReleaseLock(lock_type, x_guard);
+    ReleaseLock(lock_type, guard);
 
     t_.join();
   }
 
-  // void
-  // VerifyLockSWithMultiThread()
-  // {
-  //   // create threads to get/release a shared lock
-  //   auto lock_unlock_s = [this]() {
-  //     lock_.LockS();
-  //     lock_.UnlockS();
-  //   };
-  //   std::vector<std::thread> threads{};
-  //   threads.reserve(kThreadNumForLockS);
-  //   for (size_t i = 0; i < kThreadNumForLockS; ++i) {
-  //     threads.emplace_back(lock_unlock_s);
-  //   }
+  void
+  VerifyLockSWithMultiThread()
+  {
+    // create threads to get/release a shared lock
+    auto lock_unlock_s = [this]() {
+      auto *s_guard = lock_.LockS();
+      lock_.UnlockS(s_guard);
+    };
+    std::vector<std::thread> threads{};
+    threads.reserve(kThreadNumForLockS);
+    for (size_t i = 0; i < kThreadNumForLockS; ++i) {
+      threads.emplace_back(lock_unlock_s);
+    }
 
-  //   // check the counter of shared locks is correctly managed
-  //   for (auto &&t : threads) {
-  //     t.join();
-  //   }
-  //   TryLock(kXLock, kExpectSucceed);
+    // check the counter of shared locks is correctly managed
+    for (auto &&t : threads) {
+      t.join();
+    }
+    TryLock(kXLock, kExpectSucceed);
 
-  //   t_.join();
-  // }
+    t_.join();
+  }
 
   void
   VerifyLockXWithMultiThread()
   {
     // create a shared lock to prevent a counter from modifying
-    auto *s_guard = lock_.LockX();
+    auto *s_guard = lock_.LockS();
 
     // create incrementor threads
     auto increment_with_lock = [&]() {
@@ -139,15 +139,15 @@ class MCSLockFixture : public ::testing::Test
     ASSERT_EQ(counter_, 0);
 
     // release the shared lock, and then wait for the incrementors
-    lock_.UnlockX(s_guard);
+    lock_.UnlockS(s_guard);
     for (auto &&t : threads) {
       t.join();
     }
 
     // check the counter
-    s_guard = lock_.LockX();
+    s_guard = lock_.LockS();
     ASSERT_EQ(counter_, kThreadNum * kWriteNumPerThread);
-    lock_.UnlockX(s_guard);
+    lock_.UnlockS(s_guard);
   }
 
   /*############################################################################
@@ -160,15 +160,14 @@ class MCSLockFixture : public ::testing::Test
       -> MCSLock *
   {
     switch (lock_type) {
-        // case kSLock:
-        //   lock_.LockS();
-        //   break;
+      case kSLock:
+        return lock_.LockS();
 
       case kXLock:
         return lock_.LockX();
 
       case kSIXLock:
-        throw std::runtime_error{"This lock does not have SIX locks."};
+        throw std::runtime_error{"This class has no SIX locks."};
 
       case kFree:
       default:
@@ -183,16 +182,16 @@ class MCSLockFixture : public ::testing::Test
       MCSLock *lock_guard)
   {
     switch (lock_type) {
-        // case kSLock:
-        //   lock_.UnlockS();
-        //   break;
+      case kSLock:
+        lock_.UnlockS(lock_guard);
+        break;
 
       case kXLock:
         lock_.UnlockX(lock_guard);
         break;
 
       case kSIXLock:
-        throw std::runtime_error{"This lock does not have SIX locks."};
+        throw std::runtime_error{"This class has no SIX locks."};
 
       case kFree:
       default:
@@ -205,9 +204,9 @@ class MCSLockFixture : public ::testing::Test
       const LockType lock_type,
       std::promise<void> p)
   {
-    auto *lock_guard = GetLock(lock_type);
+    auto *guard = GetLock(lock_type);
     p.set_value();
-    ReleaseLock(lock_type, lock_guard);
+    ReleaseLock(lock_type, guard);
   }
 
   void
@@ -246,26 +245,26 @@ class MCSLockFixture : public ::testing::Test
  * Unit test definitions
  *############################################################################*/
 
-// TEST_F(  //
-//     MCSLockFixture,
-//     LockSWithoutLocksSucceed)
-// {
-//   VerifyLockSWith(kFree);
-// }
+TEST_F(  //
+    MCSLockFixture,
+    LockSWithoutLocksSucceed)
+{
+  VerifyLockSWith(kFree);
+}
 
-// TEST_F(  //
-//     MCSLockFixture,
-//     LockSWithSLockSucceed)
-// {
-//   VerifyLockSWith(kSLock);
-// }
+TEST_F(  //
+    MCSLockFixture,
+    LockSWithSLockSucceed)
+{
+  VerifyLockSWith(kSLock);
+}
 
-// TEST_F(  //
-//     MCSLockFixture,
-//     LockSWithXLockFail)
-// {
-//   VerifyLockSWith(kXLock);
-// }
+TEST_F(  //
+    MCSLockFixture,
+    LockSWithXLockFail)
+{
+  VerifyLockSWith(kXLock);
+}
 
 TEST_F(  //
     MCSLockFixture,
@@ -274,12 +273,12 @@ TEST_F(  //
   VerifyLockXWith(kFree);
 }
 
-// TEST_F(  //
-//     MCSLockFixture,
-//     LockXWithSLockFail)
-// {
-//   VerifyLockXWith(kSLock);
-// }
+TEST_F(  //
+    MCSLockFixture,
+    LockXWithSLockFail)
+{
+  VerifyLockXWith(kSLock);
+}
 
 TEST_F(  //
     MCSLockFixture,
@@ -288,12 +287,12 @@ TEST_F(  //
   VerifyLockXWith(kXLock);
 }
 
-// TEST_F(  //
-//     MCSLockFixture,
-//     SharedLockCounterIsCorrectlyManaged)
-// {
-//   VerifyLockSWithMultiThread();
-// }
+TEST_F(  //
+    MCSLockFixture,
+    SharedLockCounterIsCorrectlyManaged)
+{
+  VerifyLockSWithMultiThread();
+}
 
 TEST_F(  //
     MCSLockFixture,
