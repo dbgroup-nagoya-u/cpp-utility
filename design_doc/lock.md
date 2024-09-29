@@ -129,7 +129,7 @@ stateDiagram-v2
 
 We maintain the internal lock state according to the following table. The last bit represents an exclusive lock. The following 16 bits preserve the number of threads that have acquired shared locks. The remaining bits contain the pointer of an MCS queue node.
 
-| 63 | 62-48 | 47-0 |
+| 63 | 62-47 | 46-0 |
 |:-:|:-:|:-:|
 | an X lock flag | a shared lock counter | a queue node pointer |
 
