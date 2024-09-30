@@ -22,9 +22,6 @@
 #include <cstdint>
 #include <thread>
 
-// temp
-#include <stdexcept>
-
 // local sources
 #include "dbgroup/lock/common.hpp"
 
@@ -110,6 +107,37 @@ end:
   return MCSLockSGuard{this, qnode};
 }
 
+auto
+MCSLock::LockX()  //
+    -> MCSLockXGuard
+{
+  auto *qnode = tls_node_ ? tls_node_.release() : new MCSLock{};
+  const auto new_tail = reinterpret_cast<uint64_t>(qnode) | kXLock;
+
+  auto cur = lock_.load(kRelaxed);
+  while (true) {
+    qnode->lock_.store(cur & kLockMask, kRelaxed);
+    if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
+    CPP_UTILITY_SPINLOCK_HINT
+  }
+
+  auto *tail = reinterpret_cast<MCSLock *>(cur & kPtrMask);
+  if (tail != nullptr) {  // wait until predecessor gives up the lock
+    tail->lock_.fetch_add(new_tail & kPtrMask, kRelaxed);
+    SpinWithBackoff(
+        [](std::atomic_uint64_t *lock) -> bool {
+          return (lock->load(kAcquire) & kLockMask) == kNoLocks;
+        },
+        &(qnode->lock_));
+  }
+
+  return MCSLockXGuard{this, qnode};
+}
+
+/*##############################################################################
+ * Internal APIs
+ *############################################################################*/
+
 void
 MCSLock::UnlockS(  //
     MCSLock *qnode)
@@ -140,33 +168,6 @@ MCSLock::UnlockS(  //
   if ((next->lock_.fetch_sub(kSLock, kRelease) & kSMask) == kNoLocks) {
     tls_node_.reset(qnode);
   }
-}
-
-auto
-MCSLock::LockX()  //
-    -> MCSLockXGuard
-{
-  auto *qnode = tls_node_ ? tls_node_.release() : new MCSLock{};
-  const auto new_tail = reinterpret_cast<uint64_t>(qnode) | kXLock;
-
-  auto cur = lock_.load(kRelaxed);
-  while (true) {
-    qnode->lock_.store(cur & kLockMask, kRelaxed);
-    if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
-    CPP_UTILITY_SPINLOCK_HINT
-  }
-
-  auto *tail = reinterpret_cast<MCSLock *>(cur & kPtrMask);
-  if (tail != nullptr) {  // wait until predecessor gives up the lock
-    tail->lock_.fetch_add(new_tail & kPtrMask, kRelaxed);
-    SpinWithBackoff(
-        [](std::atomic_uint64_t *lock) -> bool {
-          return (lock->load(kAcquire) & kLockMask) == kNoLocks;
-        },
-        &(qnode->lock_));
-  }
-
-  return MCSLockXGuard{this, qnode};
 }
 
 void
