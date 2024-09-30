@@ -73,7 +73,7 @@ MCSLock::LockS()  //
     if (cur) {  // there are successors
       if (lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) break;
     } else if (lock_.compare_exchange_weak(cur, tail_ptr, kAcquire, kRelaxed)) {
-      goto end;
+      goto end;  // NOLINT
     }
     CPP_UTILITY_SPINLOCK_HINT
   }
@@ -204,9 +204,8 @@ MCSLock::UnlockX(  //
 
 MCSLock::MCSLockSGuard::MCSLockSGuard(  //
     MCSLockSGuard &&obj) noexcept
+    : lock_{obj.lock_}, qnode_{obj.qnode_}
 {
-  lock_ = obj.lock_;
-  qnode_ = obj.qnode_;
   obj.qnode_ = nullptr;
 }
 
@@ -233,9 +232,8 @@ MCSLock::MCSLockSGuard::~MCSLockSGuard()
 
 MCSLock::MCSLockXGuard::MCSLockXGuard(  //
     MCSLockXGuard &&obj) noexcept
+    : lock_{obj.lock_}, qnode_{obj.qnode_}
 {
-  lock_ = obj.lock_;
-  qnode_ = obj.qnode_;
   obj.qnode_ = nullptr;
 }
 

@@ -56,8 +56,8 @@ class EpochGuard
    */
   constexpr EpochGuard(  //
       EpochGuard &&obj) noexcept
+      : epoch_{obj.epoch_}
   {
-    epoch_ = obj.epoch_;
     obj.epoch_ = nullptr;
   }
 

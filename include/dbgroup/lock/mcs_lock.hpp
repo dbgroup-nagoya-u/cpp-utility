@@ -61,12 +61,12 @@ class MCSLock
     MCSLockSGuard(const MCSLockSGuard &) = delete;
 
     MCSLockSGuard(  //
-        MCSLockSGuard &&) noexcept;
+        MCSLockSGuard &&obj) noexcept;
 
     auto operator=(const MCSLockSGuard &) -> MCSLockSGuard & = delete;
 
-    auto operator=(                 //
-        MCSLockSGuard &&) noexcept  //
+    auto operator=(                    //
+        MCSLockSGuard &&obj) noexcept  //
         -> MCSLockSGuard &;
 
     /*##########################################################################
@@ -113,11 +113,14 @@ class MCSLock
 
     MCSLockXGuard(const MCSLockXGuard &) = delete;
 
-    MCSLockXGuard(MCSLockXGuard &&) noexcept;
+    MCSLockXGuard(  //
+        MCSLockXGuard &&obj) noexcept;
 
     auto operator=(const MCSLockXGuard &) -> MCSLockXGuard & = delete;
 
-    auto operator=(MCSLockXGuard &&) noexcept -> MCSLockXGuard &;
+    auto operator=(                    //
+        MCSLockXGuard &&obj) noexcept  //
+        -> MCSLockXGuard &;
 
     /*##########################################################################
      * Public destructors
@@ -212,7 +215,7 @@ class MCSLock
   std::atomic_uint64_t lock_{0};
 
   /// @brief A thread local queue node container.
-  static thread_local inline std::unique_ptr<MCSLock> tls_node_{};
+  static thread_local inline std::unique_ptr<MCSLock> tls_node_{};  // NOLINT
 };
 
 }  // namespace dbgroup::lock

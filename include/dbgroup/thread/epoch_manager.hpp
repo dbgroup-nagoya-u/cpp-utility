@@ -213,7 +213,7 @@ class EpochManager
      *########################################################################*/
 
     /// @brief A pointer to the next node.
-    ProtectedNode *next{nullptr};  // NOLINT
+    ProtectedNode *next{nullptr};
 
    private:
     /*##########################################################################

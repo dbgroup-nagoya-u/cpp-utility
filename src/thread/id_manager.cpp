@@ -54,7 +54,7 @@ Initialize()  //
  *############################################################################*/
 
 /// @brief A bool array for managing reservation states of thread IDs.
-std::unique_ptr<std::atomic_bool[]> id_vec = Initialize();
+std::unique_ptr<std::atomic_bool[]> _id_vec = Initialize();  // NOLINT
 
 }  // namespace
 
@@ -88,7 +88,7 @@ IDManager::GetHeartBeater()  //
   if (!hb.HasID()) {
     auto id = std::hash<std::thread::id>{}(std::this_thread::get_id()) % kMaxThreadNum;
     while (true) {
-      auto &dst = id_vec[id];
+      auto &dst = _id_vec[id];
       auto reserved = dst.load(kRelaxed);
       if (!reserved && dst.compare_exchange_strong(reserved, true, kRelaxed)) {
         hb.SetID(id);
@@ -108,7 +108,7 @@ IDManager::GetHeartBeater()  //
 
 IDManager::HeartBeater::~HeartBeater()
 {  //
-  id_vec[*id_].store(false, kRelaxed);
+  _id_vec[*id_].store(false, kRelaxed);
 }
 
 auto

@@ -73,7 +73,7 @@ auto
 OptimisticLock::GetVersion() const  //
     -> uint64_t
 {
-  uint64_t cur;
+  uint64_t cur{};
   SpinWithBackoff(
       [](const std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
         *cur = lock->load(kAcquire);
@@ -84,12 +84,12 @@ OptimisticLock::GetVersion() const  //
 }
 
 auto
-OptimisticLock::HasSameVersion(  //
-    const uint64_t cur) const    //
+OptimisticLock::HasSameVersion(     //
+    const uint64_t expected) const  //
     -> bool
 {
   std::atomic_thread_fence(kRelease);
-  return cur == (lock_.load(kRelaxed) & kXAndVersionMask);
+  return expected == (lock_.load(kRelaxed) & kXAndVersionMask);
 }
 
 /*##############################################################################
@@ -113,7 +113,7 @@ OptimisticLock::TryLockS(  //
     const uint64_t ver)    //
     -> bool
 {
-  uint64_t cur;
+  uint64_t cur{};
   SpinWithBackoff(
       [](std::atomic_uint64_t *lock, uint64_t *cur, uint64_t ver) -> bool {
         *cur = lock->load(kRelaxed);
@@ -147,7 +147,7 @@ OptimisticLock::TryLockX(  //
     const uint64_t ver)    //
     -> bool
 {
-  uint64_t cur;
+  uint64_t cur{};
   SpinWithBackoff(
       [](std::atomic_uint64_t *lock, uint64_t *cur, uint64_t ver) -> bool {
         *cur = lock->load(kRelaxed);
@@ -192,7 +192,7 @@ OptimisticLock::TryLockSIX(  //
     const uint64_t ver)      //
     -> bool
 {
-  uint64_t cur;
+  uint64_t cur{};
   SpinWithBackoff(
       [](std::atomic_uint64_t *lock, uint64_t *cur, uint64_t ver) -> bool {
         *cur = lock->load(kRelaxed);

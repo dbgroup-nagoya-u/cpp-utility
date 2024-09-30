@@ -79,7 +79,7 @@ class OptimisticLockFixture : public ::testing::Test
 
     t_.join();
 
-    const size_t inc = static_cast<size_t>(lock_type == kXLock);
+    const size_t inc = lock_type == kXLock;
     ASSERT_EQ(lock_.HasSameVersion(version), lock_type != kXLock);
     ASSERT_EQ(version + kVerUnit * inc, lock_.GetVersion());
   }
@@ -125,7 +125,7 @@ class OptimisticLockFixture : public ::testing::Test
 
     t_.join();
 
-    const size_t inc = static_cast<size_t>(lock_type == kXLock);
+    const size_t inc = lock_type == kXLock;
     ASSERT_EQ(lock_.HasSameVersion(version), lock_type != kXLock);
     ASSERT_EQ(version + kVerUnit * inc, lock_.GetVersion());
   }
