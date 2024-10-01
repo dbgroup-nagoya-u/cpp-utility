@@ -31,6 +31,13 @@ class OptiQL
 {
  public:
   /*############################################################################
+   * Public constants
+   *##########################################################################*/
+
+  /// @brief The maximum number of queue nodes.
+  static constexpr uint64_t kQNodeNum = 1UL << 16UL;
+
+  /*############################################################################
    * Public inner classes
    *##########################################################################*/
 
@@ -60,8 +67,12 @@ class OptiQL
 
     OptiQLGuard(const OptiQLGuard &) = delete;
 
-    OptiQLGuard(  //
-        OptiQLGuard &&obj) noexcept;
+    constexpr OptiQLGuard(  //
+        OptiQLGuard &&obj) noexcept
+        : lock_{obj.lock_}, qid_{obj.qid_}
+    {
+      obj.qid_ = kQNodeNum;
+    }
 
     auto operator=(const OptiQLGuard &) -> OptiQLGuard & = delete;
 

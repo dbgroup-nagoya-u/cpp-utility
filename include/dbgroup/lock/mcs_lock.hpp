@@ -60,8 +60,12 @@ class MCSLock
 
     MCSLockSGuard(const MCSLockSGuard &) = delete;
 
-    MCSLockSGuard(  //
-        MCSLockSGuard &&obj) noexcept;
+    constexpr MCSLockSGuard(  //
+        MCSLockSGuard &&obj) noexcept
+        : lock_{obj.lock_}, qnode_{obj.qnode_}
+    {
+      obj.qnode_ = nullptr;
+    }
 
     auto operator=(const MCSLockSGuard &) -> MCSLockSGuard & = delete;
 
@@ -113,8 +117,12 @@ class MCSLock
 
     MCSLockXGuard(const MCSLockXGuard &) = delete;
 
-    MCSLockXGuard(  //
-        MCSLockXGuard &&obj) noexcept;
+    constexpr MCSLockXGuard(  //
+        MCSLockXGuard &&obj) noexcept
+        : lock_{obj.lock_}, qnode_{obj.qnode_}
+    {
+      obj.qnode_ = nullptr;
+    }
 
     auto operator=(const MCSLockXGuard &) -> MCSLockXGuard & = delete;
 

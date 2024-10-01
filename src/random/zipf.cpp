@@ -62,7 +62,7 @@ ZipfDistribution<IntType>::UpdateCDF()
   // compute a base probability
   auto base_prob = 0.0;
   for (IntType i = 1; i < bin_num + 1; ++i) {
-    base_prob += 1.0 / pow(i, alpha_);
+    base_prob += 1.0 / std::pow(i, alpha_);
   }
   base_prob = 1.0 / base_prob;
 
@@ -70,7 +70,7 @@ ZipfDistribution<IntType>::UpdateCDF()
   zipf_cdf_.reserve(bin_num);
   zipf_cdf_.emplace_back(base_prob);
   for (IntType i = 1; i < bin_num; ++i) {
-    const auto ith_prob = zipf_cdf_.at(i - 1) + base_prob / pow(i + 1, alpha_);
+    const auto ith_prob = zipf_cdf_.at(i - 1) + base_prob / std::pow(i + 1, alpha_);
     zipf_cdf_.emplace_back(ith_prob);
   }
   zipf_cdf_.at(bin_num - 1) = 1.0;
@@ -117,14 +117,14 @@ ApproxZipfDistribution<IntType>::UpdateCDF()
     // compute a base probability exactly
     auto base_prob = 0.0;
     for (IntType i = 1; i < n_ + 1; ++i) {
-      base_prob += 1.0 / pow(i, alpha_);
+      base_prob += 1.0 / std::pow(i, alpha_);
     }
     base_prob = 1.0 / base_prob;
 
     // create an exact CDF according to Zipf's law
     zipf_cdf_.at(0) = base_prob;
     for (IntType i = 1; i < static_cast<IntType>(kExactBinNum); ++i) {
-      const auto ith_prob = zipf_cdf_.at(i - 1) + base_prob / pow(i + 1, alpha_);
+      const auto ith_prob = zipf_cdf_.at(i - 1) + base_prob / std::pow(i + 1, alpha_);
       zipf_cdf_.at(i) = ith_prob;
     }
     zipf_cdf_.at(n_ - 1) = 1.0;
@@ -134,12 +134,12 @@ ApproxZipfDistribution<IntType>::UpdateCDF()
     auto base_prob = 0.0;
     IntType i = 1;
     while (i < static_cast<IntType>(kExactBinNum) + 1) {  // compute exact values
-      base_prob += 1.0 / pow(i++, alpha_);
+      base_prob += 1.0 / std::pow(i++, alpha_);
     }
     while (i < n_ + 1) {  // compute approximate values
-      const auto low = 1.0 / pow(i, alpha_);
+      const auto low = 1.0 / std::pow(i, alpha_);
       i += kSkipSize;
-      const auto high = 1.0 / pow(i, alpha_);
+      const auto high = 1.0 / std::pow(i, alpha_);
       base_prob += (low + high) * kSkipSize / 2;
     }
     base_prob = 1.0 / base_prob;
@@ -147,7 +147,7 @@ ApproxZipfDistribution<IntType>::UpdateCDF()
     // create a CDF according to Zipf's law
     zipf_cdf_.at(0) = base_prob;
     for (IntType j = 1; j < static_cast<IntType>(kExactBinNum); ++j) {
-      const auto ith_prob = zipf_cdf_.at(j - 1) + base_prob / pow(j + 1, alpha_);
+      const auto ith_prob = zipf_cdf_.at(j - 1) + base_prob / std::pow(j + 1, alpha_);
       zipf_cdf_.at(j) = ith_prob;
     }
   }

@@ -19,6 +19,7 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <bit>
 #include <cstdint>
 #include <thread>
 
@@ -66,7 +67,7 @@ MCSLock::LockS()  //
 {
   auto *qnode = tls_node_ ? tls_node_.release() : new MCSLock{};
   qnode->lock_.store(kNull, kRelaxed);
-  auto tail_ptr = reinterpret_cast<uint64_t>(qnode) | kSLock;
+  auto tail_ptr = std::bit_cast<uint64_t>(qnode) | kSLock;
 
   auto cur = lock_.load(kRelaxed);
   while (true) {
@@ -81,7 +82,7 @@ MCSLock::LockS()  //
   // wait until predecessor gives up the lock
   tls_node_.reset(qnode);
   tail_ptr = cur & kQIDMask;
-  qnode = reinterpret_cast<MCSLock *>(tail_ptr);
+  qnode = std::bit_cast<MCSLock *>(tail_ptr);
   if (cur & kXLock) {
     SpinWithBackoff(
         [](std::atomic_uint64_t *lock, uint64_t &cur, uint64_t tail) -> bool {
@@ -90,7 +91,7 @@ MCSLock::LockS()  //
         },
         &lock_, cur, tail_ptr);
     if ((cur & kQIDMask) != tail_ptr) {
-      qnode = reinterpret_cast<MCSLock *>(tail_ptr);
+      qnode = std::bit_cast<MCSLock *>(tail_ptr);
       while (true) {
         tail_ptr = qnode->lock_.load(kAcquire) & kQIDMask;
         if (tail_ptr) break;
@@ -100,7 +101,7 @@ MCSLock::LockS()  //
           [](std::atomic_uint64_t *lock) -> bool {
             return (lock->load(kAcquire) & kXLock) == kNoLocks;
           },
-          &(reinterpret_cast<MCSLock *>(tail_ptr)->lock_));
+          &(std::bit_cast<MCSLock *>(tail_ptr)->lock_));
     }
   }
 end:
@@ -112,13 +113,13 @@ MCSLock::LockX()  //
     -> MCSLockXGuard
 {
   auto *qnode = tls_node_ ? tls_node_.release() : new MCSLock{};
-  const auto new_tail = reinterpret_cast<uint64_t>(qnode);
+  const auto new_tail = std::bit_cast<uint64_t>(qnode);
 
   qnode->lock_.store(kNull, kRelaxed);
   const auto cur = lock_.exchange(new_tail | kXLock, kAcquire);
   qnode->lock_.fetch_add(cur & kLockMask, kRelaxed);
 
-  auto *tail = reinterpret_cast<MCSLock *>(cur & kQIDMask);
+  auto *tail = std::bit_cast<MCSLock *>(cur & kQIDMask);
   if (tail != nullptr) {  // wait until predecessor gives up the lock
     tail->lock_.fetch_add(new_tail, kRelease);
     SpinWithBackoff(
@@ -139,7 +140,7 @@ void
 MCSLock::UnlockS(  //
     MCSLock *qnode)
 {
-  const auto this_ptr = reinterpret_cast<uint64_t>(qnode);
+  const auto this_ptr = std::bit_cast<uint64_t>(qnode);
   auto next_ptr = qnode->lock_.load(kAcquire) & kQIDMask;
   if (next_ptr == kNull) {
     auto cur = lock_.load(kRelaxed);
@@ -161,7 +162,7 @@ MCSLock::UnlockS(  //
     }
   }
 
-  auto *next = reinterpret_cast<MCSLock *>(next_ptr);
+  auto *next = std::bit_cast<MCSLock *>(next_ptr);
   if ((next->lock_.fetch_sub(kSLock, kRelease) & kSMask) == kNoLocks) {
     tls_node_.reset(qnode);
   }
@@ -171,7 +172,7 @@ void
 MCSLock::UnlockX(  //
     MCSLock *qnode)
 {
-  const auto this_ptr = reinterpret_cast<uint64_t>(qnode);
+  const auto this_ptr = std::bit_cast<uint64_t>(qnode);
   auto next_ptr = qnode->lock_.load(kAcquire) & kQIDMask;
   if (next_ptr == kNull) {
     auto cur = lock_.load(kRelaxed);
@@ -192,7 +193,7 @@ MCSLock::UnlockX(  //
     }
   }
 
-  auto *next = reinterpret_cast<MCSLock *>(next_ptr);
+  auto *next = std::bit_cast<MCSLock *>(next_ptr);
   if ((next->lock_.fetch_sub(kXLock, kRelease) & kSMask) == kNoLocks) {
     tls_node_.reset(qnode);
   }
@@ -201,13 +202,6 @@ MCSLock::UnlockX(  //
 /*##############################################################################
  * Public inner classes
  *############################################################################*/
-
-MCSLock::MCSLockSGuard::MCSLockSGuard(  //
-    MCSLockSGuard &&obj) noexcept
-    : lock_{obj.lock_}, qnode_{obj.qnode_}
-{
-  obj.qnode_ = nullptr;
-}
 
 auto
 MCSLock::MCSLockSGuard::operator=(  //
@@ -228,13 +222,6 @@ MCSLock::MCSLockSGuard::~MCSLockSGuard()
   if (qnode_) {
     lock_->UnlockS(qnode_);
   }
-}
-
-MCSLock::MCSLockXGuard::MCSLockXGuard(  //
-    MCSLockXGuard &&obj) noexcept
-    : lock_{obj.lock_}, qnode_{obj.qnode_}
-{
-  obj.qnode_ = nullptr;
 }
 
 auto

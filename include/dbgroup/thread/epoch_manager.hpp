@@ -193,10 +193,20 @@ class EpochManager
      * @param node The head pointer of a linked list.
      * @return Protected epochs.
      */
-    [[nodiscard]] static auto GetProtectedEpochs(  //
+    [[nodiscard]] static constexpr auto
+    GetProtectedEpochs(  //
         const size_t epoch,
         ProtectedNode *node)  //
-        -> std::vector<size_t> &;
+        -> std::vector<size_t> &
+    {
+      // go to the target node
+      const auto upper_epoch = epoch & kUpperMask;
+      while (node->upper_epoch_ > upper_epoch) {
+        node = node->next;
+      }
+
+      return node->epoch_lists_.at(epoch & kLowerMask);
+    }
 
     /**
      * @return The upper bits of the current epoch.
@@ -224,7 +234,7 @@ class EpochManager
     size_t upper_epoch_{};
 
     /// @brief The list of protected epochs.
-    std::array<std::vector<size_t>, kCapacity> epoch_lists_{};
+    std::array<std::vector<size_t>, kCapacity> epoch_lists_ = {};
   };
 
   /*############################################################################

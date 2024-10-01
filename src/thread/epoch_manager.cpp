@@ -198,19 +198,4 @@ EpochManager::ProtectedNode::ProtectedNode(  //
 {
 }
 
-auto
-EpochManager::ProtectedNode::GetProtectedEpochs(  //
-    const size_t epoch,
-    ProtectedNode *node)  //
-    -> std::vector<size_t> &
-{
-  // go to the target node
-  const auto upper_epoch = epoch & kUpperMask;
-  while (node->upper_epoch_ > upper_epoch) {
-    node = node->next;
-  }
-
-  return node->epoch_lists_.at(epoch & kLowerMask);
-}
-
 }  // namespace dbgroup::thread

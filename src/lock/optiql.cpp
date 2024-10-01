@@ -42,7 +42,7 @@ namespace
  *
  */
 struct alignas(::dbgroup::lock::kVMPageSize) QNodeBuffer {
-  ::dbgroup::lock::OptiQL buf[1UL << 16UL];
+  ::dbgroup::lock::OptiQL buf[::dbgroup::lock::OptiQL::kQNodeNum];
 };
 
 /*##############################################################################
@@ -56,7 +56,7 @@ constexpr uint64_t kNull = 0;
 constexpr uint64_t kNoLocks = 0b000;
 
 /// @brief A lock state representing a shared lock.
-constexpr uint64_t kSLock = 1UL << 16UL;
+constexpr uint64_t kSLock = ::dbgroup::lock::OptiQL::kQNodeNum;
 
 /// @brief A lock state representing an exclusive lock.
 constexpr uint64_t kXLock = 1UL << 17UL;
@@ -70,9 +70,6 @@ constexpr uint64_t kVersionMask = ~(kXLock | kSLock | kQIDMask);
 /// @brief A bit mask for extracting an X-lock state and version values.
 constexpr uint64_t kXAndVersionMask = kVersionMask | kXLock;
 
-/// @brief The maximum number of queue nodes.
-constexpr uint64_t kQNodeNum = kSLock;
-
 /// @brief The number of bits in one word.
 constexpr uint64_t kBitNum = 64UL;
 
@@ -80,7 +77,7 @@ constexpr uint64_t kBitNum = 64UL;
 constexpr uint64_t kQIDUnit = 8UL;
 
 /// @brief The size of a buffer for managing queue IDs.
-constexpr uint64_t kIDBufSize = kQNodeNum / kBitNum / kQIDUnit;
+constexpr uint64_t kIDBufSize = ::dbgroup::lock::OptiQL::kQNodeNum / kBitNum / kQIDUnit;
 
 /*##############################################################################
  * Static variables
@@ -245,13 +242,6 @@ OptiQL::UnlockX(  //
 /*##############################################################################
  * Public inner classes
  *############################################################################*/
-
-OptiQL::OptiQLGuard::OptiQLGuard(  //
-    OptiQLGuard &&obj) noexcept
-    : lock_{obj.lock_}, qid_{obj.qid_}
-{
-  obj.qid_ = kQNodeNum;
-}
 
 auto
 OptiQL::OptiQLGuard::operator=(  //
