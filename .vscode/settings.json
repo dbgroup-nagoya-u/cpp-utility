@@ -55,6 +55,7 @@
   "cSpell.words": [
     "Chlebus",
     "cout",
+    "ctzll",
     "DCMAKE",
     "DCPP",
     "endl",
@@ -69,6 +70,7 @@
     "NOLINT",
     "Opti",
     "OPTIQL",
+    "popcountll",
     "pthread",
     "qnode",
     "Wextra",

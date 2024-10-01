@@ -44,10 +44,10 @@ constexpr uint64_t kSLock = 1UL << 47UL;
 constexpr uint64_t kXLock = 1UL << 63UL;
 
 /// @brief A bit mask for extracting a node pointer.
-constexpr uint64_t kIDMask = kSLock - 1UL;
+constexpr uint64_t kQIDMask = kSLock - 1UL;
 
 /// @brief A bit mask for extracting a lock state.
-constexpr uint64_t kLockMask = ~kIDMask;
+constexpr uint64_t kLockMask = ~kQIDMask;
 
 /// @brief A bit mask for extracting a sharedlock state.
 constexpr uint64_t kSMask = kLockMask & ~kXLock;
@@ -80,19 +80,19 @@ MCSLock::LockS()  //
 
   // wait until predecessor gives up the lock
   tls_node_.reset(qnode);
-  tail_ptr = cur & kIDMask;
+  tail_ptr = cur & kQIDMask;
   qnode = reinterpret_cast<MCSLock *>(tail_ptr);
   if (cur & kXLock) {
     SpinWithBackoff(
         [](std::atomic_uint64_t *lock, uint64_t &cur, uint64_t tail) -> bool {
           cur = lock->load(kAcquire);
-          return (cur & kIDMask) != tail || (cur & kXLock) == kNoLocks;
+          return (cur & kQIDMask) != tail || (cur & kXLock) == kNoLocks;
         },
         &lock_, cur, tail_ptr);
-    if ((cur & kIDMask) != tail_ptr) {
+    if ((cur & kQIDMask) != tail_ptr) {
       qnode = reinterpret_cast<MCSLock *>(tail_ptr);
       while (true) {
-        tail_ptr = qnode->lock_.load(kAcquire) & kIDMask;
+        tail_ptr = qnode->lock_.load(kAcquire) & kQIDMask;
         if (tail_ptr) break;
         CPP_UTILITY_SPINLOCK_HINT
       }
@@ -118,7 +118,7 @@ MCSLock::LockX()  //
   const auto cur = lock_.exchange(new_tail | kXLock, kAcquire);
   qnode->lock_.fetch_add(cur & kLockMask, kRelaxed);
 
-  auto *tail = reinterpret_cast<MCSLock *>(cur & kIDMask);
+  auto *tail = reinterpret_cast<MCSLock *>(cur & kQIDMask);
   if (tail != nullptr) {  // wait until predecessor gives up the lock
     tail->lock_.fetch_add(new_tail, kRelease);
     SpinWithBackoff(
@@ -140,10 +140,10 @@ MCSLock::UnlockS(  //
     MCSLock *qnode)
 {
   const auto this_ptr = reinterpret_cast<uint64_t>(qnode);
-  auto next_ptr = qnode->lock_.load(kAcquire) & kIDMask;
+  auto next_ptr = qnode->lock_.load(kAcquire) & kQIDMask;
   if (next_ptr == kNull) {
     auto cur = lock_.load(kRelaxed);
-    while ((cur & kIDMask) == this_ptr) {
+    while ((cur & kQIDMask) == this_ptr) {
       const auto unlock = cur - kSLock;
       if (unlock & kSMask) {
         if (lock_.compare_exchange_weak(cur, unlock, kRelaxed, kRelaxed)) return;
@@ -155,7 +155,7 @@ MCSLock::UnlockS(  //
     }
 
     while (true) {  // wait until successor fills in its next field
-      next_ptr = qnode->lock_.load(kAcquire) & kIDMask;
+      next_ptr = qnode->lock_.load(kAcquire) & kQIDMask;
       if (next_ptr) break;
       CPP_UTILITY_SPINLOCK_HINT
     }
@@ -172,10 +172,10 @@ MCSLock::UnlockX(  //
     MCSLock *qnode)
 {
   const auto this_ptr = reinterpret_cast<uint64_t>(qnode);
-  auto next_ptr = qnode->lock_.load(kAcquire) & kIDMask;
+  auto next_ptr = qnode->lock_.load(kAcquire) & kQIDMask;
   if (next_ptr == kNull) {
     auto cur = lock_.load(kRelaxed);
-    while ((cur & kIDMask) == this_ptr) {
+    while ((cur & kQIDMask) == this_ptr) {
       if (cur & kSMask) {
         if (lock_.compare_exchange_weak(cur, cur & ~kXLock, kRelease, kRelaxed)) return;
       } else if (lock_.compare_exchange_weak(cur, kNull, kRelease, kRelaxed)) {
@@ -186,7 +186,7 @@ MCSLock::UnlockX(  //
     }
 
     while (true) {  // wait until successor fills in its next field
-      next_ptr = qnode->lock_.load(kAcquire) & kIDMask;
+      next_ptr = qnode->lock_.load(kAcquire) & kQIDMask;
       if (next_ptr) break;
       CPP_UTILITY_SPINLOCK_HINT
     }

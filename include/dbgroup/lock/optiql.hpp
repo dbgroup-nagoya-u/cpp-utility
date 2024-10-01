@@ -19,7 +19,7 @@
 
 // C++ standard libraries
 #include <atomic>
-#include <memory>
+#include <cstdint>
 
 namespace dbgroup::lock
 {
@@ -49,22 +49,25 @@ class OptiQL
 
     /**
      * @param lock The address of a target lock.
-     * @param qnode The corresponding queue node for unlocking.
+     * @param qid The corresponding queue node for unlocking.
      */
     constexpr OptiQLGuard(  //
         OptiQL *lock,
-        OptiQL *qnode)
-        : lock_{lock}, qnode_{qnode}
+        uint64_t qid)
+        : lock_{lock}, qid_{qid}
     {
     }
 
     OptiQLGuard(const OptiQLGuard &) = delete;
 
-    OptiQLGuard(OptiQLGuard &&) noexcept;
+    OptiQLGuard(  //
+        OptiQLGuard &&obj) noexcept;
 
     auto operator=(const OptiQLGuard &) -> OptiQLGuard & = delete;
 
-    auto operator=(OptiQLGuard &&) noexcept -> OptiQLGuard &;
+    auto operator=(                  //
+        OptiQLGuard &&obj) noexcept  //
+        -> OptiQLGuard &;
 
     /*##########################################################################
      * Public destructors
@@ -81,7 +84,7 @@ class OptiQL
     OptiQL *lock_{nullptr};
 
     /// @brief The corresponding queue node for unlocking.
-    OptiQL *qnode_{nullptr};
+    uint64_t qid_{};
   };
 
   /*############################################################################
@@ -147,7 +150,7 @@ class OptiQL
    * corrupt an internal lock state.
    */
   void UnlockX(  //
-      OptiQL *qnode);
+      uint64_t qid);
 
   /*############################################################################
    * Internal member variables
