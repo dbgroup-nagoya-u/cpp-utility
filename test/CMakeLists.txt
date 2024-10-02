@@ -37,9 +37,6 @@ function(ADD_DBGROUP_TEST DBGROUP_TEST_TARGET)
   add_executable(${DBGROUP_TEST_TARGET}
     "${CMAKE_CURRENT_SOURCE_DIR}/${DBGROUP_TEST_TARGET}.cpp"
   )
-  target_compile_features(${DBGROUP_TEST_TARGET} PRIVATE
-    "cxx_std_17"
-  )
   target_compile_options(${DBGROUP_TEST_TARGET} PRIVATE
     -Wall
     -Wextra
