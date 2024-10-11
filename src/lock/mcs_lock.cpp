@@ -90,11 +90,11 @@ MCSLock::LockS()  //
   qnode = reinterpret_cast<MCSLock *>(tail_ptr);
   if (cur & kXMask) {
     SpinWithBackoff(
-        [](std::atomic_uint64_t *lock, uint64_t &cur, uint64_t tail_ptr) -> bool {
-          cur = lock->load(kAcquire);
-          return (cur & kPtrMask) != tail_ptr || (cur & kXMask) == kNoLocks;
+        [](std::atomic_uint64_t *lock, uint64_t *cur, uint64_t tail_ptr) -> bool {
+          *cur = lock->load(kAcquire);
+          return (*cur & kPtrMask) != tail_ptr || (*cur & kXMask) == kNoLocks;
         },
-        &lock_, cur, tail_ptr);
+        &lock_, &cur, tail_ptr);
     if ((cur & kPtrMask) != tail_ptr) {
       qnode = reinterpret_cast<MCSLock *>(tail_ptr);
       while (true) {
@@ -210,11 +210,11 @@ MCSLock::UnlockSIX(  //
   // wait for sharel lock holders to release their locks
   uint64_t next_ptr{};
   SpinWithBackoff(
-      [](std::atomic_uint64_t *lock, uint64_t &next_ptr) -> bool {
-        next_ptr = lock->load(kRelaxed);
-        return (next_ptr & kSMask) == kNoLocks;
+      [](std::atomic_uint64_t *lock, uint64_t *next_ptr) -> bool {
+        *next_ptr = lock->load(kRelaxed);
+        return (*next_ptr & kSMask) == kNoLocks;
       },
-      &(qnode->lock_), next_ptr);
+      &(qnode->lock_), &next_ptr);
 
   const auto this_ptr = reinterpret_cast<uint64_t>(qnode);
   if (next_ptr == kNull) {  // this is the tail node
@@ -350,11 +350,11 @@ MCSLock::SIXGuard::UpgradeToX()  //
   // wait for sharel lock holders to release their locks
   uint64_t next_ptr{};
   SpinWithBackoff(
-      [](std::atomic_uint64_t *lock, uint64_t &next_ptr) -> bool {
-        next_ptr = lock->load(kRelaxed);
-        return (next_ptr & kSMask) == kNoLocks;
+      [](std::atomic_uint64_t *lock, uint64_t *next_ptr) -> bool {
+        *next_ptr = lock->load(kRelaxed);
+        return (*next_ptr & kSMask) == kNoLocks;
       },
-      &(qnode_->lock_), next_ptr);
+      &(qnode_->lock_), &next_ptr);
 
   const auto this_ptr = reinterpret_cast<uint64_t>(qnode_);
   if (next_ptr == kNull) {  // this is the tail node
