@@ -108,7 +108,7 @@ PessimisticLock::UnlockS()
 void
 PessimisticLock::UnlockSIX()
 {
-  lock_.fetch_sub(kSIXLock, kRelaxed);
+  lock_.fetch_xor(kSIXLock, kRelaxed);
 }
 
 void

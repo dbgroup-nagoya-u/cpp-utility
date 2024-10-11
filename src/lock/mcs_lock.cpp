@@ -237,7 +237,7 @@ MCSLock::UnlockSIX(  //
   }
 
   auto *next = reinterpret_cast<MCSLock *>(next_ptr);
-  if ((next->lock_.fetch_sub(kSIXLock, kRelease) & kSMask) == kNoLocks) {
+  if ((next->lock_.fetch_xor(kSIXLock, kRelease) & kSMask) == kNoLocks) {
     tls_node_.reset(qnode);
   }
 }
@@ -268,7 +268,7 @@ MCSLock::UnlockX(  //
   }
 
   auto *next = reinterpret_cast<MCSLock *>(next_ptr);
-  if ((next->lock_.fetch_sub(kXLock, kRelease) & kSMask) == kNoLocks) {
+  if ((next->lock_.fetch_xor(kXLock, kRelease) & kSMask) == kNoLocks) {
     tls_node_.reset(qnode);
   }
 }
