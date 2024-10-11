@@ -31,49 +31,52 @@ class MCSLock
 {
  public:
   /*############################################################################
-   * Public inner classes
+   * Public types
    *##########################################################################*/
+
+  // forward declarations
+  class XGuard;
 
   /**
    * @brief A class for representing a guard instance for shared locks.
    *
    */
-  class MCSLockSGuard
+  class SGuard
   {
    public:
     /*##########################################################################
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr MCSLockSGuard() = default;
+    constexpr SGuard() = default;
 
     /**
-     * @param lock The address of a target lock.
+     * @param dest The address of a target lock.
      * @param qnode The corresponding queue node for unlocking.
      */
-    constexpr MCSLockSGuard(  //
-        MCSLock *lock,
+    constexpr SGuard(  //
+        MCSLock *dest,
         MCSLock *qnode)
-        : lock_{lock}, qnode_{qnode}
+        : dest_{dest}, qnode_{qnode}
     {
     }
 
-    MCSLockSGuard(const MCSLockSGuard &) = delete;
+    SGuard(const SGuard &) = delete;
 
-    MCSLockSGuard(  //
-        MCSLockSGuard &&) noexcept;
+    SGuard(  //
+        SGuard &&) noexcept;
 
-    auto operator=(const MCSLockSGuard &) -> MCSLockSGuard & = delete;
+    auto operator=(const SGuard &) -> SGuard & = delete;
 
-    auto operator=(                 //
-        MCSLockSGuard &&) noexcept  //
-        -> MCSLockSGuard &;
+    auto operator=(          //
+        SGuard &&) noexcept  //
+        -> SGuard &;
 
     /*##########################################################################
      * Public destructors
      *########################################################################*/
 
-    ~MCSLockSGuard();
+    ~SGuard();
 
    private:
     /*##########################################################################
@@ -81,7 +84,7 @@ class MCSLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    MCSLock *lock_{nullptr};
+    MCSLock *dest_{nullptr};
 
     /// @brief The corresponding queue node for unlocking.
     MCSLock *qnode_{nullptr};
@@ -91,39 +94,53 @@ class MCSLock
    * @brief A class for representing a guard instance for exclusive locks.
    *
    */
-  class MCSLockXGuard
+  class SIXGuard
   {
    public:
     /*##########################################################################
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr MCSLockXGuard() = default;
+    constexpr SIXGuard() = default;
 
     /**
-     * @param lock The address of a target lock.
+     * @param dest The address of a target lock.
      * @param qnode The corresponding queue node for unlocking.
      */
-    constexpr MCSLockXGuard(  //
-        MCSLock *lock,
+    constexpr SIXGuard(  //
+        MCSLock *dest,
         MCSLock *qnode)
-        : lock_{lock}, qnode_{qnode}
+        : dest_{dest}, qnode_{qnode}
     {
     }
 
-    MCSLockXGuard(const MCSLockXGuard &) = delete;
+    SIXGuard(const SIXGuard &) = delete;
 
-    MCSLockXGuard(MCSLockXGuard &&) noexcept;
+    SIXGuard(SIXGuard &&) noexcept;
 
-    auto operator=(const MCSLockXGuard &) -> MCSLockXGuard & = delete;
+    auto operator=(const SIXGuard &) -> SIXGuard & = delete;
 
-    auto operator=(MCSLockXGuard &&) noexcept -> MCSLockXGuard &;
+    auto operator=(SIXGuard &&) noexcept -> SIXGuard &;
 
     /*##########################################################################
      * Public destructors
      *########################################################################*/
 
-    ~MCSLockXGuard();
+    ~SIXGuard();
+
+    /*##########################################################################
+     * Public APIs
+     *########################################################################*/
+
+    /**
+     * @brief Upgrade this lock to an X lock.
+     *
+     * @return The lock guard for an X lock.
+     * @note After calling the function, this lock guard abandons the lock's
+     * ownership.
+     */
+    [[nodiscard]] auto UpgradeToX()  //
+        -> XGuard;
 
    private:
     /*##########################################################################
@@ -131,7 +148,71 @@ class MCSLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    MCSLock *lock_{nullptr};
+    MCSLock *dest_{nullptr};
+
+    /// @brief The corresponding queue node for unlocking.
+    MCSLock *qnode_{nullptr};
+  };
+
+  /**
+   * @brief A class for representing a guard instance for exclusive locks.
+   *
+   */
+  class XGuard
+  {
+   public:
+    /*##########################################################################
+     * Public constructors and assignment operators
+     *########################################################################*/
+
+    constexpr XGuard() = default;
+
+    /**
+     * @param dest The address of a target lock.
+     * @param qnode The corresponding queue node for unlocking.
+     */
+    constexpr XGuard(  //
+        MCSLock *dest,
+        MCSLock *qnode)
+        : dest_{dest}, qnode_{qnode}
+    {
+    }
+
+    XGuard(const XGuard &) = delete;
+
+    XGuard(XGuard &&) noexcept;
+
+    auto operator=(const XGuard &) -> XGuard & = delete;
+
+    auto operator=(XGuard &&) noexcept -> XGuard &;
+
+    /*##########################################################################
+     * Public destructors
+     *########################################################################*/
+
+    ~XGuard();
+
+    /*##########################################################################
+     * Public APIs
+     *########################################################################*/
+
+    /**
+     * @brief Downgrade this lock to an SIX lock.
+     *
+     * @return The lock guard for an SIX lock.
+     * @note After calling the function, this lock guard abandons the lock's
+     * ownership.
+     */
+    [[nodiscard]] auto DowngradeToSIX()  //
+        -> SIXGuard;
+
+   private:
+    /*##########################################################################
+     * Internal member variables
+     *########################################################################*/
+
+    /// @brief The address of a target lock.
+    MCSLock *dest_{nullptr};
 
     /// @brief The corresponding queue node for unlocking.
     MCSLock *qnode_{nullptr};
@@ -167,7 +248,17 @@ class MCSLock
    * spinlock and back-off.
    */
   [[nodiscard]] auto LockS()  //
-      -> MCSLockSGuard;
+      -> SGuard;
+
+  /**
+   * @brief Get a shared-with-intent-exclusive lock.
+   *
+   * @return A guard instance for the acquired lock.
+   * @note This function does not give up acquiring a lock and continues with
+   * spinlock and back-off.
+   */
+  [[nodiscard]] auto LockSIX()  //
+      -> SIXGuard;
 
   /**
    * @brief Get an exclusive lock.
@@ -177,7 +268,7 @@ class MCSLock
    * spinlock and back-off.
    */
   [[nodiscard]] auto LockX()  //
-      -> MCSLockXGuard;
+      -> XGuard;
 
  private:
   /*############################################################################
@@ -192,6 +283,16 @@ class MCSLock
    * corrupt an internal lock state.
    */
   void UnlockS(  //
+      MCSLock *qnode);
+
+  /**
+   * @brief Release a shared-with-intent-exclusive lock.
+   *
+   * @param qnode The queue node corresponding to this lock.
+   * @note If a thread calls this function without acquiring an SIX lock, it
+   * will corrupt an internal lock state.
+   */
+  void UnlockSIX(  //
       MCSLock *qnode);
 
   /**
