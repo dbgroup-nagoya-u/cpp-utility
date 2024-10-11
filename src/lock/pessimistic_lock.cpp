@@ -43,7 +43,7 @@ constexpr uint64_t kSIXLock = 0b001UL << 62UL;
 constexpr uint64_t kXLock = 0b010UL << 62UL;
 
 /// @brief A bit mask for extracting an SIX/X-lock state.
-constexpr uint64_t kSIXAndXMask = kSIXLock | kXLock;
+constexpr uint64_t kXMask = kSIXLock | kXLock;
 
 }  // namespace
 
@@ -88,7 +88,7 @@ PessimisticLock::LockSIX()  //
   SpinWithBackoff(
       [](std::atomic_uint64_t *lock) -> bool {
         auto cur = lock->load(kRelaxed);
-        return (cur & kSIXAndXMask) == kNoLocks
+        return (cur & kXMask) == kNoLocks
                && lock->compare_exchange_weak(cur, cur | kSIXLock, kAcquire, kRelaxed);
       },
       &lock_);

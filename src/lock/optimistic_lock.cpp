@@ -49,8 +49,8 @@ constexpr uint64_t kSMask = ~((~0UL) << 16UL);
 /// @brief A bit mask for extracting an S/SIX-lock state.
 constexpr uint64_t kSAndSIXMask = kSMask | kSIXLock;
 
-/// @brief A bit mask for extracting an SIX/X-lock state.
-constexpr uint64_t kSIXAndXMask = kSIXLock | kXLock;
+/// @brief A bit mask for extracting X and SIX states.
+constexpr uint64_t kXMask = kXLock | kSIXLock;
 
 /// @brief A bit mask for extracting an SIX/X-lock state and version values.
 constexpr uint64_t kAllLockMask = kSMask | kSIXLock | kXLock;
@@ -96,8 +96,9 @@ OptimisticLock::HasSameVersion(  //
  * Pessimistic lock APIs
  *############################################################################*/
 
-void
-OptimisticLock::LockS()
+auto
+OptimisticLock::LockS()  //
+    -> SGuard
 {
   SpinWithBackoff(
       [](std::atomic_uint64_t *lock) -> bool {
@@ -106,14 +107,15 @@ OptimisticLock::LockS()
                && lock->compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed);
       },
       &lock_);
+  return SGuard{this};
 }
 
 auto
 OptimisticLock::TryLockS(  //
     const uint64_t ver)    //
-    -> bool
+    -> SGuard
 {
-  uint64_t cur;
+  uint64_t cur{};
   SpinWithBackoff(
       [](std::atomic_uint64_t *lock, uint64_t *cur, uint64_t ver) -> bool {
         *cur = lock->load(kRelaxed);
@@ -121,78 +123,29 @@ OptimisticLock::TryLockS(  //
                || lock->compare_exchange_weak(*cur, *cur + kSLock, kAcquire, kRelaxed);
       },
       &lock_, &cur, ver);
-  return (cur & kXAndVersionMask) == ver;
+  return ((cur & kXAndVersionMask) == ver) ? SGuard{this} : SGuard{};
 }
 
-void
-OptimisticLock::UnlockS()
-{
-  lock_.fetch_sub(kSLock, kRelaxed);
-}
-
-void
-OptimisticLock::LockX()
+auto
+OptimisticLock::LockSIX()  //
+    -> SIXGuard
 {
   SpinWithBackoff(
       [](std::atomic_uint64_t *lock) -> bool {
         auto cur = lock->load(kRelaxed);
-        return (cur & kAllLockMask) == kNoLocks
-               && lock->compare_exchange_weak(cur, cur | kXLock, kAcquire, kRelaxed);
-      },
-      &lock_);
-}
-
-auto
-OptimisticLock::TryLockX(  //
-    const uint64_t ver)    //
-    -> bool
-{
-  uint64_t cur;
-  SpinWithBackoff(
-      [](std::atomic_uint64_t *lock, uint64_t *cur, uint64_t ver) -> bool {
-        *cur = lock->load(kRelaxed);
-        return (*cur & kXAndVersionMask) != ver
-               || ((*cur & kSAndSIXMask) == kNoLocks
-                   && lock->compare_exchange_weak(*cur, *cur | kXLock, kAcquire, kRelaxed));
-      },
-      &lock_, &cur, ver);
-  return (cur & kXAndVersionMask) == ver;
-}
-
-auto
-OptimisticLock::DowngradeToSIX()  //
-    -> uint64_t
-{
-  const auto old_ver = lock_.fetch_add(kXLock | kSIXLock, kRelease);
-  return (old_ver + kXLock) & kVersionMask;
-}
-
-auto
-OptimisticLock::UnlockX()  //
-    -> uint64_t
-{
-  const auto old_ver = lock_.fetch_add(kXLock, kRelease);
-  return (old_ver + kXLock) & kVersionMask;
-}
-
-void
-OptimisticLock::LockSIX()
-{
-  SpinWithBackoff(
-      [](std::atomic_uint64_t *lock) -> bool {
-        auto cur = lock->load(kRelaxed);
-        return (cur & kSIXAndXMask) == kNoLocks
+        return (cur & kXMask) == kNoLocks
                && lock->compare_exchange_weak(cur, cur | kSIXLock, kAcquire, kRelaxed);
       },
       &lock_);
+  return SIXGuard{this};
 }
 
 auto
 OptimisticLock::TryLockSIX(  //
     const uint64_t ver)      //
-    -> bool
+    -> SIXGuard
 {
-  uint64_t cur;
+  uint64_t cur{};
   SpinWithBackoff(
       [](std::atomic_uint64_t *lock, uint64_t *cur, uint64_t ver) -> bool {
         *cur = lock->load(kRelaxed);
@@ -201,26 +154,184 @@ OptimisticLock::TryLockSIX(  //
                    && lock->compare_exchange_weak(*cur, *cur | kSIXLock, kAcquire, kRelaxed));
       },
       &lock_, &cur, ver);
-  return (cur & kXAndVersionMask) == ver;
+  return ((cur & kXAndVersionMask) == ver) ? SIXGuard{this} : SIXGuard{};
 }
 
-void
-OptimisticLock::UpgradeToX()
+auto
+OptimisticLock::LockX()  //
+    -> XGuard
 {
   SpinWithBackoff(
       [](std::atomic_uint64_t *lock) -> bool {
         auto cur = lock->load(kRelaxed);
-        return (cur & kSMask) == kNoLocks
-               && lock->compare_exchange_weak(cur, (cur & kVersionMask) | kXLock, kAcquire,
-                                              kRelaxed);
+        return (cur & kAllLockMask) == kNoLocks
+               && lock->compare_exchange_weak(cur, cur | kXLock, kAcquire, kRelaxed);
       },
       &lock_);
+  return XGuard{this};
+}
+
+auto
+OptimisticLock::TryLockX(  //
+    const uint64_t ver)    //
+    -> XGuard
+{
+  uint64_t cur{};
+  SpinWithBackoff(
+      [](std::atomic_uint64_t *lock, uint64_t *cur, uint64_t ver) -> bool {
+        *cur = lock->load(kRelaxed);
+        return (*cur & kXAndVersionMask) != ver
+               || ((*cur & kSAndSIXMask) == kNoLocks
+                   && lock->compare_exchange_weak(*cur, *cur | kXLock, kAcquire, kRelaxed));
+      },
+      &lock_, &cur, ver);
+  return ((cur & kXAndVersionMask) == ver) ? XGuard{this} : XGuard{};
+}
+
+/*##############################################################################
+ * Internal APIs
+ *############################################################################*/
+
+void
+OptimisticLock::UnlockS()
+{
+  lock_.fetch_sub(kSLock, kRelaxed);
 }
 
 void
 OptimisticLock::UnlockSIX()
 {
-  lock_.fetch_sub(kSIXLock, kRelaxed);
+  lock_.fetch_xor(kSIXLock, kRelaxed);
+}
+
+void
+OptimisticLock::UnlockX()
+{
+  lock_.fetch_add(kXLock, kRelease);
+}
+
+/*##############################################################################
+ * Shared lock guards
+ *############################################################################*/
+
+OptimisticLock::SGuard::SGuard(  //
+    SGuard &&obj) noexcept
+{
+  dest_ = obj.dest_;
+  obj.dest_ = nullptr;
+}
+
+auto
+OptimisticLock::SGuard::operator=(  //
+    SGuard &&obj) noexcept          //
+    -> SGuard &
+{
+  if (dest_) {
+    dest_->UnlockS();
+  }
+  dest_ = obj.dest_;
+  obj.dest_ = nullptr;
+  return *this;
+}
+
+OptimisticLock::SGuard::~SGuard()
+{
+  if (dest_) {
+    dest_->UnlockS();
+  }
+}
+
+/*##############################################################################
+ * Shared-with-intent-exclusive lock guards
+ *############################################################################*/
+
+OptimisticLock::SIXGuard::SIXGuard(  //
+    SIXGuard &&obj) noexcept
+{
+  dest_ = obj.dest_;
+  obj.dest_ = nullptr;
+}
+
+auto
+OptimisticLock::SIXGuard::operator=(  //
+    SIXGuard &&obj) noexcept          //
+    -> SIXGuard &
+{
+  if (dest_) {
+    dest_->UnlockSIX();
+  }
+  dest_ = obj.dest_;
+  obj.dest_ = nullptr;
+  return *this;
+}
+
+OptimisticLock::SIXGuard::~SIXGuard()
+{
+  if (dest_) {
+    dest_->UnlockSIX();
+  }
+}
+
+auto
+OptimisticLock::SIXGuard::UpgradeToX()  //
+    -> XGuard
+{
+  if (dest_ == nullptr) return XGuard{};
+  auto *dest = dest_;
+  dest_ = nullptr;  // release the ownership
+
+  SpinWithBackoff(
+      [](std::atomic_uint64_t *lock) -> bool {
+        auto cur = lock->load(kRelaxed);
+        return (cur & kSMask) == kNoLocks
+               && lock->compare_exchange_weak(cur, cur ^ kXMask, kAcquire, kRelaxed);
+      },
+      &(dest->lock_));
+
+  return XGuard{dest_};
+}
+
+/*##############################################################################
+ * Exclusive lock guards
+ *############################################################################*/
+
+OptimisticLock::XGuard::XGuard(  //
+    XGuard &&obj) noexcept
+{
+  dest_ = obj.dest_;
+  obj.dest_ = nullptr;
+}
+
+auto
+OptimisticLock::XGuard::operator=(  //
+    XGuard &&obj) noexcept          //
+    -> XGuard &
+{
+  if (dest_) {
+    dest_->UnlockX();
+  }
+  dest_ = obj.dest_;
+  obj.dest_ = nullptr;
+  return *this;
+}
+
+OptimisticLock::XGuard::~XGuard()
+{
+  if (dest_) {
+    dest_->UnlockX();
+  }
+}
+
+auto
+OptimisticLock::XGuard::DowngradeToSIX()  //
+    -> SIXGuard
+{
+  if (dest_ == nullptr) return SIXGuard{};
+  auto *dest = dest_;
+  dest_ = nullptr;  // release the ownership
+
+  dest->lock_.fetch_add(kXMask, kRelease);
+  return SIXGuard{dest};
 }
 
 }  // namespace dbgroup::lock
