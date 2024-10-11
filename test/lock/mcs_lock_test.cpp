@@ -195,15 +195,21 @@ class MCSLockFixture : public ::testing::Test
       -> Guard
   {
     switch (lock_type) {
-      case kSLock:
-        return Guard{lock_.LockS()};
-
-      case kXLock:
-        return Guard{lock_.LockX()};
-
-      case kSIXLock:
-        return Guard{lock_.LockSIX()};
-
+      case kSLock: {
+        auto &&guard = lock_.LockS();
+        EXPECT_TRUE(guard);
+        return Guard{std::move(guard)};
+      }
+      case kSIXLock: {
+        auto &&guard = lock_.LockSIX();
+        EXPECT_TRUE(guard);
+        return Guard{std::move(guard)};
+      }
+      case kXLock: {
+        auto &&guard = lock_.LockX();
+        EXPECT_TRUE(guard);
+        return Guard{std::move(guard)};
+      }
       case kFree:
       default:
         break;

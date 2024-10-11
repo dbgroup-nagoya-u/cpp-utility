@@ -282,7 +282,7 @@ MCSLock::SGuard::SGuard(  //
 {
   dest_ = obj.dest_;
   qnode_ = obj.qnode_;
-  obj.qnode_ = nullptr;
+  obj.dest_ = nullptr;
 }
 
 auto
@@ -290,18 +290,18 @@ MCSLock::SGuard::operator=(  //
     SGuard &&obj) noexcept   //
     -> SGuard &
 {
-  if (qnode_) {
+  if (dest_) {
     dest_->UnlockS(qnode_);
   }
   dest_ = obj.dest_;
   qnode_ = obj.qnode_;
-  obj.qnode_ = nullptr;
+  obj.dest_ = nullptr;
   return *this;
 }
 
 MCSLock::SGuard::~SGuard()
 {
-  if (qnode_) {
+  if (dest_) {
     dest_->UnlockS(qnode_);
   }
 }
@@ -315,7 +315,7 @@ MCSLock::SIXGuard::SIXGuard(  //
 {
   dest_ = obj.dest_;
   qnode_ = obj.qnode_;
-  obj.qnode_ = nullptr;
+  obj.dest_ = nullptr;
 }
 
 auto
@@ -323,18 +323,18 @@ MCSLock::SIXGuard::operator=(  //
     SIXGuard &&obj) noexcept   //
     -> SIXGuard &
 {
-  if (qnode_) {
+  if (dest_) {
     dest_->UnlockSIX(qnode_);
   }
   dest_ = obj.dest_;
   qnode_ = obj.qnode_;
-  obj.qnode_ = nullptr;
+  obj.dest_ = nullptr;
   return *this;
 }
 
 MCSLock::SIXGuard::~SIXGuard()
 {
-  if (qnode_) {
+  if (dest_) {
     dest_->UnlockSIX(qnode_);
   }
 }
@@ -343,9 +343,9 @@ auto
 MCSLock::SIXGuard::UpgradeToX()  //
     -> XGuard
 {
-  if (qnode_ == nullptr) return XGuard{};
-  auto *qnode = qnode_;
-  qnode_ = nullptr;  // release the ownership
+  if (dest_ == nullptr) return XGuard{};
+  auto *dest = dest_;
+  dest_ = nullptr;  // release the ownership
 
   // wait for sharel lock holders to release their locks
   uint64_t next_ptr{};
@@ -354,20 +354,20 @@ MCSLock::SIXGuard::UpgradeToX()  //
         next_ptr = lock->load(kRelaxed);
         return (next_ptr & kSMask) == kNoLocks;
       },
-      &(qnode->lock_), next_ptr);
+      &(qnode_->lock_), next_ptr);
 
-  const auto this_ptr = reinterpret_cast<uint64_t>(qnode);
+  const auto this_ptr = reinterpret_cast<uint64_t>(qnode_);
   if (next_ptr == kNull) {  // this is the tail node
-    auto cur = dest_->lock_.load(kRelaxed);
+    auto cur = dest->lock_.load(kRelaxed);
     while ((cur & kPtrMask) == this_ptr) {
-      if (dest_->lock_.compare_exchange_weak(cur, cur ^ kXMask, kRelaxed, kRelaxed)) {
-        return XGuard{dest_, qnode};
+      if (dest->lock_.compare_exchange_weak(cur, cur ^ kXMask, kRelaxed, kRelaxed)) {
+        return XGuard{dest, qnode_};
       }
       CPP_UTILITY_SPINLOCK_HINT
     }
 
     while (true) {  // wait until successor fills in its next field
-      next_ptr = qnode->lock_.load(kRelaxed) & kPtrMask;
+      next_ptr = qnode_->lock_.load(kRelaxed) & kPtrMask;
       if (next_ptr) break;
       CPP_UTILITY_SPINLOCK_HINT
     }
@@ -375,7 +375,7 @@ MCSLock::SIXGuard::UpgradeToX()  //
 
   auto *next = reinterpret_cast<MCSLock *>(next_ptr);
   next->lock_.fetch_xor(kXMask, kRelaxed);
-  return XGuard{dest_, qnode};
+  return XGuard{dest, qnode_};
 }
 
 /*##############################################################################
@@ -387,7 +387,7 @@ MCSLock::XGuard::XGuard(  //
 {
   dest_ = obj.dest_;
   qnode_ = obj.qnode_;
-  obj.qnode_ = nullptr;
+  obj.dest_ = nullptr;
 }
 
 auto
@@ -395,18 +395,18 @@ MCSLock::XGuard::operator=(  //
     XGuard &&obj) noexcept   //
     -> XGuard &
 {
-  if (qnode_) {
+  if (dest_) {
     dest_->UnlockX(qnode_);
   }
   dest_ = obj.dest_;
   qnode_ = obj.qnode_;
-  obj.qnode_ = nullptr;
+  obj.dest_ = nullptr;
   return *this;
 }
 
 MCSLock::XGuard::~XGuard()
 {
-  if (qnode_) {
+  if (dest_) {
     dest_->UnlockX(qnode_);
   }
 }
@@ -415,23 +415,23 @@ auto
 MCSLock::XGuard::DowngradeToSIX()  //
     -> SIXGuard
 {
-  if (qnode_ == nullptr) return SIXGuard{};
-  auto *qnode = qnode_;
-  qnode_ = nullptr;  // release the ownership
+  if (dest_ == nullptr) return SIXGuard{};
+  auto *dest = dest_;
+  dest_ = nullptr;  // release the ownership
 
-  const auto this_ptr = reinterpret_cast<uint64_t>(qnode);
-  auto next_ptr = qnode->lock_.load(kRelaxed) & kPtrMask;
+  const auto this_ptr = reinterpret_cast<uint64_t>(qnode_);
+  auto next_ptr = qnode_->lock_.load(kRelaxed) & kPtrMask;
   if (next_ptr == kNull) {  // this is the tail node
-    auto cur = dest_->lock_.load(kRelaxed);
+    auto cur = dest->lock_.load(kRelaxed);
     while ((cur & kPtrMask) == this_ptr) {
-      if (dest_->lock_.compare_exchange_weak(cur, cur ^ kXMask, kRelease, kRelaxed)) {
-        return SIXGuard{dest_, qnode};
+      if (dest->lock_.compare_exchange_weak(cur, cur ^ kXMask, kRelease, kRelaxed)) {
+        return SIXGuard{dest, qnode_};
       }
       CPP_UTILITY_SPINLOCK_HINT
     }
 
     while (true) {  // wait until successor fills in its next field
-      next_ptr = qnode->lock_.load(kRelaxed) & kPtrMask;
+      next_ptr = qnode_->lock_.load(kRelaxed) & kPtrMask;
       if (next_ptr) break;
       CPP_UTILITY_SPINLOCK_HINT
     }
@@ -439,7 +439,7 @@ MCSLock::XGuard::DowngradeToSIX()  //
 
   auto *next = reinterpret_cast<MCSLock *>(next_ptr);
   next->lock_.fetch_xor(kXMask, kRelease);
-  return SIXGuard{dest_, qnode};
+  return SIXGuard{dest, qnode_};
 }
 
 }  // namespace dbgroup::lock

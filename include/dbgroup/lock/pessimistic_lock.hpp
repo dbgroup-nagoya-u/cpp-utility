@@ -75,6 +75,20 @@ class PessimisticLock
 
     ~SGuard();
 
+    /*##########################################################################
+     * Public APIs
+     *########################################################################*/
+
+    /**
+     * @retval true if this instance has the lock ownership.
+     * @retval false otherwise.
+     */
+    constexpr explicit
+    operator bool() const
+    {
+      return dest_;
+    }
+
    private:
     /*##########################################################################
      * Internal member variables
@@ -123,6 +137,16 @@ class PessimisticLock
     /*##########################################################################
      * Public APIs
      *########################################################################*/
+
+    /**
+     * @retval true if this instance has the lock ownership.
+     * @retval false otherwise.
+     */
+    constexpr explicit
+    operator bool() const
+    {
+      return dest_;
+    }
 
     /**
      * @brief Upgrade this lock to an X lock.
@@ -182,6 +206,16 @@ class PessimisticLock
     /*##########################################################################
      * Public APIs
      *########################################################################*/
+
+    /**
+     * @retval true if this instance has the lock ownership.
+     * @retval false otherwise.
+     */
+    constexpr explicit
+    operator bool() const
+    {
+      return dest_;
+    }
 
     /**
      * @brief Downgrade this lock to an SIX lock.
