@@ -183,20 +183,28 @@ class OptimisticLock
 
     /**
      * @param dest The address of a target lock.
+     * @param ver The current version.
      */
     constexpr XGuard(  //
-        OptimisticLock *dest)
-        : dest_{dest}
+        OptimisticLock *dest,
+        const uint32_t ver)
+        : dest_{dest}, old_ver_{ver}, new_ver_{ver + 1U}
     {
     }
 
     XGuard(const XGuard &) = delete;
 
-    XGuard(XGuard &&) noexcept;
+    constexpr XGuard(  //
+        XGuard &&obj) noexcept
+        : dest_{obj.dest_}, old_ver_{obj.old_ver_}, new_ver_{obj.new_ver_}
+    {
+      obj.dest_ = nullptr;
+    }
 
     auto operator=(const XGuard &) -> XGuard & = delete;
 
-    auto operator=(XGuard &&) noexcept -> XGuard &;
+    auto operator=(  //
+        XGuard &&rhs) noexcept -> XGuard &;
 
     /*##########################################################################
      * Public destructors
@@ -219,6 +227,28 @@ class OptimisticLock
     }
 
     /**
+     * @return The version when this guard was created.
+     */
+    [[nodiscard]] constexpr auto
+    GetVersion() const  //
+        -> uint32_t
+    {
+      return old_ver_;
+    }
+
+    /**
+     * @brief Set a desired version after unlocking.
+     *
+     * @param ver A desired version after unlocking.
+     */
+    constexpr void
+    SetVersion(  //
+        const uint32_t ver)
+    {
+      new_ver_ = ver;
+    }
+
+    /**
      * @brief Downgrade this lock to an SIX lock.
      *
      * @return The lock guard for an SIX lock.
@@ -235,6 +265,142 @@ class OptimisticLock
 
     /// @brief The address of a target lock.
     OptimisticLock *dest_{nullptr};
+
+    /// @brief A version when creating this guard.
+    uint32_t old_ver_{};
+
+    /// @brief A version when failing verification.
+    uint32_t new_ver_{};
+  };
+
+  /**
+   * @brief A class for representing a guard instance for shared locks.
+   *
+   */
+  class OptGuard
+  {
+   public:
+    /*##########################################################################
+     * Public constructors and assignment operators
+     *########################################################################*/
+
+    constexpr OptGuard() = default;
+
+    /**
+     * @param dest The address of a target lock.
+     * @param ver The current version.
+     */
+    constexpr OptGuard(  //
+        OptimisticLock *dest,
+        const uint32_t ver)
+        : dest_{dest}, expect_ver_{ver}
+    {
+    }
+
+    constexpr OptGuard(const OptGuard &) = default;
+    constexpr OptGuard(OptGuard &&) noexcept = default;
+
+    constexpr auto operator=(const OptGuard &) -> OptGuard & = default;
+    constexpr auto operator=(OptGuard &&) noexcept -> OptGuard & = default;
+
+    /*##########################################################################
+     * Public destructors
+     *########################################################################*/
+
+    /**
+     * @brief Destroy this instance and release a lock if holding.
+     *
+     */
+    ~OptGuard() = default;
+
+    /*##########################################################################
+     * Public getters
+     *########################################################################*/
+
+    /**
+     * @return false.
+     */
+    constexpr explicit
+    operator bool() const
+    {
+      return false;
+    }
+
+    /**
+     * @return The version when this guard was created.
+     */
+    [[nodiscard]] constexpr auto
+    GetVersion() const  //
+        -> uint32_t
+    {
+      return expect_ver_;
+    }
+
+    /**
+     * @return The version when the verification was failed.
+     * @note The return value is undefined until try/verify functions are called.
+     * @note If this guard holds a lock, this function always return zero.
+     */
+    [[nodiscard]] constexpr auto
+    GetActualVer() const  //
+        -> uint32_t
+    {
+      return actual_ver_;
+    }
+
+    /*##########################################################################
+     * Public APIs
+     *########################################################################*/
+
+    /**
+     * @retval true if a target version does not change from an expected one.
+     * @retval false otherwise.
+     */
+    [[nodiscard]] auto VerifyVersion()  //
+        -> bool;
+
+    /**
+     * @brief Get a shared lock if a given version is the same as the current one.
+     *
+     * @retval A guard instance if the lock is acquired.
+     * @retval An empty guard instance otherwise.
+     * @note This function does not give up acquiring a lock and continues with
+     * spinlock and back-off.
+     */
+    [[nodiscard]] auto TryLockS()  //
+        -> SGuard;
+
+    /**
+     * @brief Get an SIX lock if a given version is the same as the current one.
+     *
+     * @retval A guard instance if the lock is acquired.
+     * @retval An empty guard instance otherwise.
+     */
+    [[nodiscard]] auto TryLockSIX()  //
+        -> SIXGuard;
+
+    /**
+     * @brief Get an X lock if a given version is the same as the current one.
+     *
+     * @retval A guard instance if the lock is acquired.
+     * @retval An empty guard instance otherwise.
+     */
+    [[nodiscard]] auto TryLockX()  //
+        -> XGuard;
+
+   private:
+    /*##########################################################################
+     * Internal member variables
+     *########################################################################*/
+
+    /// @brief The address of a target lock.
+    OptimisticLock *dest_{nullptr};
+
+    /// @brief A version when creating this guard.
+    uint32_t expect_ver_{};
+
+    /// @brief A version when failing verification.
+    uint32_t actual_ver_{};
   };
 
   /*############################################################################
@@ -260,22 +426,13 @@ class OptimisticLock
    *##########################################################################*/
 
   /**
-   * @return The current version value.
+   * @return An empty guard instance with the current version value.
    *
    * @note This function does not give up reading a version value and continues
    * with spinlock and back-off.
    */
-  [[nodiscard]] auto GetVersion() const  //
-      -> uint64_t;
-
-  /**
-   * @param expected An expected version value.
-   * @retval true if the given version value is the same as the current one.
-   * @retval false otherwise.
-   */
-  [[nodiscard]] auto HasSameVersion(  //
-      const uint64_t expected) const  //
-      -> bool;
+  [[nodiscard]] auto GetVersion()  //
+      -> OptGuard;
 
   /*############################################################################
    * Pessimistic lock APIs
@@ -292,19 +449,6 @@ class OptimisticLock
       -> SGuard;
 
   /**
-   * @brief Get a shared lock if a given version is the same as the current one.
-   *
-   * @param ver An expected version value.
-   * @retval A guard instance if the lock is acquired.
-   * @retval An empty guard instance otherwise.
-   * @note This function does not give up acquiring a lock and continues with
-   * spinlock and back-off.
-   */
-  [[nodiscard]] auto TryLockS(  //
-      const uint64_t ver)       //
-      -> SGuard;
-
-  /**
    * @brief Get a shared-with-intent-exclusive lock.
    *
    * @return A guard instance for the acquired lock.
@@ -315,17 +459,6 @@ class OptimisticLock
       -> SIXGuard;
 
   /**
-   * @brief Get an SIX lock if a given version is the same as the current one.
-   *
-   * @param ver an expected version value.
-   * @retval A guard instance if the lock is acquired.
-   * @retval An empty guard instance otherwise.
-   */
-  [[nodiscard]] auto TryLockSIX(  //
-      const uint64_t ver)         //
-      -> SIXGuard;
-
-  /**
    * @brief Get an exclusive lock.
    *
    * @return A guard instance for the acquired lock.
@@ -333,17 +466,6 @@ class OptimisticLock
    * spinlock and back-off.
    */
   [[nodiscard]] auto LockX()  //
-      -> XGuard;
-
-  /**
-   * @brief Get an X lock if a given version is the same as the current one.
-   *
-   * @param ver An expected version value.
-   * @retval A guard instance if the lock is acquired.
-   * @retval An empty guard instance otherwise.
-   */
-  [[nodiscard]] auto TryLockX(  //
-      const uint64_t ver)       //
       -> XGuard;
 
  private:
@@ -370,10 +492,12 @@ class OptimisticLock
   /**
    * @brief Release an exclusive lock.
    *
+   * @param ver A desired version after unlocking.
    * @note If a thread calls this function without acquiring an X lock, it will
    * corrupt an internal lock state.
    */
-  void UnlockX();
+  void UnlockX(  //
+      uint64_t ver);
 
   /*############################################################################
    * Internal member variables
