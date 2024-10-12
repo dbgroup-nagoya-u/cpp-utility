@@ -77,11 +77,35 @@ OptimisticLock::GetVersion()  //
   SpinWithBackoff(
       [](const std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
         *cur = lock->load(kAcquire);
-        return (*cur & kXLock) == 0;
+        return (*cur & kXLock) == kNoLocks;
       },
       &lock_, &cur);
 
   return OptGuard{this, static_cast<uint32_t>(cur)};
+}
+
+auto
+OptimisticLock::PrepareRead()  //
+    -> ReadGuard
+{
+  uint64_t cur{};
+  for (size_t i = 0; true; ++i) {
+    cur = lock_.load(kAcquire);
+    if ((cur & kXLock) == kNoLocks) return ReadGuard{this, static_cast<uint32_t>(cur)};
+    if (i >= kRetryNum) break;
+    CPP_UTILITY_SPINLOCK_HINT
+  }
+
+  SpinWithBackoff(
+      [](std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
+        *cur = lock->load(kAcquire);
+        if (*cur & kXLock) return false;
+        return (*cur & kAllLockMask)
+               || lock->compare_exchange_weak(*cur, *cur + kSLock, kRelaxed, kRelaxed);
+      },
+      &lock_, &cur);
+
+  return (cur & kAllLockMask) ? ReadGuard{this, static_cast<uint32_t>(cur)} : ReadGuard{this};
 }
 
 /*##############################################################################
@@ -334,6 +358,52 @@ OptimisticLock::OptGuard::TryLockX()  //
 
   actual_ver_ = static_cast<uint32_t>(cur & kVersionMask);
   return (actual_ver_ == expect_ver_) ? XGuard{dest_, expect_ver_} : XGuard{};
+}
+
+/*##############################################################################
+ * Composite (optimistic or shared) lock guards
+ *############################################################################*/
+
+auto
+OptimisticLock::ReadGuard::operator=(  //
+    ReadGuard &&rhs) noexcept          //
+    -> ReadGuard &
+{
+  if (has_lock_) {
+    dest_->UnlockS();
+  }
+  dest_ = rhs.dest_;
+  expect_ver_ = rhs.expect_ver_;
+  actual_ver_ = rhs.actual_ver_;
+  has_lock_ = rhs.has_lock_;
+  rhs.has_lock_ = false;
+  return *this;
+}
+
+OptimisticLock::ReadGuard::~ReadGuard()
+{
+  if (has_lock_) {
+    dest_->UnlockS();
+  }
+}
+
+auto
+OptimisticLock::ReadGuard::VerifyVersion()  //
+    -> bool
+{
+  if (has_lock_) return true;
+
+  uint64_t cur{};
+  SpinWithBackoff(
+      [](const std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
+        std::atomic_thread_fence(kRelease);
+        *cur = lock->load(kRelaxed);
+        return (*cur & kXLock) == kNoLocks;
+      },
+      &(dest_->lock_), &cur);
+
+  actual_ver_ = static_cast<uint32_t>(cur & kVersionMask);
+  return actual_ver_ == expect_ver_;
 }
 
 }  // namespace dbgroup::lock

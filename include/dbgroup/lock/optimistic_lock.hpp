@@ -296,7 +296,7 @@ class OptimisticLock
   };
 
   /**
-   * @brief A class for representing a guard instance for shared locks.
+   * @brief A class for representing a guard instance for opsmistic locking.
    *
    */
   class OptGuard
@@ -329,10 +329,6 @@ class OptimisticLock
      * Public destructors
      *########################################################################*/
 
-    /**
-     * @brief Destroy this instance and release a lock if holding.
-     *
-     */
     ~OptGuard() = default;
 
     /*##########################################################################
@@ -361,7 +357,6 @@ class OptimisticLock
     /**
      * @return The version when the verification was failed.
      * @note The return value is undefined until try/verify functions are called.
-     * @note If this guard holds a lock, this function always return zero.
      */
     [[nodiscard]] constexpr auto
     GetActualVer() const  //
@@ -425,6 +420,131 @@ class OptimisticLock
     uint32_t actual_ver_{};
   };
 
+  /**
+   * @brief A class for representing a guard instance for composite locks.
+   *
+   */
+  class ReadGuard
+  {
+   public:
+    /*##########################################################################
+     * Public constructors and assignment operators
+     *########################################################################*/
+
+    constexpr ReadGuard() = default;
+
+    /**
+     * @param dest The address of a target lock.
+     */
+    constexpr explicit ReadGuard(  //
+        OptimisticLock *dest)
+        : dest_{dest}, has_lock_{true}
+    {
+    }
+
+    /**
+     * @param dest The address of a target lock.
+     * @param ver The current version.
+     */
+    constexpr ReadGuard(  //
+        OptimisticLock *dest,
+        const uint32_t ver)
+        : dest_{dest}, expect_ver_{ver}
+    {
+    }
+
+    ReadGuard(const ReadGuard &) = delete;
+
+    constexpr ReadGuard(  //
+        ReadGuard &&obj) noexcept
+        : dest_{obj.dest_},
+          expect_ver_{obj.expect_ver_},
+          actual_ver_{obj.actual_ver_},
+          has_lock_{obj.has_lock_}
+    {
+      obj.has_lock_ = false;
+    }
+
+    auto operator=(const ReadGuard &) -> ReadGuard & = delete;
+
+    auto operator=(  //
+        ReadGuard &&rhs) noexcept -> ReadGuard &;
+
+    /*##########################################################################
+     * Public destructors
+     *########################################################################*/
+
+    /**
+     * @brief Destroy this instance and release a lock if holding.
+     *
+     */
+    ~ReadGuard();
+
+    /*##########################################################################
+     * Public getters
+     *########################################################################*/
+
+    /**
+     * @retval true if this instance has the lock ownership.
+     * @retval false otherwise.
+     */
+    constexpr explicit
+    operator bool() const
+    {
+      return has_lock_;
+    }
+
+    /**
+     * @return The version when this guard was created.
+     */
+    [[nodiscard]] constexpr auto
+    GetVersion() const  //
+        -> uint32_t
+    {
+      return expect_ver_;
+    }
+
+    /**
+     * @return The version when the verification was failed.
+     * @note The return value is undefined until a verify function is called.
+     * @note If this guard holds a lock, this function always return zero.
+     */
+    [[nodiscard]] constexpr auto
+    GetActualVer() const  //
+        -> uint32_t
+    {
+      return actual_ver_;
+    }
+
+    /*##########################################################################
+     * Public APIs
+     *########################################################################*/
+
+    /**
+     * @retval true if a target version does not change from an expected one.
+     * @retval false otherwise.
+     */
+    [[nodiscard]] auto VerifyVersion()  //
+        -> bool;
+
+   private:
+    /*##########################################################################
+     * Internal member variables
+     *########################################################################*/
+
+    /// @brief The address of a target lock.
+    OptimisticLock *dest_{nullptr};
+
+    /// @brief A version when creating this guard.
+    uint32_t expect_ver_{};
+
+    /// @brief A version when failing verification.
+    uint32_t actual_ver_{};
+
+    /// @brief A flag indicating whether this instance is holding a lock.
+    bool has_lock_{};
+  };
+
   /*############################################################################
    * Public constructors and assignment operators
    *##########################################################################*/
@@ -455,6 +575,17 @@ class OptimisticLock
    */
   [[nodiscard]] auto GetVersion()  //
       -> OptGuard;
+
+  /**
+   * @brief Prepare a guard instance to read contents.
+   *
+   * @retval A guard instance with a shared lock if the lock is busy.
+   * @retval A guard instance with a version value otherwise.
+   * @note This function does not give up preparing a guard instance and
+   * continues with spinlock and back-off.
+   */
+  [[nodiscard]] auto PrepareRead()  //
+      -> ReadGuard;
 
   /*############################################################################
    * Pessimistic lock APIs

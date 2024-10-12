@@ -20,6 +20,7 @@
 #include <chrono>
 #include <future>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 // external libraries
@@ -109,17 +110,59 @@ class OptimisticLockFixture : public ::testing::Test
 
   void
   VerifyUpgradeToXWith(  //
-      const LockType lock_type,
+      const LockType with_lock_type,
       const bool expected_rc)
   {
     auto &&opt_guard = lock_.GetVersion();
     {
-      [[maybe_unused]] const auto &guard = GetLock(lock_type);
+      [[maybe_unused]] const auto &guard = GetLock(with_lock_type);
       TryUpgrade(lock_.LockSIX(), expected_rc);
     }
     t_.join();
 
     ASSERT_FALSE(opt_guard.VerifyVersion());
+  }
+
+  void
+  VerifyPrepareRead(  //
+      const LockType with_lock_type,
+      const bool expected_rc)
+  {
+    auto &&read_guard = lock_.PrepareRead();
+
+    std::promise<void> p{};
+    auto &&f = p.get_future();
+    {
+      [[maybe_unused]] const auto &guard = GetLock(with_lock_type);
+
+      auto worker = [](LockType lock_type, OptimisticLock *lock, std::promise<void> p) {
+        auto &&guard = lock->PrepareRead();
+
+        ASSERT_TRUE(guard.VerifyVersion());
+        if (lock_type != kXLock) {
+          ASSERT_FALSE(guard);
+        } else {
+          ASSERT_TRUE(guard);
+        }
+
+        p.set_value();
+      };
+      std::thread{worker, with_lock_type, &lock_, std::move(p)}.detach();
+
+      // after short sleep, give up on acquiring the lock
+      const auto rc = f.wait_for(kWaitTimeMill);
+
+      // verify status to check locking is succeeded
+      if (expected_rc) {
+        ASSERT_EQ(rc, std::future_status::ready);
+      } else {
+        ASSERT_EQ(rc, std::future_status::timeout);
+      }
+    }
+    f.get();
+
+    std::ignore = lock_.LockX();  // NOLINT
+    ASSERT_FALSE(read_guard.VerifyVersion());
   }
 
   void
@@ -555,6 +598,38 @@ TEST_F(  //
     UpgradeToXWithSLockNeedWait)
 {
   VerifyUpgradeToXWith(kSLock, kExpectFail);
+}
+
+/*----------------------------------------------------------------------------*
+ * Composite lock tests
+ *----------------------------------------------------------------------------*/
+
+TEST_F(  //
+    OptimisticLockFixture,
+    PrepareReadWithoutLocksSucceed)
+{
+  VerifyPrepareRead(kFree, kExpectSucceed);
+}
+
+TEST_F(  //
+    OptimisticLockFixture,
+    PrepareReadWithSLockSucceed)
+{
+  VerifyPrepareRead(kSLock, kExpectSucceed);
+}
+
+TEST_F(  //
+    OptimisticLockFixture,
+    PrepareReadWithSIXLockSucceed)
+{
+  VerifyPrepareRead(kSIXLock, kExpectSucceed);
+}
+
+TEST_F(  //
+    OptimisticLockFixture,
+    PrepareReadWithXLockNeedWait)
+{
+  VerifyPrepareRead(kXLock, kExpectFail);
 }
 
 /*----------------------------------------------------------------------------*
