@@ -88,7 +88,7 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
   )
   add_library(dbgroup::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
   target_compile_features(${PROJECT_NAME} PUBLIC
-    "cxx_std_17"
+    "cxx_std_20"
   )
   target_compile_options(${PROJECT_NAME} PRIVATE
     -Wall

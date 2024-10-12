@@ -63,13 +63,17 @@ class MCSLock
 
     SGuard(const SGuard &) = delete;
 
-    SGuard(  //
-        SGuard &&) noexcept;
+    constexpr SGuard(  //
+        SGuard &&obj) noexcept
+        : dest_{obj.dest_}, qnode_{obj.qnode_}
+    {
+      obj.dest_ = nullptr;
+    }
 
     auto operator=(const SGuard &) -> SGuard & = delete;
 
-    auto operator=(          //
-        SGuard &&) noexcept  //
+    auto operator=(             //
+        SGuard &&rhs) noexcept  //
         -> SGuard &;
 
     /*##########################################################################
@@ -130,11 +134,18 @@ class MCSLock
 
     SIXGuard(const SIXGuard &) = delete;
 
-    SIXGuard(SIXGuard &&) noexcept;
+    constexpr SIXGuard(  //
+        SIXGuard &&obj) noexcept
+        : dest_{obj.dest_}, qnode_{obj.qnode_}
+    {
+      obj.dest_ = nullptr;
+    }
 
     auto operator=(const SIXGuard &) -> SIXGuard & = delete;
 
-    auto operator=(SIXGuard &&) noexcept -> SIXGuard &;
+    auto operator=(               //
+        SIXGuard &&rhs) noexcept  //
+        -> SIXGuard &;
 
     /*##########################################################################
      * Public destructors
@@ -204,11 +215,18 @@ class MCSLock
 
     XGuard(const XGuard &) = delete;
 
-    XGuard(XGuard &&) noexcept;
+    constexpr XGuard(  //
+        XGuard &&obj) noexcept
+        : dest_{obj.dest_}, qnode_{obj.qnode_}
+    {
+      obj.dest_ = nullptr;
+    }
 
     auto operator=(const XGuard &) -> XGuard & = delete;
 
-    auto operator=(XGuard &&) noexcept -> XGuard &;
+    auto operator=(             //
+        XGuard &&rhs) noexcept  //
+        -> XGuard &;
 
     /*##########################################################################
      * Public destructors
@@ -347,7 +365,7 @@ class MCSLock
   std::atomic_uint64_t lock_{0};
 
   /// @brief A thread local queue node container.
-  static thread_local inline std::unique_ptr<MCSLock> tls_node_{};
+  static thread_local inline std::unique_ptr<MCSLock> tls_node_{};  // NOLINT
 };
 
 }  // namespace dbgroup::lock

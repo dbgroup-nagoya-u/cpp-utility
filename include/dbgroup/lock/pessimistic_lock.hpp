@@ -52,7 +52,7 @@ class PessimisticLock
     /**
      * @param dest The address of a target lock.
      */
-    constexpr SGuard(  //
+    constexpr explicit SGuard(  //
         PessimisticLock *dest)
         : dest_{dest}
     {
@@ -60,13 +60,17 @@ class PessimisticLock
 
     SGuard(const SGuard &) = delete;
 
-    SGuard(  //
-        SGuard &&) noexcept;
+    constexpr SGuard(  //
+        SGuard &&obj) noexcept
+        : dest_{obj.dest_}
+    {
+      obj.dest_ = nullptr;
+    }
 
     auto operator=(const SGuard &) -> SGuard & = delete;
 
-    auto operator=(          //
-        SGuard &&) noexcept  //
+    auto operator=(             //
+        SGuard &&rhs) noexcept  //
         -> SGuard &;
 
     /*##########################################################################
@@ -114,7 +118,7 @@ class PessimisticLock
     /**
      * @param dest The address of a target lock.
      */
-    constexpr SIXGuard(  //
+    constexpr explicit SIXGuard(  //
         PessimisticLock *dest)
         : dest_{dest}
     {
@@ -122,11 +126,18 @@ class PessimisticLock
 
     SIXGuard(const SIXGuard &) = delete;
 
-    SIXGuard(SIXGuard &&) noexcept;
+    constexpr SIXGuard(  //
+        SIXGuard &&obj) noexcept
+        : dest_{obj.dest_}
+    {
+      obj.dest_ = nullptr;
+    }
 
     auto operator=(const SIXGuard &) -> SIXGuard & = delete;
 
-    auto operator=(SIXGuard &&) noexcept -> SIXGuard &;
+    auto operator=(               //
+        SIXGuard &&rhs) noexcept  //
+        -> SIXGuard &;
 
     /*##########################################################################
      * Public destructors
@@ -183,7 +194,7 @@ class PessimisticLock
     /**
      * @param dest The address of a target lock.
      */
-    constexpr XGuard(  //
+    constexpr explicit XGuard(  //
         PessimisticLock *dest)
         : dest_{dest}
     {
@@ -191,11 +202,18 @@ class PessimisticLock
 
     XGuard(const XGuard &) = delete;
 
-    XGuard(XGuard &&) noexcept;
+    constexpr XGuard(  //
+        XGuard &&obj) noexcept
+        : dest_{obj.dest_}
+    {
+      obj.dest_ = nullptr;
+    }
 
     auto operator=(const XGuard &) -> XGuard & = delete;
 
-    auto operator=(XGuard &&) noexcept -> XGuard &;
+    auto operator=(             //
+        XGuard &&rhs) noexcept  //
+        -> XGuard &;
 
     /*##########################################################################
      * Public destructors

@@ -54,7 +54,7 @@ Initialize()  //
  *############################################################################*/
 
 /// @brief A bool array for managing reservation states of thread IDs.
-std::unique_ptr<std::atomic_bool[]> id_vec = Initialize();
+std::unique_ptr<std::atomic_bool[]> id_vec = Initialize();  // NOLINT
 
 }  // namespace
 

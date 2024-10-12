@@ -53,7 +53,7 @@ class OptimisticLock
     /**
      * @param dest The address of a target lock.
      */
-    constexpr SGuard(  //
+    constexpr explicit SGuard(  //
         OptimisticLock *dest)
         : dest_{dest}
     {
@@ -61,19 +61,27 @@ class OptimisticLock
 
     SGuard(const SGuard &) = delete;
 
-    SGuard(  //
-        SGuard &&) noexcept;
+    constexpr SGuard(  //
+        SGuard &&obj) noexcept
+        : dest_{obj.dest_}
+    {
+      obj.dest_ = nullptr;
+    }
 
     auto operator=(const SGuard &) -> SGuard & = delete;
 
-    auto operator=(          //
-        SGuard &&) noexcept  //
+    auto operator=(             //
+        SGuard &&rhs) noexcept  //
         -> SGuard &;
 
     /*##########################################################################
      * Public destructors
      *########################################################################*/
 
+    /**
+     * @brief Destroy this instance and release a lock if holding.
+     *
+     */
     ~SGuard();
 
     /*##########################################################################
@@ -115,7 +123,7 @@ class OptimisticLock
     /**
      * @param dest The address of a target lock.
      */
-    constexpr SIXGuard(  //
+    constexpr explicit SIXGuard(  //
         OptimisticLock *dest)
         : dest_{dest}
     {
@@ -123,16 +131,26 @@ class OptimisticLock
 
     SIXGuard(const SIXGuard &) = delete;
 
-    SIXGuard(SIXGuard &&) noexcept;
+    constexpr SIXGuard(  //
+        SIXGuard &&obj) noexcept
+        : dest_{obj.dest_}
+    {
+      obj.dest_ = nullptr;
+    }
 
     auto operator=(const SIXGuard &) -> SIXGuard & = delete;
 
-    auto operator=(SIXGuard &&) noexcept -> SIXGuard &;
+    auto operator=(  //
+        SIXGuard &&rhs) noexcept -> SIXGuard &;
 
     /*##########################################################################
      * Public destructors
      *########################################################################*/
 
+    /**
+     * @brief Destroy this instance and release a lock if holding.
+     *
+     */
     ~SIXGuard();
 
     /*##########################################################################
@@ -210,6 +228,10 @@ class OptimisticLock
      * Public destructors
      *########################################################################*/
 
+    /**
+     * @brief Destroy this instance and release a lock if holding.
+     *
+     */
     ~XGuard();
 
     /*##########################################################################

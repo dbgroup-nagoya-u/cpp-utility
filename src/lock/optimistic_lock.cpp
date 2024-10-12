@@ -159,23 +159,16 @@ OptimisticLock::UnlockX(  //
  * Shared lock guards
  *############################################################################*/
 
-OptimisticLock::SGuard::SGuard(  //
-    SGuard &&obj) noexcept
-{
-  dest_ = obj.dest_;
-  obj.dest_ = nullptr;
-}
-
 auto
 OptimisticLock::SGuard::operator=(  //
-    SGuard &&obj) noexcept          //
+    SGuard &&rhs) noexcept          //
     -> SGuard &
 {
   if (dest_) {
     dest_->UnlockS();
   }
-  dest_ = obj.dest_;
-  obj.dest_ = nullptr;
+  dest_ = rhs.dest_;
+  rhs.dest_ = nullptr;
   return *this;
 }
 
@@ -190,23 +183,16 @@ OptimisticLock::SGuard::~SGuard()
  * Shared-with-intent-exclusive lock guards
  *############################################################################*/
 
-OptimisticLock::SIXGuard::SIXGuard(  //
-    SIXGuard &&obj) noexcept
-{
-  dest_ = obj.dest_;
-  obj.dest_ = nullptr;
-}
-
 auto
 OptimisticLock::SIXGuard::operator=(  //
-    SIXGuard &&obj) noexcept          //
+    SIXGuard &&rhs) noexcept          //
     -> SIXGuard &
 {
   if (dest_) {
     dest_->UnlockSIX();
   }
-  dest_ = obj.dest_;
-  obj.dest_ = nullptr;
+  dest_ = rhs.dest_;
+  rhs.dest_ = nullptr;
   return *this;
 }
 

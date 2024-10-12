@@ -121,23 +121,16 @@ PessimisticLock::UnlockX()
  * Shared lock guards
  *############################################################################*/
 
-PessimisticLock::SGuard::SGuard(  //
-    SGuard &&obj) noexcept
-{
-  dest_ = obj.dest_;
-  obj.dest_ = nullptr;
-}
-
 auto
 PessimisticLock::SGuard::operator=(  //
-    SGuard &&obj) noexcept           //
+    SGuard &&rhs) noexcept           //
     -> SGuard &
 {
   if (dest_) {
     dest_->UnlockS();
   }
-  dest_ = obj.dest_;
-  obj.dest_ = nullptr;
+  dest_ = rhs.dest_;
+  rhs.dest_ = nullptr;
   return *this;
 }
 
@@ -152,23 +145,16 @@ PessimisticLock::SGuard::~SGuard()
  * Shared-with-intent-exclusive lock guards
  *############################################################################*/
 
-PessimisticLock::SIXGuard::SIXGuard(  //
-    SIXGuard &&obj) noexcept
-{
-  dest_ = obj.dest_;
-  obj.dest_ = nullptr;
-}
-
 auto
 PessimisticLock::SIXGuard::operator=(  //
-    SIXGuard &&obj) noexcept           //
+    SIXGuard &&rhs) noexcept           //
     -> SIXGuard &
 {
   if (dest_) {
     dest_->UnlockSIX();
   }
-  dest_ = obj.dest_;
-  obj.dest_ = nullptr;
+  dest_ = rhs.dest_;
+  rhs.dest_ = nullptr;
   return *this;
 }
 
@@ -201,23 +187,16 @@ PessimisticLock::SIXGuard::UpgradeToX()  //
  * Exclusive lock guards
  *############################################################################*/
 
-PessimisticLock::XGuard::XGuard(  //
-    XGuard &&obj) noexcept
-{
-  dest_ = obj.dest_;
-  obj.dest_ = nullptr;
-}
-
 auto
 PessimisticLock::XGuard::operator=(  //
-    XGuard &&obj) noexcept           //
+    XGuard &&rhs) noexcept           //
     -> XGuard &
 {
   if (dest_) {
     dest_->UnlockX();
   }
-  dest_ = obj.dest_;
-  obj.dest_ = nullptr;
+  dest_ = rhs.dest_;
+  rhs.dest_ = nullptr;
   return *this;
 }
 

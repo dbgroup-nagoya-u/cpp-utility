@@ -37,7 +37,7 @@ constexpr std::memory_order kRelease = std::memory_order_release;
 constexpr std::memory_order kRelaxed = std::memory_order_relaxed;
 
 /// @brief The maximum number of threads used in a process.
-constexpr size_t kMaxThreadNum = DBGROUP_MAX_THREAD_NUM;
+constexpr size_t kMaxThreadNum = DBGROUP_MAX_THREAD_NUM;  // NOLINT
 
 /// @brief The expected cache-line size.
 constexpr size_t kCashLineSize = 64;
