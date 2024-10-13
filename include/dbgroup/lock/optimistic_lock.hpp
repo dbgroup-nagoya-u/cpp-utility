@@ -315,7 +315,7 @@ class OptimisticLock
     constexpr OptGuard(  //
         OptimisticLock *dest,
         const uint32_t ver)
-        : dest_{dest}, expect_ver_{ver}
+        : dest_{dest}, ver_{ver}
     {
     }
 
@@ -351,18 +351,7 @@ class OptimisticLock
     GetVersion() const  //
         -> uint32_t
     {
-      return expect_ver_;
-    }
-
-    /**
-     * @return The version when the verification was failed.
-     * @note The return value is undefined until try/verify functions are called.
-     */
-    [[nodiscard]] constexpr auto
-    GetActualVer() const  //
-        -> uint32_t
-    {
-      return actual_ver_;
+      return ver_;
     }
 
     /*##########################################################################
@@ -414,10 +403,7 @@ class OptimisticLock
     OptimisticLock *dest_{nullptr};
 
     /// @brief A version when creating this guard.
-    uint32_t expect_ver_{};
-
-    /// @brief A version when failing verification.
-    uint32_t actual_ver_{};
+    uint32_t ver_{};
   };
 
   /**
@@ -449,7 +435,7 @@ class OptimisticLock
     constexpr ReadGuard(  //
         OptimisticLock *dest,
         const uint32_t ver)
-        : dest_{dest}, expect_ver_{ver}
+        : dest_{dest}, ver_{ver}
     {
     }
 
@@ -457,10 +443,7 @@ class OptimisticLock
 
     constexpr ReadGuard(  //
         ReadGuard &&obj) noexcept
-        : dest_{obj.dest_},
-          expect_ver_{obj.expect_ver_},
-          actual_ver_{obj.actual_ver_},
-          has_lock_{obj.has_lock_}
+        : dest_{obj.dest_}, ver_{obj.ver_}, has_lock_{obj.has_lock_}
     {
       obj.has_lock_ = false;
     }
@@ -501,19 +484,7 @@ class OptimisticLock
     GetVersion() const  //
         -> uint32_t
     {
-      return expect_ver_;
-    }
-
-    /**
-     * @return The version when the verification was failed.
-     * @note The return value is undefined until a verify function is called.
-     * @note If this guard holds a lock, this function always return zero.
-     */
-    [[nodiscard]] constexpr auto
-    GetActualVer() const  //
-        -> uint32_t
-    {
-      return actual_ver_;
+      return ver_;
     }
 
     /*##########################################################################
@@ -536,10 +507,7 @@ class OptimisticLock
     OptimisticLock *dest_{nullptr};
 
     /// @brief A version when creating this guard.
-    uint32_t expect_ver_{};
-
-    /// @brief A version when failing verification.
-    uint32_t actual_ver_{};
+    uint32_t ver_{};
 
     /// @brief A flag indicating whether this instance is holding a lock.
     bool has_lock_{};

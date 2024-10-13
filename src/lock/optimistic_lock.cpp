@@ -99,9 +99,9 @@ OptimisticLock::PrepareRead()  //
   SpinWithBackoff(
       [](std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
         *cur = lock->load(kAcquire);
-        if (*cur & kXLock) return false;
-        return (*cur & kAllLockMask)
-               || lock->compare_exchange_weak(*cur, *cur + kSLock, kRelaxed, kRelaxed);
+        return (*cur & kXLock) == kNoLocks
+               && ((*cur & kAllLockMask)
+                   || lock->compare_exchange_weak(*cur, *cur + kSLock, kRelaxed, kRelaxed));
       },
       &lock_, &cur);
 
@@ -302,8 +302,9 @@ OptimisticLock::OptGuard::VerifyVersion()  //
       },
       &(dest_->lock_), &cur);
 
-  actual_ver_ = static_cast<uint32_t>(cur & kVersionMask);
-  return actual_ver_ == expect_ver_;
+  auto expected = ver_;
+  ver_ = static_cast<uint32_t>(cur & kVersionMask);
+  return ver_ == expected;
 }
 
 auto
@@ -318,10 +319,11 @@ OptimisticLock::OptGuard::TryLockS()  //
                && ((*cur & kVersionMask) != ver
                    || lock->compare_exchange_weak(*cur, *cur + kSLock, kRelaxed, kRelaxed));
       },
-      &(dest_->lock_), &cur, expect_ver_);
+      &(dest_->lock_), &cur, ver_);
 
-  actual_ver_ = static_cast<uint32_t>(cur & kVersionMask);
-  return (actual_ver_ == expect_ver_) ? SGuard{dest_} : SGuard{};
+  auto expected = ver_;
+  ver_ = static_cast<uint32_t>(cur & kVersionMask);
+  return (ver_ == expected) ? SGuard{dest_} : SGuard{};
 }
 
 auto
@@ -336,10 +338,11 @@ OptimisticLock::OptGuard::TryLockSIX()  //
                && ((*cur & kVersionMask) != ver
                    || lock->compare_exchange_weak(*cur, *cur | kSIXLock, kRelaxed, kRelaxed));
       },
-      &(dest_->lock_), &cur, expect_ver_);
+      &(dest_->lock_), &cur, ver_);
 
-  actual_ver_ = static_cast<uint32_t>(cur & kVersionMask);
-  return (actual_ver_ == expect_ver_) ? SIXGuard{dest_} : SIXGuard{};
+  auto expected = ver_;
+  ver_ = static_cast<uint32_t>(cur & kVersionMask);
+  return (ver_ == expected) ? SIXGuard{dest_} : SIXGuard{};
 }
 
 auto
@@ -354,10 +357,11 @@ OptimisticLock::OptGuard::TryLockX()  //
                && ((*cur & kXAndVersionMask) != ver
                    || lock->compare_exchange_weak(*cur, *cur | kXLock, kRelaxed, kRelaxed));
       },
-      &(dest_->lock_), &cur, expect_ver_);
+      &(dest_->lock_), &cur, ver_);
 
-  actual_ver_ = static_cast<uint32_t>(cur & kVersionMask);
-  return (actual_ver_ == expect_ver_) ? XGuard{dest_, expect_ver_} : XGuard{};
+  auto expected = ver_;
+  ver_ = static_cast<uint32_t>(cur & kVersionMask);
+  return (ver_ == expected) ? XGuard{dest_, ver_} : XGuard{};
 }
 
 /*##############################################################################
@@ -373,8 +377,7 @@ OptimisticLock::ReadGuard::operator=(  //
     dest_->UnlockS();
   }
   dest_ = rhs.dest_;
-  expect_ver_ = rhs.expect_ver_;
-  actual_ver_ = rhs.actual_ver_;
+  ver_ = rhs.ver_;
   has_lock_ = rhs.has_lock_;
   rhs.has_lock_ = false;
   return *this;
@@ -402,8 +405,9 @@ OptimisticLock::ReadGuard::VerifyVersion()  //
       },
       &(dest_->lock_), &cur);
 
-  actual_ver_ = static_cast<uint32_t>(cur & kVersionMask);
-  return actual_ver_ == expect_ver_;
+  auto expected = ver_;
+  ver_ = static_cast<uint32_t>(cur & kVersionMask);
+  return ver_ == expected;
 }
 
 }  // namespace dbgroup::lock
