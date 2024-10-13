@@ -76,8 +76,12 @@ class Epoch
   /**
    * @param global_epoch A pointer to the global epoch.
    */
-  void SetGrobalEpoch(  //
-      std::atomic_size_t *global_epoch);
+  constexpr void
+  SetGrobalEpoch(  //
+      std::atomic_size_t *global_epoch)
+  {
+    current_ = global_epoch;
+  }
 
   /*############################################################################
    * Public utility functions

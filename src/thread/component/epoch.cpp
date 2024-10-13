@@ -45,13 +45,6 @@ Epoch::GetProtectedEpoch() const  //
   return entered_.load(kRelaxed);
 }
 
-void
-Epoch::SetGrobalEpoch(  //
-    std::atomic_size_t *global_epoch)
-{
-  current_ = global_epoch;
-}
-
 /*##############################################################################
  * Public utility functions
  *############################################################################*/
