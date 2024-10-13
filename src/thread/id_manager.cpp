@@ -32,29 +32,11 @@ namespace dbgroup::thread
 namespace
 {
 /*##############################################################################
- * Local utilities
- *############################################################################*/
-
-/**
- * @return An initialized atomic_bool array.
- */
-auto
-Initialize()  //
-    -> std::unique_ptr<std::atomic_bool[]>
-{
-  auto &&vec = std::make_unique<std::atomic_bool[]>(kMaxThreadNum);
-  for (size_t i = 0; i < kMaxThreadNum; ++i) {
-    vec[i].store(false, kRelaxed);
-  }
-  return std::move(vec);
-}
-
-/*##############################################################################
  * Local variables
  *############################################################################*/
 
 /// @brief A bool array for managing reservation states of thread IDs.
-std::unique_ptr<std::atomic_bool[]> id_vec = Initialize();  // NOLINT
+std::atomic_bool _id_vec[kMaxThreadNum] = {};  // NOLINT
 
 }  // namespace
 
@@ -87,17 +69,12 @@ IDManager::GetHeartBeater()  //
   thread_local HeartBeater hb{};
   if (!hb.HasID()) {
     auto id = std::hash<std::thread::id>{}(std::this_thread::get_id()) % kMaxThreadNum;
-    while (true) {
-      auto &dst = id_vec[id];
-      auto reserved = dst.load(kRelaxed);
-      if (!reserved && dst.compare_exchange_strong(reserved, true, kRelaxed)) {
-        hb.SetID(id);
-        break;
-      }
+    do {
       if (++id >= kMaxThreadNum) {
         id = 0;
       }
-    }
+    } while (_id_vec[id].load(kRelaxed) || _id_vec[id].exchange(true, kRelaxed));
+    hb.SetID(id);
   }
   return hb;
 }
@@ -108,7 +85,7 @@ IDManager::GetHeartBeater()  //
 
 IDManager::HeartBeater::~HeartBeater()
 {  //
-  id_vec[*id_].store(false, kRelaxed);
+  _id_vec[*id_].store(false, kRelaxed);
 }
 
 auto

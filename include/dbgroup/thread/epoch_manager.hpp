@@ -234,7 +234,7 @@ class EpochManager
     size_t upper_epoch_{};
 
     /// @brief The list of protected epochs.
-    std::array<std::vector<size_t>, kCapacity> epoch_lists_{};
+    std::array<std::vector<size_t>, kCapacity> epoch_lists_ = {};
   };
 
   /*############################################################################
