@@ -19,7 +19,6 @@
 // C++ standard libraries
 #include <chrono>
 #include <future>
-#include <stdexcept>
 #include <thread>
 #include <variant>
 #include <vector>
@@ -32,17 +31,15 @@
 
 namespace dbgroup::lock::test
 {
-using Guard = std::variant<int, MCSLock::MCSLockSGuard, MCSLock::MCSLockXGuard>;
-
 /*##############################################################################
  * Global constants
  *############################################################################*/
 
 constexpr bool kExpectSucceed = true;
 constexpr bool kExpectFail = false;
-constexpr size_t kWaitTimeMill = 100;
 constexpr size_t kThreadNumForLockS = 1E2;
 constexpr size_t kWriteNumPerThread = 1E4;
+constexpr std::chrono::milliseconds kWaitTimeMill{100};
 
 /*##############################################################################
  * Fixture definition
@@ -51,6 +48,12 @@ constexpr size_t kWriteNumPerThread = 1E4;
 class MCSLockFixture : public ::testing::Test
 {
  protected:
+  /*############################################################################
+   * Types
+   *##########################################################################*/
+
+  using Guard = std::variant<int, MCSLock::SGuard, MCSLock::SIXGuard, MCSLock::XGuard>;
+
   /*############################################################################
    * Setup/Teardown
    *##########################################################################*/
@@ -70,24 +73,61 @@ class MCSLockFixture : public ::testing::Test
    *##########################################################################*/
 
   void
-  VerifyLockSWith(const LockType lock_type)
+  VerifyLockSWith(  //
+      const LockType lock_type,
+      const bool expected_rc)
   {
-    const auto expected_rc = (lock_type == kXLock) ? kExpectFail : kExpectSucceed;
     {
-      auto &&guard = GetLock(lock_type);
+      [[maybe_unused]] const auto &guard = GetLock(lock_type);
       TryLock(kSLock, expected_rc);
     }
     t_.join();
   }
 
   void
-  VerifyLockXWith(  //
-      const LockType lock_type)
+  VerifyLockSIXWith(  //
+      const LockType lock_type,
+      const bool expected_rc)
   {
-    const auto expected_rc = (lock_type != kFree) ? kExpectFail : kExpectSucceed;
     {
-      auto &&guard = GetLock(lock_type);
+      [[maybe_unused]] const auto &guard = GetLock(lock_type);
+      TryLock(kSIXLock, expected_rc);
+    }
+    t_.join();
+  }
+
+  void
+  VerifyLockXWith(  //
+      const LockType lock_type,
+      const bool expected_rc)
+  {
+    {
+      [[maybe_unused]] const auto &guard = GetLock(lock_type);
       TryLock(kXLock, expected_rc);
+    }
+    t_.join();
+  }
+
+  void
+  VerifyDowngradeToSIX(  //
+      const LockType lock_type,
+      const bool expected_rc)
+  {
+    {
+      [[maybe_unused]] const auto &six_guard = lock_.LockX().DowngradeToSIX();
+      TryLock(lock_type, expected_rc);
+    }
+    t_.join();
+  }
+
+  void
+  VerifyUpgradeToXWith(  //
+      const LockType lock_type,
+      const bool expected_rc)
+  {
+    {
+      [[maybe_unused]] const auto &guard = GetLock(lock_type);
+      TryUpgrade(lock_.LockSIX(), expected_rc);
     }
     t_.join();
   }
@@ -131,7 +171,7 @@ class MCSLockFixture : public ::testing::Test
       }
 
       // after short sleep, check that the counter has not incremented
-      std::this_thread::sleep_for(std::chrono::milliseconds(kWaitTimeMill));
+      std::this_thread::sleep_for(kWaitTimeMill);
       ASSERT_EQ(counter_, 0);
     }
 
@@ -155,15 +195,21 @@ class MCSLockFixture : public ::testing::Test
       -> Guard
   {
     switch (lock_type) {
-      case kSLock:
-        return Guard{lock_.LockS()};
-
-      case kXLock:
-        return Guard{lock_.LockX()};
-
-      case kSIXLock:
-        throw std::runtime_error{"This class has no SIX locks."};
-
+      case kSLock: {
+        auto &&guard = lock_.LockS();
+        EXPECT_TRUE(guard);
+        return Guard{std::move(guard)};
+      }
+      case kSIXLock: {
+        auto &&guard = lock_.LockSIX();
+        EXPECT_TRUE(guard);
+        return Guard{std::move(guard)};
+      }
+      case kXLock: {
+        auto &&guard = lock_.LockX();
+        EXPECT_TRUE(guard);
+        return Guard{std::move(guard)};
+      }
       case kFree:
       default:
         break;
@@ -176,7 +222,7 @@ class MCSLockFixture : public ::testing::Test
       const LockType lock_type,
       std::promise<void> p)
   {
-    auto &&guard = GetLock(lock_type);
+    [[maybe_unused]] const auto &guard = GetLock(lock_type);
     p.set_value();
   }
 
@@ -191,7 +237,33 @@ class MCSLockFixture : public ::testing::Test
     t_ = std::thread{&MCSLockFixture::LockWorker, this, lock_type, std::move(p)};
 
     // after short sleep, give up on acquiring the lock
-    const auto rc = f.wait_for(std::chrono::milliseconds{kWaitTimeMill});
+    const auto rc = f.wait_for(kWaitTimeMill);
+
+    // verify status to check locking is succeeded
+    if (expect_success) {
+      ASSERT_EQ(rc, std::future_status::ready);
+    } else {
+      ASSERT_EQ(rc, std::future_status::timeout);
+    }
+  }
+
+  void
+  TryUpgrade(  //
+      MCSLock::SIXGuard six_guard,
+      const bool expect_success)
+  {
+    auto upgrade_worker = [](MCSLock::SIXGuard six_guard, std::promise<void> p) -> void {
+      [[maybe_unused]] const auto &x_guard = six_guard.UpgradeToX();
+      p.set_value();
+    };
+
+    // try to get an exclusive lock by another thread
+    std::promise<void> p{};
+    auto &&f = p.get_future();
+    t_ = std::thread{upgrade_worker, std::move(six_guard), std::move(p)};
+
+    // after short sleep, give up on acquiring the lock
+    const auto rc = f.wait_for(kWaitTimeMill);
 
     // verify status to check locking is succeeded
     if (expect_success) {
@@ -216,47 +288,140 @@ class MCSLockFixture : public ::testing::Test
  * Unit test definitions
  *############################################################################*/
 
+/*----------------------------------------------------------------------------*
+ * Shared lock tests
+ *----------------------------------------------------------------------------*/
+
 TEST_F(  //
     MCSLockFixture,
     LockSWithoutLocksSucceed)
 {
-  VerifyLockSWith(kFree);
+  VerifyLockSWith(kFree, kExpectSucceed);
 }
 
 TEST_F(  //
     MCSLockFixture,
-    LockSWithSLockSucceed)
+    LockSAfterSLockSucceed)
 {
-  VerifyLockSWith(kSLock);
+  VerifyLockSWith(kSLock, kExpectSucceed);
 }
 
 TEST_F(  //
     MCSLockFixture,
-    LockSWithXLockFail)
+    LockSAfterSIXLockNeedWait)
 {
-  VerifyLockSWith(kXLock);
+  VerifyLockSWith(kSIXLock, kExpectFail);
 }
+
+TEST_F(  //
+    MCSLockFixture,
+    LockSAfterXLockNeedWait)
+{
+  VerifyLockSWith(kXLock, kExpectFail);
+}
+
+/*----------------------------------------------------------------------------*
+ * Exclusive lock tests
+ *----------------------------------------------------------------------------*/
 
 TEST_F(  //
     MCSLockFixture,
     LockXWithoutLocksSucceed)
 {
-  VerifyLockXWith(kFree);
+  VerifyLockXWith(kFree, kExpectSucceed);
 }
 
 TEST_F(  //
     MCSLockFixture,
-    LockXWithSLockFail)
+    LockXAfterSLockNeedWait)
 {
-  VerifyLockXWith(kSLock);
+  VerifyLockXWith(kSLock, kExpectFail);
 }
 
 TEST_F(  //
     MCSLockFixture,
-    LockXWithXLockFail)
+    LockXAfterSIXLockNeedWait)
 {
-  VerifyLockXWith(kXLock);
+  VerifyLockXWith(kSIXLock, kExpectFail);
 }
+
+TEST_F(  //
+    MCSLockFixture,
+    LockXAfterXLockNeedWait)
+{
+  VerifyLockXWith(kXLock, kExpectFail);
+}
+
+/*----------------------------------------------------------------------------*
+ * Shared-with-intent-exclusive lock tests
+ *----------------------------------------------------------------------------*/
+
+TEST_F(  //
+    MCSLockFixture,
+    LockSIXWithoutLocksSucceed)
+{
+  VerifyLockSIXWith(kFree, kExpectSucceed);
+}
+
+TEST_F(  //
+    MCSLockFixture,
+    LockSIXAfterSLockSucceed)
+{
+  VerifyLockSIXWith(kSLock, kExpectSucceed);
+}
+
+TEST_F(  //
+    MCSLockFixture,
+    LockSIXAfterSIXLockNeedWait)
+{
+  VerifyLockSIXWith(kSIXLock, kExpectFail);
+}
+
+TEST_F(  //
+    MCSLockFixture,
+    LockSIXAfterXLockNeedWait)
+{
+  VerifyLockSIXWith(kXLock, kExpectFail);
+}
+
+TEST_F(  //
+    MCSLockFixture,
+    LockSAfterDowngradeToSIXNeedWait)
+{
+  VerifyDowngradeToSIX(kSLock, kExpectFail);
+}
+
+TEST_F(  //
+    MCSLockFixture,
+    LockSIXAfterDowngradeToSIXNeedWait)
+{
+  VerifyDowngradeToSIX(kSIXLock, kExpectFail);
+}
+
+TEST_F(  //
+    MCSLockFixture,
+    LockXAfterDowngradeToSIXNeedWait)
+{
+  VerifyDowngradeToSIX(kXLock, kExpectFail);
+}
+
+TEST_F(  //
+    MCSLockFixture,
+    UpgradeToXWithoutLocksSucceed)
+{
+  VerifyUpgradeToXWith(kFree, kExpectSucceed);
+}
+
+TEST_F(  //
+    MCSLockFixture,
+    UpgradeToXAfterSLockNeedWait)
+{
+  VerifyUpgradeToXWith(kSLock, kExpectFail);
+}
+
+/*----------------------------------------------------------------------------*
+ * Multi-thread tests
+ *----------------------------------------------------------------------------*/
 
 TEST_F(  //
     MCSLockFixture,

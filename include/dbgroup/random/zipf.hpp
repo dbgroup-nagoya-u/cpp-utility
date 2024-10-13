@@ -59,9 +59,9 @@ class ZipfDistribution
    * @param alpha A skew parameter (zero means uniform distribution).
    */
   ZipfDistribution(  //
-      const IntType min,
-      const IntType max,
-      const double alpha);
+      IntType min,
+      IntType max,
+      double alpha);
 
   ZipfDistribution(const ZipfDistribution &) = default;
   ZipfDistribution(ZipfDistribution &&) noexcept = default;
@@ -105,7 +105,7 @@ class ZipfDistribution
       RandEngine &g) const  //
       -> IntType
   {
-    thread_local std::uniform_real_distribution<double> uniform_dist{0.0, 1.0};
+    thread_local std::uniform_real_distribution<double> uniform_dist{0.0, 1.0};  // NOLINT
     const auto target_prob = uniform_dist(g);
 
     // find a target bin by using a binary search
@@ -198,9 +198,9 @@ class ApproxZipfDistribution
    * @param alpha A skew parameter (zero means uniform distribution).
    */
   ApproxZipfDistribution(  //
-      const IntType min,
-      const IntType max,
-      const double alpha);
+      IntType min,
+      IntType max,
+      double alpha);
 
   constexpr ApproxZipfDistribution(const ApproxZipfDistribution &) = default;
   constexpr ApproxZipfDistribution(ApproxZipfDistribution &&) noexcept = default;

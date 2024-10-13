@@ -56,25 +56,19 @@ class EpochGuard
    */
   constexpr EpochGuard(  //
       EpochGuard &&obj) noexcept
+      : epoch_{obj.epoch_}
   {
-    epoch_ = obj.epoch_;
     obj.epoch_ = nullptr;
   }
 
   /**
    * @brief Construct a new instance.
    *
-   * @param obj An rvalue reference.
+   * @param rhs An rvalue reference.
    */
-  constexpr auto
-  operator=(                      //
-      EpochGuard &&obj) noexcept  //
-      -> EpochGuard &
-  {
-    epoch_ = obj.epoch_;
-    obj.epoch_ = nullptr;
-    return *this;
-  }
+  auto operator=(                 //
+      EpochGuard &&rhs) noexcept  //
+      -> EpochGuard &;
 
   // delete the copy constructor/assignment
   EpochGuard(const EpochGuard &) = delete;

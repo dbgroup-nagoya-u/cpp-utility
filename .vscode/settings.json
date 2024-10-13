@@ -29,9 +29,8 @@
   // C/C++ settings
   "C_Cpp.codeAnalysis.runAutomatically": true,
   "C_Cpp.codeAnalysis.clangTidy.enabled": true,
-  // "C_Cpp.codeAnalysis.clangTidy.path": "/usr/bin/clang-tidy",
-  // "C_Cpp.codeAnalysis.clangTidy.useBuildPath": true,
-  "C_Cpp.default.compileCommands": "build/vscode/compile_commands.json",
+  "C_Cpp.codeAnalysis.clangTidy.path": "/usr/bin/clang-tidy",
+  "C_Cpp.codeAnalysis.clangTidy.useBuildPath": true,
   // unit test settings
   "testMate.cpp.test.runtimeLimit": 60,
   "testMate.cpp.test.executables": "build/vscode/test/**/*_test",
@@ -49,7 +48,7 @@
     "files.trimTrailingWhitespace": false,
   },
   "markdown.extension.list.indentationSize": "inherit",
-  "markdown.extension.tableFormatter.enabled": false,
+  "markdown.extension.tableFormatter.enabled": true,
   "markdown.extension.toc.levels": "2..3",
   // local dictionary
   "cSpell.words": [
@@ -158,6 +157,8 @@
     "concepts": "cpp",
     "numbers": "cpp",
     "semaphore": "cpp",
-    "stop_token": "cpp"
+    "stop_token": "cpp",
+    "regex": "cpp",
+    "shared_mutex": "cpp"
   },
 }

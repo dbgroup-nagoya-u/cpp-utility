@@ -163,7 +163,7 @@ class EpochManager
      * @param next A pointer to the next node.
      */
     ProtectedNode(  //
-        const size_t epoch,
+        size_t epoch,
         ProtectedNode *next);
 
     ProtectedNode(const ProtectedNode &) = delete;
@@ -193,10 +193,20 @@ class EpochManager
      * @param node The head pointer of a linked list.
      * @return Protected epochs.
      */
-    [[nodiscard]] static auto GetProtectedEpochs(  //
+    [[nodiscard]] static constexpr auto
+    GetProtectedEpochs(  //
         const size_t epoch,
         ProtectedNode *node)  //
-        -> std::vector<size_t> &;
+        -> std::vector<size_t> &
+    {
+      // go to the target node
+      const auto upper_epoch = epoch & kUpperMask;
+      while (node->upper_epoch_ > upper_epoch) {
+        node = node->next;
+      }
+
+      return node->epoch_lists_.at(epoch & kLowerMask);
+    }
 
     /**
      * @return The upper bits of the current epoch.
@@ -251,7 +261,7 @@ class EpochManager
    * @param protected_epochs Protected epoch values.
    */
   void CollectProtectedEpochs(  //
-      const size_t cur_epoch,
+      size_t cur_epoch,
       std::vector<size_t> &protected_epochs);
 
   /**

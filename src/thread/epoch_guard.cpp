@@ -26,6 +26,19 @@ EpochGuard::EpochGuard(  //
   epoch_->EnterEpoch();
 }
 
+auto
+EpochGuard::operator=(          //
+    EpochGuard &&rhs) noexcept  //
+    -> EpochGuard &
+{
+  if (epoch_ != nullptr) {
+    epoch_->LeaveEpoch();
+  }
+  epoch_ = rhs.epoch_;
+  rhs.epoch_ = nullptr;
+  return *this;
+}
+
 EpochGuard::~EpochGuard()
 {
   if (epoch_ != nullptr) {

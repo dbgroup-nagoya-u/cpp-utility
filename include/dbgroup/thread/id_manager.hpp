@@ -133,7 +133,7 @@ class IDManager
      * @param id The thread ID to be assigned.
      */
     void SetID(  //
-        const size_t id);
+        size_t id);
 
    private:
     /*##########################################################################

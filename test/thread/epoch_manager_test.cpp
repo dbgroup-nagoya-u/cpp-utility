@@ -160,7 +160,7 @@ TEST_F(EpochManagerFixture, GetProtectedEpochWithLeavedEpochGetCurrentEpoch)
 
 TEST_F(EpochManagerFixture, EpochGuardProtectProtectedEpochLists)
 {
-  constexpr size_t kLoopNum = 1000 * 100;
+  constexpr size_t kLoopNum = 1000UL * 100UL;
   constexpr size_t kRepeatNum = 10;
 
   // a flag for controling worker threads
