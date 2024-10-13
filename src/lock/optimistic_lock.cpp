@@ -86,12 +86,12 @@ OptimisticLock::GetVersion()  //
 
 auto
 OptimisticLock::PrepareRead()  //
-    -> ReadGuard
+    -> CompositeGuard
 {
   uint64_t cur{};
   for (size_t i = 0; true; ++i) {
     cur = lock_.load(kAcquire);
-    if ((cur & kXLock) == kNoLocks) return ReadGuard{this, static_cast<uint32_t>(cur)};
+    if ((cur & kXLock) == kNoLocks) return CompositeGuard{this, static_cast<uint32_t>(cur)};
     if (i >= kRetryNum) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
@@ -105,7 +105,8 @@ OptimisticLock::PrepareRead()  //
       },
       &lock_, &cur);
 
-  return (cur & kAllLockMask) ? ReadGuard{this, static_cast<uint32_t>(cur)} : ReadGuard{this};
+  return (cur & kAllLockMask) ? CompositeGuard{this, static_cast<uint32_t>(cur)}
+                              : CompositeGuard{this};
 }
 
 /*##############################################################################
@@ -369,9 +370,9 @@ OptimisticLock::OptGuard::TryLockX()  //
  *############################################################################*/
 
 auto
-OptimisticLock::ReadGuard::operator=(  //
-    ReadGuard &&rhs) noexcept          //
-    -> ReadGuard &
+OptimisticLock::CompositeGuard::operator=(  //
+    CompositeGuard &&rhs) noexcept          //
+    -> CompositeGuard &
 {
   if (has_lock_) {
     dest_->UnlockS();
@@ -383,7 +384,7 @@ OptimisticLock::ReadGuard::operator=(  //
   return *this;
 }
 
-OptimisticLock::ReadGuard::~ReadGuard()
+OptimisticLock::CompositeGuard::~CompositeGuard()
 {
   if (has_lock_) {
     dest_->UnlockS();
@@ -391,7 +392,7 @@ OptimisticLock::ReadGuard::~ReadGuard()
 }
 
 auto
-OptimisticLock::ReadGuard::VerifyVersion()  //
+OptimisticLock::CompositeGuard::VerifyVersion()  //
     -> bool
 {
   if (has_lock_) return true;

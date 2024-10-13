@@ -410,19 +410,19 @@ class OptimisticLock
    * @brief A class for representing a guard instance for composite locks.
    *
    */
-  class ReadGuard
+  class CompositeGuard
   {
    public:
     /*##########################################################################
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr ReadGuard() = default;
+    constexpr CompositeGuard() = default;
 
     /**
      * @param dest The address of a target lock.
      */
-    constexpr explicit ReadGuard(  //
+    constexpr explicit CompositeGuard(  //
         OptimisticLock *dest)
         : dest_{dest}, has_lock_{true}
     {
@@ -432,26 +432,26 @@ class OptimisticLock
      * @param dest The address of a target lock.
      * @param ver The current version.
      */
-    constexpr ReadGuard(  //
+    constexpr CompositeGuard(  //
         OptimisticLock *dest,
         const uint32_t ver)
         : dest_{dest}, ver_{ver}
     {
     }
 
-    ReadGuard(const ReadGuard &) = delete;
+    CompositeGuard(const CompositeGuard &) = delete;
 
-    constexpr ReadGuard(  //
-        ReadGuard &&obj) noexcept
+    constexpr CompositeGuard(  //
+        CompositeGuard &&obj) noexcept
         : dest_{obj.dest_}, ver_{obj.ver_}, has_lock_{obj.has_lock_}
     {
       obj.has_lock_ = false;
     }
 
-    auto operator=(const ReadGuard &) -> ReadGuard & = delete;
+    auto operator=(const CompositeGuard &) -> CompositeGuard & = delete;
 
     auto operator=(  //
-        ReadGuard &&rhs) noexcept -> ReadGuard &;
+        CompositeGuard &&rhs) noexcept -> CompositeGuard &;
 
     /*##########################################################################
      * Public destructors
@@ -461,7 +461,7 @@ class OptimisticLock
      * @brief Destroy this instance and release a lock if holding.
      *
      */
-    ~ReadGuard();
+    ~CompositeGuard();
 
     /*##########################################################################
      * Public getters
@@ -553,7 +553,7 @@ class OptimisticLock
    * continues with spinlock and back-off.
    */
   [[nodiscard]] auto PrepareRead()  //
-      -> ReadGuard;
+      -> CompositeGuard;
 
   /*############################################################################
    * Pessimistic lock APIs
