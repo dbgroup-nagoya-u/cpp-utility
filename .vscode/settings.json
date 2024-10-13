@@ -48,7 +48,7 @@
     "files.trimTrailingWhitespace": false,
   },
   "markdown.extension.list.indentationSize": "inherit",
-  "markdown.extension.tableFormatter.enabled": false,
+  "markdown.extension.tableFormatter.enabled": true,
   "markdown.extension.toc.levels": "2..3",
   // local dictionary
   "cSpell.words": [
