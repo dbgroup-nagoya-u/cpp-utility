@@ -40,6 +40,8 @@ We maintain the internal lock state according to the following table. The last a
 | :------------: | :--------------: | :-------------------: |
 | an X lock flag | an SIX lock flag | a shared lock counter |
 
+This lock uses *back-off* to schedule threads requesting lock acquisition, so getting a lock is unfair. While back-off scheduling will significantly reduce CPU usage, some threads may have to wait a long time for other threads.
+
 ### class MCSLock
 
 We have implemented the MCS queue lock [^1] with shared and shared-with-intent-exclusive locks. We maintain the internal lock state according to the following table. The last and second-to-last bits represent exclusive and shared-with-intent-exclusive locks, respectively. The following 15 bits preserve the number of threads that have acquired shared locks. The remaining bits contain the pointer of an MCS queue node.
@@ -68,6 +70,8 @@ stateDiagram-v2
     QNode1 --> QNode2: next
     QNode2 --> QNode3: next
 ```
+
+Since this lock uses *spinning* to wait for other threads to release locks, many concurrent lock requests will cause heavy and wasteful CPU usage. Although our implementation calls `std::this_thread::yield` to give other threads a chance to get CPU cores, we advise against creating more threads than logical CPU cores.
 
 ### Example of Usages
 
@@ -143,6 +147,8 @@ We maintain the internal lock state according to the following table. The last a
 |       63       |        62        |         61-32         |      31-0       |
 | :------------: | :--------------: | :-------------------: | :-------------: |
 | an X lock flag | an SIX lock flag | a shared lock counter | a version value |
+
+This lock uses *back-off* to schedule threads requesting lock acquisition, so getting a lock is unfair. While back-off scheduling will significantly reduce CPU usage, some threads may have to wait a long time for other threads.
 
 ### Example of Usages
 

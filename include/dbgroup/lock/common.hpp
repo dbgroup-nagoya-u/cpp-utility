@@ -38,6 +38,9 @@ namespace dbgroup::lock
  * Global constants
  *############################################################################*/
 
+/// @brief An alias of the acquire&release memory order.
+constexpr std::memory_order kAcqRel = std::memory_order_acq_rel;
+
 /// @brief An alias of the release memory order.
 constexpr std::memory_order kRelease = std::memory_order_release;
 
