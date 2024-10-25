@@ -119,15 +119,18 @@ MCSLock::LockSIX()  //
     -> SIXGuard
 {
   auto *qnode = tls_node_ ? tls_node_.release() : new MCSLock{};
-  const auto new_tail = std::bit_cast<uint64_t>(qnode);
+  const auto new_tail = std::bit_cast<uint64_t>(qnode) | kSIXLock;
 
-  qnode->lock_.store(kXLock, kRelaxed);
-  const auto cur = lock_.exchange(new_tail | kSIXLock, kAcquire);
-  qnode->lock_.store(cur & kLockMask, kRelaxed);
+  auto cur = lock_.load(kRelaxed);
+  while (true) {
+    qnode->lock_.store(cur & kLockMask, kRelaxed);
+    if (lock_.compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
+    CPP_UTILITY_SPINLOCK_HINT
+  }
 
   auto *tail = std::bit_cast<MCSLock *>(cur & kPtrMask);
   if (tail != nullptr) {  // wait until predecessor gives up the lock
-    tail->lock_.fetch_add(new_tail, kRelease);
+    tail->lock_.fetch_add(new_tail & kPtrMask, kRelease);
     SpinWithBackoff(
         [](std::atomic_uint64_t *lock) -> bool {
           return (lock->load(kAcquire) & kXMask) == kNoLocks;
@@ -143,15 +146,18 @@ MCSLock::LockX()  //
     -> XGuard
 {
   auto *qnode = tls_node_ ? tls_node_.release() : new MCSLock{};
-  const auto new_tail = std::bit_cast<uint64_t>(qnode);
+  const auto new_tail = std::bit_cast<uint64_t>(qnode) | kXLock;
 
-  qnode->lock_.store(kXLock, kRelaxed);
-  const auto cur = lock_.exchange(new_tail | kXLock, kAcquire);
-  qnode->lock_.store(cur & kLockMask, kRelaxed);
+  auto cur = lock_.load(kRelaxed);
+  while (true) {
+    qnode->lock_.store(cur & kLockMask, kRelaxed);
+    if (lock_.compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
+    CPP_UTILITY_SPINLOCK_HINT
+  }
 
   auto *tail = std::bit_cast<MCSLock *>(cur & kPtrMask);
   if (tail != nullptr) {  // wait until predecessor gives up the lock
-    tail->lock_.fetch_add(new_tail, kRelease);
+    tail->lock_.fetch_add(new_tail & kPtrMask, kRelease);
     SpinWithBackoff(
         [](std::atomic_uint64_t *lock) -> bool {
           return (lock->load(kAcquire) & kLockMask) == kNoLocks;
