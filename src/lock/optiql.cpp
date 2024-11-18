@@ -38,13 +38,19 @@ namespace
  * Local types
  *############################################################################*/
 
-/**
- * @brief A class for representing a queue node container.
- *
- */
-struct alignas(::dbgroup::lock::kVMPageSize) QNodeBuffer {
-  ::dbgroup::lock::OptiQL buf[::dbgroup::lock::OptiQL::kQNodeNum];
+struct QNode {
+  std::atomic_uint64_t ver;
+
+  std::atomic<QNode *> next;
 };
+
+/*##############################################################################
+ * Constant aliases
+ *############################################################################*/
+
+constexpr auto kVMPageSize = ::dbgroup::lock::kVMPageSize;
+constexpr auto kQNodeNum = ::dbgroup::lock::OptiQL::kQNodeNum;
+constexpr auto kRelaxed = ::dbgroup::lock::kRelaxed;
 
 /*##############################################################################
  * Local constants
@@ -77,89 +83,56 @@ constexpr uint64_t kXAndVersionMask = kVersionMask | kXLock;
 /// @brief The number of bits in one word.
 constexpr uint64_t kBitNum = 64UL;
 
-/// @brief Reserve eight IDs by one bit.
-constexpr uint64_t kQIDUnit = 8UL;
+/// @brief The maximum number of thread local queue nodes.
+constexpr uint32_t kMaxTLSNum = 8;
 
-/// @brief The size of a buffer for managing queue IDs.
-constexpr uint64_t kIDBufSize = ::dbgroup::lock::OptiQL::kQNodeNum / kBitNum / kQIDUnit;
+/// @brief The size of a buffer for managing queue node IDs.
+constexpr uint64_t kIDBufSize = kQNodeNum / kBitNum;
 
 /*##############################################################################
  * Static variables
  *############################################################################*/
 
-/// @brief The container of queue node IDs.
-alignas(::dbgroup::lock::kCacheLineSize) std::atomic_uint64_t _id_buf[kIDBufSize] = {};  // NOLINT
+// The definition of a static member.
+QNode _qnodes[kQNodeNum] = {};  // NOLINT
 
-/// @brief The container of queue nodes.
-std::unique_ptr<QNodeBuffer> _qnode = std::make_unique<QNodeBuffer>();  // NOLINT
+/// @brief The container of queue node IDs.
+alignas(kVMPageSize) std::atomic_uint64_t _id_buf[kIDBufSize] = {};  // NOLINT
 
 /// @brief A thread local queue node container.
-thread_local std::vector<std::pair<uint64_t, uint64_t>> _tls{};  // NOLINT
+thread_local std::vector<uint32_t> _tls{};  // NOLINT
 
 /*##############################################################################
  * Local utilities
  *############################################################################*/
 
 /**
- * @return A base QID for representing reserved eight QIDs.
- * @note Reserved IDs: {id, id + 64, ..., id + 7*64}
- */
-auto
-ReserveQID()  //
-    -> uint64_t
-{
-  constexpr uint64_t kIDBufMask = kIDBufSize - 1UL;
-  constexpr uint64_t kFilledIDs = ~0UL;
-
-  thread_local const auto base = std::hash<std::thread::id>{}(std::this_thread::get_id());
-  for (uint64_t pos = base; true; ++pos) {
-    pos &= kIDBufMask;
-    auto cur = _id_buf[pos].load(::dbgroup::lock::kRelaxed);
-    while (cur < kFilledIDs) {
-      const auto ctz = cur == 0UL ? 0UL : static_cast<uint64_t>(std::countr_zero(cur));
-      const auto flag = 1UL << ctz;
-      cur = _id_buf[pos].fetch_or(flag, ::dbgroup::lock::kRelaxed);
-      if ((cur & flag) == 0) return pos * (kBitNum * kQIDUnit) + ctz;
-      CPP_UTILITY_SPINLOCK_HINT
-    }
-  }
-}
-
-/**
- * @brief Release the ownership of reserved QIDs.
- *
- * @param qid A base QID.
- */
-void
-RestoreQIDs(  //
-    const uint64_t qid)
-{
-  constexpr uint64_t kCTZMask = kBitNum - 1UL;
-
-  _id_buf[qid & ~kCTZMask].fetch_xor(1UL << (qid & kCTZMask), ::dbgroup::lock::kRelaxed);
-}
-
-/**
  * @return A unique QID.
  */
 auto
 GetQID()  //
-    -> uint64_t
+    -> uint32_t
 {
-  constexpr uint64_t kLSB = 1UL << kQIDUnit;
-  constexpr uint64_t kFilled = kLSB - 1UL;
-
-  for (auto &[base_qid, state] : _tls) {
-    if (state == kFilled) continue;
-    const auto ctz = static_cast<uint64_t>(std::countr_zero(state | kLSB));
-    state |= 1UL << ctz;
-    return base_qid + ctz * kBitNum;
+  if (!_tls.empty()) {
+    const auto qid = _tls.back();
+    _tls.pop_back();
+    return qid;
   }
 
-  // all the reserved QIDs are used, so get new IDs
-  const auto qid = ReserveQID();
-  _tls.emplace_back(qid, 1UL);
-  return qid;
+  constexpr uint32_t kIDBufMask = kIDBufSize - 1U;
+  constexpr uint64_t kFilledIDs = ~0UL;
+  thread_local const auto base = std::hash<std::thread::id>{}(std::this_thread::get_id());
+  for (uint32_t pos = base; true; ++pos) {
+    pos &= kIDBufMask;
+    auto cur = _id_buf[pos].load(kRelaxed);
+    while (cur < kFilledIDs) {
+      const uint32_t cto = std::countr_one(cur);
+      const auto flag = 1UL << cto;
+      cur = _id_buf[pos].fetch_or(flag, kRelaxed);
+      if ((cur & flag) == 0UL) return pos * kBitNum + cto;
+      CPP_UTILITY_SPINLOCK_HINT
+    }
+  }
 }
 
 /**
@@ -169,21 +142,13 @@ GetQID()  //
  */
 void
 RetainQID(  //
-    const uint64_t qid)
+    const uint32_t qid)
 {
-  constexpr uint64_t kBaseQIDMask = ~((kQIDUnit - 1UL) << (kBitNum / 8UL));
-  constexpr uint64_t kCTZMask = (1UL << kQIDUnit) - 1UL;
-
-  size_t cnt = 0;
-  for (auto &[base_qid, state] : _tls) {
-    cnt += std::popcount(state);
-    if ((qid & kBaseQIDMask) != base_qid) continue;
-    state ^= 1UL << (qid & kCTZMask);
-  }
-
-  if (_tls.size() > 1UL && cnt > kQIDUnit && _tls.back().second == 0UL) {
-    RestoreQIDs(_tls.back().first);
-    _tls.pop_back();
+  if (_tls.size() < kMaxTLSNum) {
+    _tls.emplace_back(qid);
+  } else {
+    constexpr uint32_t kFlagMask = kBitNum - 1U;
+    _id_buf[qid / kBitNum].fetch_xor(qid & kFlagMask, kRelaxed);
   }
 }
 
@@ -215,7 +180,7 @@ OptiQL::LockX()  //
     -> XGuard
 {
   auto qid = GetQID();
-  auto *qnode = &(_qnode->buf[qid]);
+  auto *qnode = &(_qnodes[qid]);
 
   throw std::runtime_error{"not implemented yet"};
 
@@ -231,7 +196,7 @@ void
 OptiQL::UnlockX(  //
     const uint64_t qid)
 {
-  auto *qnode = &(_qnode->buf[qid]);
+  auto *qnode = &(_qnodes[qid]);
 
   throw std::runtime_error{"not implemented yet"};
 }

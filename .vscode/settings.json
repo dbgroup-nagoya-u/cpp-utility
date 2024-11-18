@@ -69,6 +69,7 @@
     "optiql",
     "pthread",
     "qnode",
+    "qnodes",
     "Wextra",
     "xmmintrin",
     "zipf"
@@ -160,6 +161,7 @@
     "semaphore": "cpp",
     "stop_token": "cpp",
     "regex": "cpp",
-    "shared_mutex": "cpp"
+    "shared_mutex": "cpp",
+    "ranges": "cpp"
   },
 }
