@@ -71,6 +71,9 @@ constexpr uint64_t kSIXLock = 1UL << 62UL;
 /// @brief A lock state representing an exclusive lock.
 constexpr uint64_t kXLock = 1UL << 63UL;
 
+/// @brief A lock state representing an opportunistic lock.
+constexpr uint64_t kOPReadLock = 1UL << 61UL;
+
 /// @brief A bit mask for extracting a version value.
 constexpr uint64_t kVersionMask = ~(~0UL << 32UL);
 
@@ -80,6 +83,9 @@ constexpr uint64_t kQIDMask = (kSLock - 1UL) ^ kVersionMask;
 /// @brief A bit mask for extracting an X-lock state and version values.
 constexpr uint64_t kXAndVersionMask = kVersionMask | kXLock;
 
+/// @brief A bit mask for extracting an X-lock state and version values.
+constexpr uint64_t kLockMask = ~(kVersionMask | kQIDMask);
+
 /// @brief The number of bits in one word.
 constexpr uint64_t kBitNum = 64UL;
 
@@ -88,6 +94,9 @@ constexpr uint32_t kMaxTLSNum = 8;
 
 /// @brief The size of a buffer for managing queue node IDs.
 constexpr uint64_t kIDBufSize = kQNodeNum / kBitNum;
+
+/// @brief The size of a buffer for managing queue node IDs.
+constexpr uint64_t kVersionUpdate = 1;
 
 /*##############################################################################
  * Static variables
@@ -182,9 +191,36 @@ OptiQL::LockX()  //
   auto qid = GetQID();
   auto *qnode = &(_qnodes[qid]);
 
-  throw std::runtime_error{"not implemented yet"};
+  const auto new_tail = std::bit_cast<uint32_t>(qid) | kXLock;
+  auto cur = lock_.load(kRelaxed);
+  auto *pred_qnode = &(_qnodes[cur & kQIDMask]);
+  while (true) {
+    if (lock_.compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
+    CPP_UTILITY_SPINLOCK_HINT
+  }
 
-  uint64_t cur{};
+  auto *tail = std::bit_cast<OptiQL *>(pred_qnode);
+  auto *qnode_set = std::bit_cast<OptiQL *>(qnode);
+  if ((cur & kXLock) == kNoLocks) {  // wait until predecessor gives up the lock
+    cur = tail->lock_.fetch_add(new_tail & kQIDMask, kRelease);
+    while (lock_.load(kAcquire)) {
+      CPP_UTILITY_SPINLOCK_HINT
+      std::this_thread::yield();
+    }
+    qnode->ver = (cur & kVersionMask) + kVersionUpdate;
+  } else {
+    pred_qnode->next = qnode;
+    while (true) {
+      cur = tail->lock_.fetch_add(new_tail & kQIDMask, kRelease);
+      while (qnode_set->lock_.load(kAcquire) & kLockMask) {
+        CPP_UTILITY_SPINLOCK_HINT
+        std::this_thread::yield();
+      }
+      lock_.fetch_and(~(kOPReadLock | kVersionMask));
+    }
+  }
+  // throw std::runtime_error{"not implemented yet"};
+
   return XGuard{this, qid, static_cast<uint32_t>(cur & kVersionMask)};
 }
 
@@ -198,7 +234,21 @@ OptiQL::UnlockX(  //
 {
   auto *qnode = &(_qnodes[qid]);
 
-  throw std::runtime_error{"not implemented yet"};
+  auto next_ptr = std::bit_cast<QNode *>(qnode->next);
+  auto cur = lock_.load(kRelaxed);
+  if (next_ptr == nullptr && lock_.compare_exchange_weak(cur, qnode->ver, kRelease, kRelaxed)) {
+    // Do CAS IF
+  } else {
+    lock_.fetch_and(kOPReadLock | kVersionMask);
+    while (true) {  // wait until successor fills in its next field
+      auto *next_ptr = &(qnode->next);
+      if (next_ptr) break;
+      CPP_UTILITY_SPINLOCK_HINT
+    }
+    next_ptr->ver = qnode->ver + kVersionUpdate;
+  }
+
+  // throw std::runtime_error{"not implemented yet"};
 }
 
 /*##############################################################################
