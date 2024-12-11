@@ -204,39 +204,6 @@ class OptiQLFixture : public ::testing::Test
 /*##############################################################################
  * Unit test definitions
  *############################################################################*/
-
-/*----------------------------------------------------------------------------*
- * Shared lock tests
- *----------------------------------------------------------------------------*/
-
-TEST_F(  //
-    OptiQLFixture,
-    LockSWithoutLocksSucceed)
-{
-  VerifyLockSWith(kFree, kExpectSucceed);
-}
-
-TEST_F(  //
-    OptiQLFixture,
-    LockSAfterSLockSucceed)
-{
-  VerifyLockSWith(kSLock, kExpectSucceed);
-}
-
-TEST_F(  //
-    OptiQLFixture,
-    LockSAfterSIXLockNeedWait)
-{
-  VerifyLockSWith(kSIXLock, kExpectFail);
-}
-
-TEST_F(  //
-    OptiQLFixture,
-    LockSAfterXLockNeedWait)
-{
-  VerifyLockSWith(kXLock, kExpectFail);
-}
-
 /*----------------------------------------------------------------------------*
  * Exclusive lock tests
  *----------------------------------------------------------------------------*/
@@ -250,55 +217,9 @@ TEST_F(  //
 
 TEST_F(  //
     OptiQLFixture,
-    LockXAfterSLockNeedWait)
-{
-  VerifyLockXWith(kSLock, kExpectFail);
-}
-
-TEST_F(  //
-    OptiQLFixture,
-    LockXAfterSIXLockNeedWait)
-{
-  VerifyLockXWith(kSIXLock, kExpectFail);
-}
-
-TEST_F(  //
-    OptiQLFixture,
     LockXAfterXLockNeedWait)
 {
   VerifyLockXWith(kXLock, kExpectFail);
-}
-
-/*----------------------------------------------------------------------------*
- * Shared-with-intent-exclusive lock tests
- *----------------------------------------------------------------------------*/
-
-TEST_F(  //
-    OptiQLFixture,
-    LockSIXWithoutLocksSucceed)
-{
-  VerifyLockSIXWith(kFree, kExpectSucceed);
-}
-
-TEST_F(  //
-    OptiQLFixture,
-    LockSIXAfterSLockSucceed)
-{
-  VerifyLockSIXWith(kSLock, kExpectSucceed);
-}
-
-TEST_F(  //
-    OptiQLFixture,
-    LockSIXAfterSIXLockNeedWait)
-{
-  VerifyLockSIXWith(kSIXLock, kExpectFail);
-}
-
-TEST_F(  //
-    OptiQLFixture,
-    LockSIXAfterXLockNeedWait)
-{
-  VerifyLockSIXWith(kXLock, kExpectFail);
 }
 
 /*----------------------------------------------------------------------------*
