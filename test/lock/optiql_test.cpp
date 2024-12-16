@@ -19,6 +19,7 @@
 // C++ standard libraries
 #include <chrono>
 #include <future>
+#include <shared_mutex>
 #include <thread>
 #include <variant>
 #include <vector>
@@ -111,10 +112,13 @@ class OptiQLFixture : public ::testing::Test
   void
   VerifyLockXWithMultiThread()
   {
+    auto &&opt_guard = lock_.GetVersion();
     std::vector<std::thread> threads{};
     threads.reserve(kThreadNum);
+    const std::lock_guard guard{mtx_};
 
     {  // create incrementor threads
+      std::shared_lock<std::shared_mutex> lock(mtx_);
       for (size_t i = 0; i < kThreadNum; ++i) {
         threads.emplace_back([this]() {
           for (size_t i = 0; i < kWriteNumPerThread; i++) {
@@ -197,6 +201,8 @@ class OptiQLFixture : public ::testing::Test
   OptiQL lock_{};
 
   size_t counter_{0};
+
+  std::shared_mutex mtx_{};
 
   std::thread t_{};
 };

@@ -19,6 +19,7 @@
 // C++ standard libraries
 #include <chrono>
 #include <future>
+#include <shared_mutex>
 #include <thread>
 #include <variant>
 #include <vector>
@@ -159,10 +160,12 @@ class MCSLockFixture : public ::testing::Test
 
     {  // create a shared lock to prevent a counter from modifying
       auto &&s_guard = lock_.LockS();
+      const std::lock_guard guard{mtx_};
 
       // create incrementor threads
       for (size_t i = 0; i < kThreadNum; ++i) {
         threads.emplace_back([this]() {
+          std::shared_lock guard{mtx_};
           for (size_t i = 0; i < kWriteNumPerThread; i++) {
             auto &&x_guard = lock_.LockX();
             ++counter_;
@@ -278,6 +281,8 @@ class MCSLockFixture : public ::testing::Test
    *##########################################################################*/
 
   MCSLock lock_{};
+
+  std::mutex mtx_{};
 
   size_t counter_{0};
 
