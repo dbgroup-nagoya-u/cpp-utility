@@ -73,7 +73,7 @@ IDManager::GetHeartBeater()  //
       if (++id >= kMaxThreadNum) {
         id = 0;
       }
-    } while (_id_vec[id].load(kRelaxed) || _id_vec[id].exchange(true, kRelaxed));
+    } while (_id_vec[id].load(kRelaxed) || _id_vec[id].exchange(true, kAcquire));
     hb.SetID(id);
   }
   return hb;
@@ -85,7 +85,7 @@ IDManager::GetHeartBeater()  //
 
 IDManager::HeartBeater::~HeartBeater()
 {  //
-  _id_vec[*id_].store(false, kRelaxed);
+  _id_vec[*id_].store(false, kRelease);
 }
 
 auto
