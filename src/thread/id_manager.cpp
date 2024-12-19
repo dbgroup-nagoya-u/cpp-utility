@@ -67,10 +67,10 @@ IDManager::GetHeartBeater()  //
     -> const HeartBeater &
 {
   thread_local HeartBeater hb{};
-  if (!hb.HasID()) {
+  if (!hb.HasID()) [[unlikely]] {
     auto id = std::hash<std::thread::id>{}(std::this_thread::get_id()) % kMaxThreadNum;
     do {
-      if (++id >= kMaxThreadNum) {
+      if (++id >= kMaxThreadNum) [[unlikely]] {
         id = 0;
       }
     } while (_id_vec[id].load(kRelaxed) || _id_vec[id].exchange(true, kAcquire));
