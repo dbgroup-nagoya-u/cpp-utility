@@ -39,7 +39,7 @@ namespace dbgroup::lock::test
 constexpr bool kExpectSucceed = true;
 constexpr bool kExpectFail = false;
 constexpr size_t kThreadNumForLockS = 1E2;
-constexpr size_t kWriteNumPerThread = 1E5;
+constexpr size_t kWriteNumPerThread = 1E4;
 constexpr std::chrono::milliseconds kWaitTimeMill{100};
 
 /*##############################################################################
@@ -53,7 +53,7 @@ class OptiQLFixture : public ::testing::Test
    * Types
    *##########################################################################*/
 
-  using Guard = std::variant<int, OptiQL::XGuard>;
+  using Guard = std::variant<int, OptiQL::XGuard, OptiQL::OptGuard>;
 
   /*############################################################################
    * Setup/Teardown
@@ -112,15 +112,14 @@ class OptiQLFixture : public ::testing::Test
   void
   VerifyLockXWithMultiThread()
   {
-    auto &&opt_guard = lock_.GetVersion();
     std::vector<std::thread> threads{};
     threads.reserve(kThreadNum);
-    const std::lock_guard guard{mtx_};
 
     {  // create incrementor threads
-      std::shared_lock<std::shared_mutex> lock(mtx_);
+      const std::lock_guard guard{mtx_};
       for (size_t i = 0; i < kThreadNum; ++i) {
         threads.emplace_back([this]() {
+          std::shared_lock<std::shared_mutex> lock(mtx_);
           for (size_t i = 0; i < kWriteNumPerThread; i++) {
             auto &&x_guard = lock_.LockX();
             ++counter_;

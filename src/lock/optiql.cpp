@@ -80,7 +80,7 @@ constexpr uint64_t kVersionMask = ~(~0UL << 32UL);
 /// @brief A bit mask for extracting a node pointer.
 constexpr uint64_t kQIDMask = (kSLock - 1UL) ^ kVersionMask;
 
-/// @brief A bit mask for extracting a node pointer.
+/// @brief A bit shift for QNode.
 constexpr uint64_t kQIDShift = 32UL;
 
 /// @brief A bit mask for extracting an X-lock state and version values.
@@ -99,7 +99,7 @@ constexpr uint32_t kMaxTLSNum = 8;
 constexpr uint64_t kIDBufSize = kQNodeNum / kBitNum;
 
 /// @brief The version update number
-constexpr uint64_t kVersionUpdate = 1;
+constexpr uint64_t kVersionUpdate = 1U;
 
 /*##############################################################################
  * Static variables
@@ -193,29 +193,29 @@ OptiQL::LockX()  //
 {
   auto qid = GetQID();
   auto *qnode = &(_qnodes[qid]);
-  const auto new_tail = (qid << kQIDShift) | kXLock;
+  const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
   auto cur = lock_.load(kRelaxed);
-  auto pred_qid = (cur & kQIDMask) >> kQIDShift;
-  auto *pred_qnode = &(_qnodes[pred_qid]);
   while (true) {
     qnode->ver.store(cur & kLockMask, kRelaxed);
     if (lock_.compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
 
-  if ((cur & kLockMask) == kNoLocks) {  // wait until predecessor gives up the lock
-    qnode->ver = (cur & kVersionMask) + kVersionUpdate;
-  } else {
-    pred_qnode->next = qnode;
-    // ここの構造要チェック
+  auto pred_qid = (cur & kQIDMask) >> kQIDShift;
+  auto *pred_qnode = &(_qnodes[pred_qid]);
+  if (pred_qid != kNoLocks) {
+    // wait until predecessor gives up the lock
+    pred_qnode->next.store(qnode, kRelease);
     while (qnode->ver.load(kAcquire) & kLockMask) {
       CPP_UTILITY_SPINLOCK_HINT
       std::this_thread::yield();
     }
-    lock_.fetch_and(~(kOPReadLock | kVersionMask));
+    lock_.fetch_and(~(kOPReadLock | kVersionMask), kRelaxed);
+  } else {
+    qnode->ver.store((cur & kVersionMask) + kVersionUpdate, kRelease);
   }
-  // throw std::runtime_error{"not implemented yet"};
+
 end:
   return XGuard{this, qid, static_cast<uint32_t>(cur & kVersionMask)};
 }
@@ -230,23 +230,31 @@ OptiQL::UnlockX(  //
 {
   auto *qnode = &(_qnodes[qid]);
 
-  auto *next_ptr = qnode->next.load(kRelaxed);
-  auto cur = lock_.load(kRelaxed);
-  if (next_ptr == nullptr && lock_.compare_exchange_weak(cur, qnode->ver, kRelease, kRelaxed)) {
-    // Do CAS IF
-  } else {
+  auto expected_lock = kXLock | (static_cast<uint64_t>(qid) << kQIDShift);
+  auto set_ver = qnode->ver.load(kAcquire);
+  auto *next_ptr = qnode->next.load(kAcquire);
+  if (next_ptr == nullptr) {  // this is the tail node
+    auto cur = lock_.load(kRelaxed);
+    while (((cur & kQIDMask) >> kQIDShift) == qid) {
+      if (lock_.compare_exchange_weak(expected_lock, set_ver, kRelease, kRelaxed)) {
+        RetainQID(qid);
+        return;
+      }
+      CPP_UTILITY_SPINLOCK_HINT
+    }
+
     // enable opportunistic read
-    lock_.fetch_or(kOPReadLock | qnode->ver);
+    lock_.fetch_or(kOPReadLock | set_ver, kRelaxed);
     while (true) {  // wait until successor fills in its next field
-      auto *next_ptr = qnode->next.load(kRelaxed);
+      next_ptr = qnode->next.load(kAcquire);
       if (next_ptr) break;
       CPP_UTILITY_SPINLOCK_HINT
     }
-    next_ptr->ver = qnode->ver + kVersionUpdate;
-    if ((next_ptr->ver.fetch_sub(kSLock, kRelease)) == kNoLocks) {
-    }
   }
 
+  next_ptr->ver.store(set_ver + kVersionUpdate, kRelease);
+  if ((next_ptr->ver.load(kAcquire) & kLockMask) == kNoLocks) {
+  }
   // throw std::runtime_error{"not implemented yet"};
 }
 
@@ -260,7 +268,7 @@ OptiQL::XGuard::operator=(  //
     -> XGuard &
 {
   if (dest_) {
-    dest_->UnlockX(new_ver_);
+    dest_->UnlockX(qid_);  // 引数変更
   }
   dest_ = rhs.dest_;
   qid_ = rhs.qid_;
@@ -273,7 +281,7 @@ OptiQL::XGuard::operator=(  //
 OptiQL::XGuard::~XGuard()
 {
   if (dest_) {
-    dest_->UnlockX(new_ver_);
+    dest_->UnlockX(qid_);  // 引数変更
   }
 }
 
