@@ -281,7 +281,8 @@ class OptiQL
    * corrupt an internal lock state.
    */
   void UnlockX(  //
-      uint64_t qid);
+      uint64_t qid,
+      uint64_t ver);
 
   /*############################################################################
    * Internal member variables

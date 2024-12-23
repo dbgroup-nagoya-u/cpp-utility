@@ -39,7 +39,7 @@ namespace dbgroup::lock::test
 constexpr bool kExpectSucceed = true;
 constexpr bool kExpectFail = false;
 constexpr size_t kThreadNumForLockS = 1E2;
-constexpr size_t kWriteNumPerThread = 1E4;
+constexpr size_t kWriteNumPerThread = 1E5;
 constexpr std::chrono::milliseconds kWaitTimeMill{100};
 
 /*##############################################################################
