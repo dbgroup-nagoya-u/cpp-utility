@@ -86,7 +86,7 @@ constexpr uint64_t kQIDShift = 32UL;
 /// @brief A bit mask for extracting an X-lock state and version values.
 constexpr uint64_t kXAndVersionMask = kVersionMask | kXLock;
 
-/// @brief A bit mask for extracting an X-lock state and version values.
+/// @brief A bit mask for extracting a lock state.
 constexpr uint64_t kLockMask = ~(kVersionMask | kQIDMask);
 
 /// @brief The number of bits in one word.
@@ -184,7 +184,8 @@ OptiQL::GetVersion()  //
   SpinWithBackoff(
       [](const std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
         *cur = lock->load(kAcquire);
-        return (*cur & kXLock) == kNoLocks;
+        return (*cur & kXLock) == kNoLocks  // lock released
+               || (*cur & kOPReadLock);     // or, opportunistically readable
       },
       &lock_, &cur);
 
@@ -217,10 +218,10 @@ OptiQL::LockX()  //
       CPP_UTILITY_SPINLOCK_HINT
       std::this_thread::yield();
     }
+    // disable opportunistic read
     lock_.fetch_and(~(kOPReadLock | kVersionMask), kRelaxed);
   }
 
-end:
   return XGuard{this, qid, static_cast<uint32_t>(cur & kVersionMask)};
 }
 
@@ -269,7 +270,7 @@ OptiQL::XGuard::operator=(  //
     -> XGuard &
 {
   if (dest_) {
-    dest_->UnlockX(qid_, new_ver_);  // 引数変更
+    dest_->UnlockX(qid_, new_ver_);
   }
   dest_ = rhs.dest_;
   qid_ = rhs.qid_;
@@ -282,7 +283,7 @@ OptiQL::XGuard::operator=(  //
 OptiQL::XGuard::~XGuard()
 {
   if (dest_) {
-    dest_->UnlockX(qid_, new_ver_);  // 引数変更
+    dest_->UnlockX(qid_, new_ver_);
   }
 }
 
@@ -299,8 +300,8 @@ OptiQL::OptGuard::VerifyVersion()  //
       [](const std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
         std::atomic_thread_fence(kRelease);
         *cur = lock->load(kRelaxed);
-        return (((*cur & kXLock) == kNoLocks)
-                | (((*cur ^ kXLock ^ kOPReadLock) & kLockMask) == kNoLocks));
+        return (*cur & kXLock) == kNoLocks  // lock released
+               || (*cur & kOPReadLock);     // or, opportunistically readable
       },
       &(dest_->lock_), &cur);
 
