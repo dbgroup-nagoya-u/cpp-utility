@@ -249,7 +249,7 @@ OptiQL::UnlockX(  //
   }
 
   // enable opportunistic read
-  lock_.fetch_or(kOPReadLock | ver, kRelaxed);
+  lock_.fetch_or(kOPReadLock | ver, kRelease);
   while (true) {  // wait until successor fills in its next field
     next_ptr = qnode->next.load(kAcquire);
     if (next_ptr) break;
