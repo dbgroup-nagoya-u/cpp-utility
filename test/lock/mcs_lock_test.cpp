@@ -19,7 +19,6 @@
 // C++ standard libraries
 #include <chrono>
 #include <future>
-#include <shared_mutex>
 #include <thread>
 #include <variant>
 #include <vector>
@@ -279,8 +278,6 @@ class MCSLockFixture : public ::testing::Test
    *##########################################################################*/
 
   MCSLock lock_{};
-
-  std::mutex mtx_{};
 
   size_t counter_{0};
 
