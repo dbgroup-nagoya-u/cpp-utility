@@ -71,14 +71,26 @@ constexpr uint64_t kSIXLock = 1UL << 62UL;
 /// @brief A lock state representing an exclusive lock.
 constexpr uint64_t kXLock = 1UL << 63UL;
 
+/// @brief A lock state representing an opportunistic lock.
+constexpr uint64_t kOPReadFlag = 1UL << 61UL;
+
+/// @brief A bit mask for extracting an X-lock state and opportunisitic read flag.
+constexpr uint64_t kXAndOPReadMask = kXLock | kOPReadFlag;
+
 /// @brief A bit mask for extracting a version value.
 constexpr uint64_t kVersionMask = ~(~0UL << 32UL);
 
 /// @brief A bit mask for extracting a node pointer.
 constexpr uint64_t kQIDMask = (kSLock - 1UL) ^ kVersionMask;
 
+/// @brief A bit shift for QNode.
+constexpr uint64_t kQIDShift = 32UL;
+
 /// @brief A bit mask for extracting an X-lock state and version values.
 constexpr uint64_t kXAndVersionMask = kVersionMask | kXLock;
+
+/// @brief A bit mask for extracting a lock state.
+constexpr uint64_t kLockMask = ~(kVersionMask | kQIDMask);
 
 /// @brief The number of bits in one word.
 constexpr uint64_t kBitNum = 64UL;
@@ -88,6 +100,9 @@ constexpr uint32_t kMaxTLSNum = 8;
 
 /// @brief The size of a buffer for managing queue node IDs.
 constexpr uint64_t kIDBufSize = kQNodeNum / kBitNum;
+
+/// @brief The version update number
+constexpr uint64_t kVersionUpdate = 1U;
 
 /*##############################################################################
  * Static variables
@@ -144,6 +159,10 @@ void
 RetainQID(  //
     const uint32_t qid)
 {
+  auto *qnode = &(_qnodes[qid]);
+  qnode->next.store(nullptr, kRelaxed);
+  qnode->ver.store(kNoLocks, kRelaxed);
+
   if (_tls.size() < kMaxTLSNum) {
     _tls.emplace_back(qid);
   } else {
@@ -168,7 +187,7 @@ OptiQL::GetVersion()  //
   SpinWithBackoff(
       [](const std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
         *cur = lock->load(kAcquire);
-        return (*cur & kXLock) == kNoLocks;
+        return (*cur & kXAndOPReadMask) != kXLock;  // lock released or opportunistically readable
       },
       &lock_, &cur);
 
@@ -181,10 +200,26 @@ OptiQL::LockX()  //
 {
   auto qid = GetQID();
   auto *qnode = &(_qnodes[qid]);
+  const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
-  throw std::runtime_error{"not implemented yet"};
+  auto cur = lock_.load(kRelaxed);
+  while (true) {
+    qnode->ver.store(cur & kLockMask, kRelaxed);
+    if (lock_.compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
+    CPP_UTILITY_SPINLOCK_HINT
+  }
 
-  uint64_t cur{};
+  if ((cur & kLockMask) != kNoLocks) {
+    // wait until predecessor gives up the lock
+    auto *pred_qnode = &(_qnodes[(cur & kQIDMask) >> kQIDShift]);
+    pred_qnode->next.store(qnode, kRelease);
+    while (qnode->ver.load(kRelaxed) & kLockMask) {
+      std::this_thread::yield();
+    }
+    // disable opportunistic read
+    cur = lock_.fetch_xor(kOPReadFlag, kAcquire);
+  }
+
   return XGuard{this, qid, static_cast<uint32_t>(cur & kVersionMask)};
 }
 
@@ -194,11 +229,33 @@ OptiQL::LockX()  //
 
 void
 OptiQL::UnlockX(  //
-    const uint64_t qid)
+    const uint64_t qid,
+    const uint64_t ver)
 {
   auto *qnode = &(_qnodes[qid]);
 
-  throw std::runtime_error{"not implemented yet"};
+  auto *next_ptr = qnode->next.load(kAcquire);
+  if (next_ptr == nullptr) {  // this is the tail node
+    auto cur = lock_.load(kRelaxed);
+    while (((cur & kQIDMask) >> kQIDShift) == qid) {
+      if (lock_.compare_exchange_weak(cur, ver, kRelease, kRelaxed)) {
+        RetainQID(qid);
+        return;
+      }
+      CPP_UTILITY_SPINLOCK_HINT
+    }
+  }
+
+  // enable opportunistic read
+  lock_.fetch_or(kOPReadFlag | ver, kRelease);
+  while (true) {  // wait until successor fills in its next field
+    next_ptr = qnode->next.load(kAcquire);
+    if (next_ptr) break;
+    CPP_UTILITY_SPINLOCK_HINT
+  }
+
+  next_ptr->ver.store(kNoLocks, kRelaxed);
+  RetainQID(qid);
 }
 
 /*##############################################################################
@@ -211,7 +268,7 @@ OptiQL::XGuard::operator=(  //
     -> XGuard &
 {
   if (dest_) {
-    dest_->UnlockX(new_ver_);
+    dest_->UnlockX(qid_, new_ver_);
   }
   dest_ = rhs.dest_;
   qid_ = rhs.qid_;
@@ -224,7 +281,7 @@ OptiQL::XGuard::operator=(  //
 OptiQL::XGuard::~XGuard()
 {
   if (dest_) {
-    dest_->UnlockX(new_ver_);
+    dest_->UnlockX(qid_, new_ver_);
   }
 }
 
@@ -241,7 +298,7 @@ OptiQL::OptGuard::VerifyVersion()  //
       [](const std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
         std::atomic_thread_fence(kRelease);
         *cur = lock->load(kRelaxed);
-        return (*cur & kXLock) == kNoLocks;
+        return (*cur & kXAndOPReadMask) != kXLock;  // lock released or opportunistically readable
       },
       &(dest_->lock_), &cur);
 
