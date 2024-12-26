@@ -39,9 +39,11 @@ namespace
  *############################################################################*/
 
 struct QNode {
-  std::atomic_uint64_t ver;
-
+  /// @brief The next queue node if exist.
   std::atomic<QNode *> next;
+
+  /// @brief A flag for indicating this node's owner holds a lock.
+  std::atomic_bool hold_lock;
 };
 
 /*##############################################################################
@@ -161,7 +163,7 @@ RetainQID(  //
 {
   auto *qnode = &(_qnodes[qid]);
   qnode->next.store(nullptr, kRelaxed);
-  qnode->ver.store(kNoLocks, kRelaxed);
+  qnode->hold_lock.store(false, kRelaxed);
 
   if (_tls.size() < kMaxTLSNum) {
     _tls.emplace_back(qid);
@@ -184,12 +186,11 @@ OptiQL::GetVersion()  //
     -> OptGuard
 {
   uint64_t cur{};
-  SpinWithBackoff(
-      [](const std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
-        *cur = lock->load(kAcquire);
-        return (*cur & kXAndOPReadMask) != kXLock;  // lock released or opportunistically readable
-      },
-      &lock_, &cur);
+  while (true) {
+    cur = lock_.load(kAcquire);
+    if ((cur & kXAndOPReadMask) != kXLock) break;  // lock released or opportunistically readable
+    std::this_thread::yield();
+  }
 
   return OptGuard{this, static_cast<uint32_t>(cur & kVersionMask)};
 }
@@ -204,16 +205,15 @@ OptiQL::LockX()  //
 
   auto cur = lock_.load(kRelaxed);
   while (true) {
-    qnode->ver.store(cur & kLockMask, kRelaxed);
-    if (lock_.compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
+    if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
 
   if ((cur & kLockMask) != kNoLocks) {
     // wait until predecessor gives up the lock
     auto *pred_qnode = &(_qnodes[(cur & kQIDMask) >> kQIDShift]);
-    pred_qnode->next.store(qnode, kRelease);
-    while (qnode->ver.load(kRelaxed) & kLockMask) {
+    pred_qnode->next.store(qnode, kRelaxed);
+    while (!qnode->hold_lock.load(kRelaxed)) {
       std::this_thread::yield();
     }
     // disable opportunistic read
@@ -249,12 +249,11 @@ OptiQL::UnlockX(  //
   // enable opportunistic read
   lock_.fetch_or(kOPReadFlag | ver, kRelease);
   while (true) {  // wait until successor fills in its next field
-    next_ptr = qnode->next.load(kAcquire);
+    next_ptr = qnode->next.load(kRelaxed);
     if (next_ptr) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
-
-  next_ptr->ver.store(kNoLocks, kRelaxed);
+  next_ptr->hold_lock.store(true, kRelaxed);
   RetainQID(qid);
 }
 
@@ -294,13 +293,12 @@ OptiQL::OptGuard::VerifyVersion()  //
     -> bool
 {
   uint64_t cur{};
-  SpinWithBackoff(
-      [](const std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
-        std::atomic_thread_fence(kRelease);
-        *cur = lock->load(kRelaxed);
-        return (*cur & kXAndOPReadMask) != kXLock;  // lock released or opportunistically readable
-      },
-      &(dest_->lock_), &cur);
+  while (true) {
+    std::atomic_thread_fence(kRelease);
+    cur = dest_->lock_.load(kRelaxed);
+    if ((cur & kXAndOPReadMask) != kXLock) break;  // lock released or opportunistically readable
+    std::this_thread::yield();
+  }
 
   auto expected = ver_;
   ver_ = static_cast<uint32_t>(cur & kVersionMask);
