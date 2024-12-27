@@ -163,7 +163,7 @@ class OptiQL
      * @param ver The current version.
      */
     constexpr OptGuard(  //
-        OptiQL *dest,
+        const OptiQL *dest,
         const uint32_t ver)
         : dest_{dest}, ver_{ver}
     {
@@ -221,7 +221,7 @@ class OptiQL
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    OptiQL *dest_{};
+    const OptiQL *dest_{};
 
     /// @brief A version when creating this guard.
     uint32_t ver_{};

@@ -83,14 +83,14 @@ constexpr uint64_t kBitNum = 64UL;
 constexpr uint32_t kMaxTLSNum = 8;
 
 /// @brief The size of a buffer for managing queue node IDs.
-constexpr uint64_t kIDBufSize = kQNodeNum / kBitNum;
+constexpr uint64_t kIDBufSize = OptiQL::kQNodeNum / kBitNum;
 
 /*##############################################################################
  * Static variables
  *############################################################################*/
 
 // The definition of a static member.
-QNode _qnodes[kQNodeNum] = {};  // NOLINT
+QNode _qnodes[OptiQL::kQNodeNum] = {};  // NOLINT
 
 /// @brief The container of queue node IDs.
 alignas(kVMPageSize) std::atomic_uint64_t _id_buf[kIDBufSize] = {};  // NOLINT
@@ -159,7 +159,7 @@ RetainQID(  //
  *############################################################################*/
 
 auto
-OptiQL::GetVersion()  //
+OptiQL::GetVersion() const  //
     -> OptGuard
 {
   uint64_t cur{};
