@@ -300,7 +300,7 @@ OptiQL::OptGuard::VerifyVersion()  //
     std::this_thread::yield();
   }
 
-  auto expected = ver_;
+  const auto expected = ver_;
   ver_ = static_cast<uint32_t>(cur & kVersionMask);
   return ver_ == expected;
 }
