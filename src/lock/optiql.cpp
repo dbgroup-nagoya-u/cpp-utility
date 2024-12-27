@@ -199,7 +199,7 @@ auto
 OptiQL::LockX()  //
     -> XGuard
 {
-  auto qid = GetQID();
+  const auto qid = GetQID();
   auto *qnode = &(_qnodes[qid]);
   const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
