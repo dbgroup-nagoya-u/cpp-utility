@@ -32,6 +32,8 @@
 // local sources
 #include "dbgroup/lock/common.hpp"
 
+namespace dbgroup::lock
+{
 namespace
 {
 /*##############################################################################
@@ -47,34 +49,17 @@ struct QNode {
 };
 
 /*##############################################################################
- * Constant aliases
- *############################################################################*/
-
-constexpr auto kVMPageSize = ::dbgroup::lock::kVMPageSize;
-constexpr auto kQNodeNum = ::dbgroup::lock::OptiQL::kQNodeNum;
-constexpr auto kRelaxed = ::dbgroup::lock::kRelaxed;
-
-/*##############################################################################
  * Local constants
  *############################################################################*/
 
-/// @brief The `uintptr_t` of nullptr.
-constexpr uint64_t kNull = 0;
-
 /// @brief A lock state representing no locks.
 constexpr uint64_t kNoLocks = 0b000;
-
-/// @brief A lock state representing a shared lock.
-constexpr uint64_t kSLock = 1UL << 48UL;
-
-/// @brief A lock state representing a shared-with-intent-exclusive lock.
-constexpr uint64_t kSIXLock = 1UL << 62UL;
 
 /// @brief A lock state representing an exclusive lock.
 constexpr uint64_t kXLock = 1UL << 63UL;
 
 /// @brief A lock state representing an opportunistic lock.
-constexpr uint64_t kOPReadFlag = 1UL << 61UL;
+constexpr uint64_t kOPReadFlag = 1UL << 62UL;
 
 /// @brief A bit mask for extracting an X-lock state and opportunisitic read flag.
 constexpr uint64_t kXAndOPReadMask = kXLock | kOPReadFlag;
@@ -83,13 +68,10 @@ constexpr uint64_t kXAndOPReadMask = kXLock | kOPReadFlag;
 constexpr uint64_t kVersionMask = ~(~0UL << 32UL);
 
 /// @brief A bit mask for extracting a node pointer.
-constexpr uint64_t kQIDMask = (kSLock - 1UL) ^ kVersionMask;
+constexpr uint64_t kQIDMask = (kOPReadFlag - 1UL) ^ kVersionMask;
 
 /// @brief A bit shift for QNode.
 constexpr uint64_t kQIDShift = 32UL;
-
-/// @brief A bit mask for extracting an X-lock state and version values.
-constexpr uint64_t kXAndVersionMask = kVersionMask | kXLock;
 
 /// @brief A bit mask for extracting a lock state.
 constexpr uint64_t kLockMask = ~(kVersionMask | kQIDMask);
@@ -102,9 +84,6 @@ constexpr uint32_t kMaxTLSNum = 8;
 
 /// @brief The size of a buffer for managing queue node IDs.
 constexpr uint64_t kIDBufSize = kQNodeNum / kBitNum;
-
-/// @brief The version update number
-constexpr uint64_t kVersionUpdate = 1U;
 
 /*##############################################################################
  * Static variables
@@ -175,8 +154,6 @@ RetainQID(  //
 
 }  // namespace
 
-namespace dbgroup::lock
-{
 /*##############################################################################
  * Public APIs
  *############################################################################*/
