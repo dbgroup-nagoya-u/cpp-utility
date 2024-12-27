@@ -255,7 +255,7 @@ class OptiQL
    * @note This function does not give up reading a version value and continues
    * with spinlock and back-off.
    */
-  [[nodiscard]] auto GetVersion()  //
+  [[nodiscard]] auto GetVersion() const  //
       -> OptGuard;
 
   /**
