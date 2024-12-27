@@ -57,6 +57,19 @@ constexpr size_t kRetryNum{CPP_UTILITY_SPINLOCK_RETRY_NUM};
 constexpr std::chrono::microseconds kBackOffTime{CPP_UTILITY_BACKOFF_TIME};
 
 /*##############################################################################
+ * Turning parameters
+ *############################################################################*/
+
+/// @brief The page size of virtual memory addresses.
+constexpr size_t kVMPageSize = 4096;
+
+/// @brief The size of words.
+constexpr size_t kWordSize = 8;
+
+/// @brief The expected cache line size.
+constexpr size_t kCacheLineSize = 64;
+
+/*##############################################################################
  * Internal utilities
  *############################################################################*/
 
