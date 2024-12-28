@@ -134,7 +134,6 @@ MCSLock::LockSIX()  //
       std::this_thread::yield();
     }
   }
-end:
   return SIXGuard{this, qnode};
 }
 
@@ -160,7 +159,6 @@ MCSLock::LockX()  //
       std::this_thread::yield();
     }
   }
-end:
   return XGuard{this, qnode};
 }
 
