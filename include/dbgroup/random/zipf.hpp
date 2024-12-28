@@ -230,7 +230,7 @@ class ApproxZipfDistribution
       -> double
   {
     if (id < static_cast<IntType>(kExactBinNum)) return zipf_cdf_.at(id);
-    return GetHarmonicNum(id + 1) / denom_;
+    return GetHarmonicNum(id + 1) / (c_ / 2.0);  // NOLINT
   }
 
   /*############################################################################
@@ -247,8 +247,26 @@ class ApproxZipfDistribution
       RandEngine &g) const  //
       -> IntType
   {
-    thread_local std::uniform_real_distribution<double> uniform_dist{0.0, 1.0};
-    const auto target_prob = uniform_dist(g);
+    // NOLINTBEGIN
+    const auto p = _uniform_dist(g);
+    const auto bin =
+        pow_ == 0 ? (-3.0 + std::sqrt(9.0 - 4.0 * (2.0 - std::exp(c_ * p - 1.0)))) / 2.0 + kBase
+                  : std::pow((c_ * pow_ * p - pow_ + 2.0) / 2.0, 1.0 / pow_) - 1.0 + base_;
+    // NOLINTEND
+    return min_ + static_cast<IntType>(bin);
+  }
+
+  /**
+   * @param g A random value generator.
+   * @return A random value according to Zipf's law.
+   */
+  template <class RandEngine>
+  [[nodiscard]] auto
+  GetIDUsingBinarySearch(   //
+      RandEngine &g) const  //
+      -> IntType
+  {
+    const auto p = _uniform_dist(g);
 
     // find a target bin by using a binary search
     int64_t begin_pos = 0;
@@ -256,16 +274,16 @@ class ApproxZipfDistribution
     while (begin_pos < end_pos) {
       auto pos = (begin_pos + end_pos) >> 1UL;  // NOLINT
       const auto cdf_val = GetCDF(pos);
-      if (target_prob < cdf_val) {
+      if (p < cdf_val) {
         end_pos = pos - 1;
-      } else if (target_prob > cdf_val) {
+      } else if (p > cdf_val) {
         begin_pos = pos + 1;
       } else {  // target_prob == cdf_val
         begin_pos = pos;
         break;
       }
     }
-    if (target_prob > GetCDF(begin_pos)) {
+    if (p > GetCDF(begin_pos)) {
       ++begin_pos;
     }
 
@@ -280,6 +298,12 @@ class ApproxZipfDistribution
   /// @brief The number of bins for approximation.
   static constexpr size_t kExactBinNum = 100;
 
+  /// @brief The maximum value of random probabilities.
+  static constexpr double kMaxP = 0.9999999999999999;
+
+  /// @brief An offset for ensuring positive IDs.
+  static constexpr double kBase = 0.71394692216654844;
+
   /*############################################################################
    * Internal utility functions
    *##########################################################################*/
@@ -293,13 +317,15 @@ class ApproxZipfDistribution
    * @param n The number of partial elements in the p-serires.
    * @return An approximate partial sum of the p-series.
    */
-  [[nodiscard]] constexpr auto
+  [[nodiscard]] auto
   GetHarmonicNum(             //
       const IntType n) const  //
       -> double
   {
-    if (pow_ == 0.0) return (1 + log(n) + log(n + 1)) * 0.5;          // NOLINT
-    return (pow(n + 1, pow_) + pow(n, pow_) - 2) / (2 * pow_) + 0.5;  // NOLINT
+    // NOLINTBEGIN
+    return pow_ == 0 ? (1 + std::log(n) + std::log(n + 1)) * 0.5
+                     : (std::pow(n + 1, pow_) + std::pow(n, pow_) - 2) / (2 * pow_) + 0.5;
+    // NOLINTEND
   }
 
   /*############################################################################
@@ -326,16 +352,24 @@ class ApproxZipfDistribution
   double alpha_{0.0};
 
   /// @brief The number of bins in this Zipf distribution.
-  IntType n_{1};
+  IntType n_{max_ - min_ + static_cast<IntType>(1)};
 
   /// @brief Equal to `1 - alpha_`.
-  double pow_{1.0};
+  double pow_{1.0 - alpha_};
 
-  /// @brief Equal to `GetHarmonicNum(n_)`.
-  double denom_{1.0};
+  // NOLINTBEGIN
+  /// @brief Equal to `2 * GetHarmonicNum(n_)`.
+  double c_{2 * GetHarmonicNum(n_)};
+
+  /// @brief An offset for ensuring positive IDs.
+  double base_{-(std::pow((-pow_ + 2.0) / 2.0, 1.0 / pow_) - 1.0)};
 
   /// @brief A cumulative distribution function according to Zipf's law.
   std::array<double, kExactBinNum> zipf_cdf_{};
+
+  static thread_local inline auto _uniform_dist =
+      std::uniform_real_distribution<double>{0.0, kMaxP};
+  // NOLINTEND
 };
 
 }  // namespace dbgroup::random
