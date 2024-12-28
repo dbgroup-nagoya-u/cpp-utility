@@ -103,7 +103,6 @@ MCSLock::LockS()  //
       }
       const auto *qnode = std::bit_cast<MCSLock *>(tail_ptr);
       while (qnode->lock_.load(kAcquire) & kXMask) {
-        CPP_UTILITY_SPINLOCK_HINT
         std::this_thread::yield();
       }
     }
@@ -130,11 +129,9 @@ MCSLock::LockSIX()  //
   if (tail != nullptr) {  // wait until predecessor gives up the lock
     cur = tail->lock_.fetch_add(new_tail & kPtrMask, kRelease);
     while (qnode->lock_.load(kAcquire) & kXMask) {
-      CPP_UTILITY_SPINLOCK_HINT
       std::this_thread::yield();
     }
   }
-end:
   return SIXGuard{this, qnode};
 }
 
@@ -156,11 +153,9 @@ MCSLock::LockX()  //
   if (tail != nullptr) {  // wait until predecessor gives up the lock
     cur = tail->lock_.fetch_add(new_tail & kPtrMask, kRelease);
     while (qnode->lock_.load(kAcquire) & kLockMask) {
-      CPP_UTILITY_SPINLOCK_HINT
       std::this_thread::yield();
     }
   }
-end:
   return XGuard{this, qnode};
 }
 
@@ -331,7 +326,6 @@ MCSLock::SIXGuard::UpgradeToX()  //
   // wait for sharel lock holders to release their locks
   auto next_ptr = qnode_->lock_.load(kRelaxed);
   while (next_ptr & kSMask) {
-    CPP_UTILITY_SPINLOCK_HINT
     std::this_thread::yield();
     next_ptr = qnode_->lock_.load(kRelaxed);
   }

@@ -74,12 +74,11 @@ OptimisticLock::GetVersion()  //
     -> OptGuard
 {
   uint64_t cur{};
-  SpinWithBackoff(
-      [](const std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
-        *cur = lock->load(kAcquire);
-        return (*cur & kXLock) == kNoLocks;
-      },
-      &lock_, &cur);
+  while (true) {
+    cur = lock_.load(kAcquire);
+    if ((cur & kXLock) == kNoLocks) break;
+    std::this_thread::yield();
+  }
 
   return OptGuard{this, static_cast<uint32_t>(cur)};
 }
@@ -294,16 +293,15 @@ auto
 OptimisticLock::OptGuard::VerifyVersion()  //
     -> bool
 {
-  uint64_t cur{};
-  SpinWithBackoff(
-      [](const std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
-        std::atomic_thread_fence(kRelease);
-        *cur = lock->load(kRelaxed);
-        return (*cur & kXLock) == kNoLocks;
-      },
-      &(dest_->lock_), &cur);
-
   auto expected = ver_;
+  uint64_t cur{};
+  while (true) {
+    std::atomic_thread_fence(kRelease);
+    cur = dest_->lock_.load(kRelaxed);
+    if ((cur & kXLock) == kNoLocks) break;
+    std::this_thread::yield();
+  }
+
   ver_ = static_cast<uint32_t>(cur & kVersionMask);
   return ver_ == expected;
 }
@@ -397,16 +395,15 @@ OptimisticLock::CompositeGuard::VerifyVersion()  //
 {
   if (has_lock_) return true;
 
-  uint64_t cur{};
-  SpinWithBackoff(
-      [](const std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
-        std::atomic_thread_fence(kRelease);
-        *cur = lock->load(kRelaxed);
-        return (*cur & kXLock) == kNoLocks;
-      },
-      &(dest_->lock_), &cur);
-
   auto expected = ver_;
+  uint64_t cur{};
+  while (true) {
+    std::atomic_thread_fence(kRelease);
+    cur = dest_->lock_.load(kRelaxed);
+    if ((cur & kXLock) == kNoLocks) break;
+    std::this_thread::yield();
+  }
+
   ver_ = static_cast<uint32_t>(cur & kVersionMask);
   return ver_ == expected;
 }
