@@ -91,12 +91,7 @@ ApproxZipfDistribution<IntType>::ApproxZipfDistribution(  //
     const IntType min,
     const IntType max,
     const double alpha)
-    : min_{min},
-      max_{max},
-      alpha_{alpha},
-      n_{max_ - min_ + static_cast<IntType>(1)},
-      pow_{1.0 - alpha_},
-      denom_{GetHarmonicNum(n_)}
+    : min_{min}, max_{max}, alpha_{alpha}
 {
   if (max < min) {
     throw std::runtime_error{"The maximum value must be greater than the minimum one."};

@@ -154,14 +154,39 @@ class ZipfDistributionFixture : public ::testing::Test
   {
     for (size_t i = 0; i <= kMaxAlphaUL; ++i) {
       const auto alpha = static_cast<double>(i) / static_cast<double>(kAlphaUnitUL);
-      ZipfDist_t zipf{0, kLargeBinNum - 1, alpha};
-      ApproxZipf_t approx_zipf{0, kLargeBinNum - 1, alpha};
+      ZipfDist_t zipf{0, kSmallBinNum - 1, alpha};
+      ApproxZipf_t approx_zipf{0, kSmallBinNum - 1, alpha};
 
-      for (size_t i = 0; i < kLargeBinNum; ++i) {
+      for (size_t i = 0; i < kSmallBinNum; ++i) {
         const auto expect = zipf.GetCDF(i);
         const auto actual = approx_zipf.GetCDF(i);
         EXPECT_LT(fabs(expect - actual), kAllowableError);
       }
+
+      constexpr auto kLoopNum = kSmallBinNum * 1'000;
+      std::vector<size_t> e_bins(kSmallBinNum, 0);
+      std::vector<size_t> a_bins(kSmallBinNum, 0);
+      {
+        std::mt19937_64 rand_engine{kRandomSeed};  // NOLINT
+        for (size_t i = 0; i < kLoopNum; ++i) {
+          ++e_bins[zipf(rand_engine)];
+        }
+      }
+      {
+        std::mt19937_64 rand_engine{kRandomSeed};  // NOLINT
+        for (size_t i = 0; i < kLoopNum; ++i) {
+          ++a_bins[approx_zipf(rand_engine)];
+        }
+      }
+
+      double err_sum = 0;
+      for (size_t i = 0; i < kSmallBinNum; ++i) {
+        const auto expect = static_cast<double>(e_bins[i]);
+        const auto actual = static_cast<double>(a_bins[i]);
+        err_sum += std::abs(expect - actual);
+      }
+      constexpr auto kAllowableCntErr = 50;  // 50 / 1000 = 5%
+      EXPECT_LT(err_sum / kSmallBinNum, kAllowableCntErr);
     }
   }
 
