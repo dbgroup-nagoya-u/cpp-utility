@@ -42,6 +42,9 @@
   "cmake.buildDirectory": "${workspaceRoot}/build/vscode",
   "cmake.generator": "Ninja",
   "cmake.options.statusBarVisibility": "compact",
+  "cmake.debugConfig": {
+    "args": []
+  },
   // Markdown settings
   "[markdown]": {
     "editor.tabSize": 4,
@@ -51,6 +54,10 @@
   "markdown.extension.tableFormatter.enabled": true,
   "markdown.extension.toc.levels": "2..3",
   // local dictionary
+  "cSpell.enabledFileTypes": {
+    "*": true,
+    "ignore": false,
+  },
   "cSpell.words": [
     "Chlebus",
     "cout",
