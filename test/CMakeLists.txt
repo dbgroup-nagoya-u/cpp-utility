@@ -40,9 +40,6 @@ function(ADD_DBGROUP_TEST DBGROUP_TEST_TARGET)
   target_compile_options(${DBGROUP_TEST_TARGET} PRIVATE
     -Wall
     -Wextra
-    $<$<STREQUAL:${CMAKE_BUILD_TYPE},"Release">:"-O2 -march=native">
-    $<$<STREQUAL:${CMAKE_BUILD_TYPE},"RelWithDebInfo">:"-g3 -Og -pg">
-    $<$<STREQUAL:${CMAKE_BUILD_TYPE},"Debug">:"-g3 -O0 -pg">
   )
   target_include_directories(${DBGROUP_TEST_TARGET} PRIVATE
     "${PROJECT_SOURCE_DIR}/test"
