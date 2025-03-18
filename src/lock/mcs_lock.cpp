@@ -199,7 +199,7 @@ void
 MCSLock::UnlockSIX(  //
     MCSLock *qnode)
 {
-  // wait for sharel lock holders to release their locks
+  // wait for shared lock holders to release their locks
   uint64_t next_ptr{};
   SpinWithBackoff(
       [](std::atomic_uint64_t *lock, uint64_t *next_ptr) -> bool {
@@ -323,7 +323,7 @@ MCSLock::SIXGuard::UpgradeToX()  //
   auto *dest = dest_;
   dest_ = nullptr;  // release the ownership
 
-  // wait for sharel lock holders to release their locks
+  // wait for shared lock holders to release their locks
   auto next_ptr = qnode_->lock_.load(kRelaxed);
   while (next_ptr & kSMask) {
     std::this_thread::yield();

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// the correspnding header
+// the corresponding header
 #include "dbgroup/thread/component/epoch.hpp"
 
 // C++ standard libraries

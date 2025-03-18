@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// the correspnding header
+// the corresponding header
 #include "dbgroup/thread/epoch_manager.hpp"
 
 // C++ standard libraries
@@ -92,7 +92,7 @@ EpochManager::CreateEpochGuard()  //
 {
   auto &tls = tls_fields_[IDManager::GetThreadID()];
   if (tls.heartbeat.expired()) {
-    tls.epoch.SetGrobalEpoch(&global_epoch_);
+    tls.epoch.SetGlobalEpoch(&global_epoch_);
     tls.heartbeat = IDManager::GetHeartBeat();
   }
 

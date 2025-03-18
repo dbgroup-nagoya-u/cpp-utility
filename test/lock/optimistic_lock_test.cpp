@@ -213,7 +213,7 @@ class OptimisticLockFixture : public ::testing::Test
       ASSERT_EQ(counter_, 0);
     }
 
-    // release the shared lock, and then wait for the incrementors
+    // release the shared lock, and then wait for the increment workers
     for (auto &&t : threads) {
       t.join();
     }

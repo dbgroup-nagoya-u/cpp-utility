@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// the correspnding header
+// the corresponding header
 #include "dbgroup/thread/epoch_guard.hpp"
 
 namespace dbgroup::thread

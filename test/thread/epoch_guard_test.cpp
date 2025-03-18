@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// the correspnding header
+// the corresponding header
 #include "dbgroup/thread/epoch_guard.hpp"
 
 // C++ standard libraries
@@ -55,7 +55,7 @@ class EpochGuardFixture : public ::testing::Test
   {
     current_epoch_ = 0;
     epoch_ = std::make_unique<Epoch>();
-    epoch_->SetGrobalEpoch(&current_epoch_);
+    epoch_->SetGlobalEpoch(&current_epoch_);
   }
 
   void

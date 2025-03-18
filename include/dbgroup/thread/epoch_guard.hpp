@@ -79,7 +79,7 @@ class EpochGuard
    *##########################################################################*/
 
   /**
-   * @brief Destroy the instace and release a protected epoch.
+   * @brief Destroy the instance and release a protected epoch.
    *
    */
   ~EpochGuard();

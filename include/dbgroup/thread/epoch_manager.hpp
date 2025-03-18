@@ -279,7 +279,7 @@ class EpochManager
   /// @brief A global epoch counter.
   std::atomic_size_t global_epoch_{kInitialEpoch};
 
-  /// @brief The minimum protected ecpoch value.
+  /// @brief The minimum protected epoch value.
   std::atomic_size_t min_epoch_{kInitialEpoch};
 
   /// @brief The head pointer of a linked list of epochs.

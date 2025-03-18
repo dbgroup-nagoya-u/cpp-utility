@@ -61,7 +61,7 @@ constexpr uint64_t kXLock = 1UL << 63UL;
 /// @brief A lock state representing an opportunistic lock.
 constexpr uint64_t kOPReadFlag = 1UL << 62UL;
 
-/// @brief A bit mask for extracting an X-lock state and opportunisitic read flag.
+/// @brief A bit mask for extracting an X-lock state and opportunistic read flag.
 constexpr uint64_t kXAndOPReadMask = kXLock | kOPReadFlag;
 
 /// @brief A bit mask for extracting a version value.

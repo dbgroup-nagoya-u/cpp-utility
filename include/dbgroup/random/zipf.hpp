@@ -52,7 +52,7 @@ class ZipfDistribution
    * @brief Construct a new Zipf distribution with given parameters.
    *
    * This distribution will generate random values within [`min`, `max`]
-   * according to Zipf's law with a skew paramter `alpha`.
+   * according to Zipf's law with a skew parameter `alpha`.
    *
    * @param min The minimum value to be generated.
    * @param max The maximum value to be generated.
@@ -191,7 +191,7 @@ class ApproxZipfDistribution
    * @brief Construct a new Zipf distribution with given parameters.
    *
    * This distribution will generate random values within [`min`, `max`]
-   * according to Zipf's law with a skew paramter `alpha`.
+   * according to Zipf's law with a skew parameter `alpha`.
    *
    * @param min The minimum value to be generated.
    * @param max The maximum value to be generated.
@@ -314,7 +314,7 @@ class ApproxZipfDistribution
   void UpdateCDF();
 
   /**
-   * @param n The number of partial elements in the p-serires.
+   * @param n The number of partial elements in the p-series.
    * @return An approximate partial sum of the p-series.
    */
   [[nodiscard]] auto

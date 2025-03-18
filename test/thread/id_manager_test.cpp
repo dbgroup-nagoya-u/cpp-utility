@@ -66,7 +66,7 @@ class IDManagerFixture : public ::testing::Test
    *##########################################################################*/
 
   static void
-  RserveAllThreadIDs()
+  ReserveAllThreadIDs()
   {
     std::mutex mtx{};
     std::atomic_size_t cnt{0};
@@ -107,13 +107,13 @@ class IDManagerFixture : public ::testing::Test
 
 TEST_F(IDManagerFixture, GetThreadIDReturnsUniqueIDs)
 {  //
-  RserveAllThreadIDs();
+  ReserveAllThreadIDs();
 }
 
 TEST_F(IDManagerFixture, ExitedThreadsReleaseTheirIDs)
 {  //
-  RserveAllThreadIDs();
-  RserveAllThreadIDs();
+  ReserveAllThreadIDs();
+  ReserveAllThreadIDs();
 }
 
 TEST_F(IDManagerFixture, ThreadHeartBeatsShowProperBoolValues)

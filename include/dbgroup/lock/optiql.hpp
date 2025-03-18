@@ -146,7 +146,7 @@ class OptiQL
   };
 
   /**
-   * @brief A class for representing a guard instance for opsmistic locking.
+   * @brief A class for representing a guard instance for optimistic locking.
    *
    */
   class OptGuard
