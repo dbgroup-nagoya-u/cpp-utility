@@ -19,7 +19,7 @@ set(
 
 # project information
 project(cpp_utility
-  VERSION "0.10.0"
+  VERSION "0.10.1"
   DESCRIPTION "An open-source C++ utility library for research use."
   LANGUAGES "CXX"
 )
