@@ -184,7 +184,7 @@ for (auto &&opt_guard = opt_lock.GetVersion();;) {  // keep a version-based guar
 }
 ```
 
-#### Controling Internal Version State
+#### Controlling Internal Version State
 
 ```cpp
 {

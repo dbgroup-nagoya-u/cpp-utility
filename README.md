@@ -24,6 +24,14 @@ sudo apt update && sudo apt install -y build-essential cmake
 - `DBGROUP_MAX_THREAD_NUM`: The maximum number of worker threads (defaults to the number of logical cores x2).
 - `CPP_UTILITY_SPINLOCK_RETRY_NUM`: The number of spinlock retries (default `10`).
 - `CPP_UTILITY_BACKOFF_TIME`: A back-off time interval in microseconds (default `10`).
+- `CMAKE_USER_MAKE_RULES_OVERRIDE`/`CMAKE_USER_MAKE_RULES_OVERRIDE_CXX`: This library overrides the default C/C++ build flags using `cmake/{c,cxx}_flag_overrides.cmake`. You need to override these variables to use other settings.
+    - For example, the following command will use the default flags.
+        ```bash
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_USER_MAKE_RULES_OVERRIDE="" \
+          -DCMAKE_USER_MAKE_RULES_OVERRIDE_CXX=""
+        ```
 
 #### Parameters for Unit Testing
 
