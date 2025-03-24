@@ -138,7 +138,7 @@ class EpochManager
    * @brief A class for representing thread local epoch storages.
    *
    */
-  struct alignas(kCashLineSize) TLSEpoch {
+  struct alignas(kCacheLineSize) TLSEpoch {
     /// @brief An epoch object for each thread.
     Epoch epoch{};
 
@@ -150,7 +150,7 @@ class EpochManager
    * @brief A class for composing a linked list of epochs in each thread.
    *
    */
-  class alignas(kCashLineSize) ProtectedNode
+  class alignas(kCacheLineSize) ProtectedNode
   {
    public:
     /*########################################################################*
