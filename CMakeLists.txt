@@ -22,6 +22,24 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
   #----------------------------------------------------------------------------#
 
   set(
+    DBGROUP_WORD_SIZE
+    "8" CACHE STRING
+    "The expected cache line size in bytes."
+  )
+
+  set(
+    DBGROUP_CACHE_LINE_SIZE
+    "64" CACHE STRING
+    "The expected cache line size in bytes."
+  )
+
+  set(
+    DBGROUP_VIRTUAL_PAGE_SIZE
+    "4096" CACHE STRING
+    "The expected page size of virtual memory in bytes."
+  )
+
+  set(
     DBGROUP_MAX_THREAD_NUM
     "" CACHE STRING
     "The maximum number of worker threads."
@@ -101,8 +119,11 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
   )
   target_compile_definitions(${PROJECT_NAME} PUBLIC
-    $<$<BOOL:${CPP_UTILITY_HAS_SPINLOCK_HINT}>:CPP_UTILITY_HAS_SPINLOCK_HINT>
+    DBGROUP_WORD_SIZE=${DBGROUP_WORD_SIZE}
+    DBGROUP_CACHE_LINE_SIZE=${DBGROUP_CACHE_LINE_SIZE}
+    DBGROUP_VIRTUAL_PAGE_SIZE=${DBGROUP_VIRTUAL_PAGE_SIZE}
     DBGROUP_MAX_THREAD_NUM=${DBGROUP_MAX_THREAD_NUM}
+    $<$<BOOL:${CPP_UTILITY_HAS_SPINLOCK_HINT}>:CPP_UTILITY_HAS_SPINLOCK_HINT>
     CPP_UTILITY_SPINLOCK_RETRY_NUM=${CPP_UTILITY_SPINLOCK_RETRY_NUM}
     CPP_UTILITY_BACKOFF_TIME=${CPP_UTILITY_BACKOFF_TIME}
   )

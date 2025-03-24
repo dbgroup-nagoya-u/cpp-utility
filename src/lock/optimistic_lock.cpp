@@ -23,6 +23,7 @@
 #include <thread>
 
 // local sources
+#include "dbgroup/constants.hpp"
 #include "dbgroup/lock/common.hpp"
 
 namespace

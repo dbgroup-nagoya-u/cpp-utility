@@ -27,6 +27,7 @@
 #include <vector>
 
 // local sources
+#include "dbgroup/constants.hpp"
 #include "dbgroup/thread/epoch_guard.hpp"
 #include "dbgroup/thread/id_manager.hpp"
 

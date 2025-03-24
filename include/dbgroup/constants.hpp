@@ -14,18 +14,24 @@
  * limitations under the License.
  */
 
-#ifndef CPP_UTILITY_DBGROUP_THREAD_COMMON_HPP_
-#define CPP_UTILITY_DBGROUP_THREAD_COMMON_HPP_
+#ifndef CPP_UTILITY_DBGROUP_CONSTANTS_HPP_
+#define CPP_UTILITY_DBGROUP_CONSTANTS_HPP_
 
 // C++ standard libraries
 #include <atomic>
 #include <cstddef>
 
-namespace dbgroup::thread
+namespace dbgroup
 {
 /*##############################################################################
  * Global constants
  *############################################################################*/
+
+/// @brief An alias of the sequential-consistency memory order.
+constexpr std::memory_order kSeqCst = std::memory_order_seq_cst;
+
+/// @brief An alias of the acquire&release memory order.
+constexpr std::memory_order kAcqRel = std::memory_order_acq_rel;
 
 /// @brief An alias of the acquire memory order.
 constexpr std::memory_order kAcquire = std::memory_order_acquire;
@@ -36,12 +42,22 @@ constexpr std::memory_order kRelease = std::memory_order_release;
 /// @brief An alias of the relaxed memory order.
 constexpr std::memory_order kRelaxed = std::memory_order_relaxed;
 
-/// @brief The maximum number of threads used in a process.
-constexpr size_t kMaxThreadNum = DBGROUP_MAX_THREAD_NUM;  // NOLINT
+/*##############################################################################
+ * Global tuning parameters
+ *############################################################################*/
+
+/// @brief The size of words.
+constexpr size_t kWordSize = static_cast<size_t>(DBGROUP_WORD_SIZE);
 
 /// @brief The expected cache-line size.
-constexpr size_t kCashLineSize = 64;
+constexpr size_t kCashLineSize = static_cast<size_t>(DBGROUP_CACHE_LINE_SIZE);
 
-}  // namespace dbgroup::thread
+/// @brief The expected cache-line size.
+constexpr size_t kVMPageSize = static_cast<size_t>(DBGROUP_VIRTUAL_PAGE_SIZE);
 
-#endif  // CPP_UTILITY_DBGROUP_THREAD_COMMON_HPP_
+/// @brief The maximum number of threads used in a process.
+constexpr size_t kMaxThreadNum = static_cast<size_t>(DBGROUP_MAX_THREAD_NUM);
+
+}  // namespace dbgroup
+
+#endif  // CPP_UTILITY_DBGROUP_CONSTANTS_HPP_
