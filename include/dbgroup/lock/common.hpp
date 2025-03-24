@@ -38,36 +38,11 @@ namespace dbgroup::lock
  * Global constants
  *############################################################################*/
 
-/// @brief An alias of the acquire&release memory order.
-constexpr std::memory_order kAcqRel = std::memory_order_acq_rel;
-
-/// @brief An alias of the release memory order.
-constexpr std::memory_order kRelease = std::memory_order_release;
-
-/// @brief An alias of the acquire memory order.
-constexpr std::memory_order kAcquire = std::memory_order_acquire;
-
-/// @brief An alias of the relaxed memory order.
-constexpr std::memory_order kRelaxed = std::memory_order_relaxed;
-
 /// @brief The maximum number of retries for preventing busy loops.
 constexpr size_t kRetryNum{CPP_UTILITY_SPINLOCK_RETRY_NUM};
 
 /// @brief A back-off time interval for preventing busy loops.
 constexpr std::chrono::microseconds kBackOffTime{CPP_UTILITY_BACKOFF_TIME};
-
-/*##############################################################################
- * Turning parameters
- *############################################################################*/
-
-/// @brief The page size of virtual memory addresses.
-constexpr size_t kVMPageSize = 4096;
-
-/// @brief The size of words.
-constexpr size_t kWordSize = 8;
-
-/// @brief The expected cache line size.
-constexpr size_t kCacheLineSize = 64;
 
 /*##############################################################################
  * Internal utilities

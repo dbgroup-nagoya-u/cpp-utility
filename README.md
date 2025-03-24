@@ -21,6 +21,9 @@ sudo apt update && sudo apt install -y build-essential cmake
 
 ### Build Options
 
+- `DBGROUP_WORD_SIZE`: The expected cache line size in bytes (default `8`).
+- `DBGROUP_CACHE_LINE_SIZE`: The expected cache line size in bytes (default `64`).
+- `DBGROUP_VIRTUAL_PAGE_SIZE`: The expected page size of virtual memory in bytes (default `4096`).
 - `DBGROUP_MAX_THREAD_NUM`: The maximum number of worker threads (defaults to the number of logical cores x2).
 - `CPP_UTILITY_SPINLOCK_RETRY_NUM`: The number of spinlock retries (default `10`).
 - `CPP_UTILITY_BACKOFF_TIME`: A back-off time interval in microseconds (default `10`).

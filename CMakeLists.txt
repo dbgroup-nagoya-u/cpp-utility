@@ -7,7 +7,7 @@ endif()
 
 # project information
 project(cpp_utility
-  VERSION "0.10.1"
+  VERSION "0.11.0"
   DESCRIPTION "An open-source C++ utility library for research use."
   LANGUAGES "CXX"
 )
@@ -20,6 +20,24 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
   #----------------------------------------------------------------------------#
   # Build parameters
   #----------------------------------------------------------------------------#
+
+  set(
+    DBGROUP_WORD_SIZE
+    "8" CACHE STRING
+    "The expected cache line size in bytes."
+  )
+
+  set(
+    DBGROUP_CACHE_LINE_SIZE
+    "64" CACHE STRING
+    "The expected cache line size in bytes."
+  )
+
+  set(
+    DBGROUP_VIRTUAL_PAGE_SIZE
+    "4096" CACHE STRING
+    "The expected page size of virtual memory in bytes."
+  )
 
   set(
     DBGROUP_MAX_THREAD_NUM
@@ -45,6 +63,9 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
 
   # check SSE support for spinlock hints
   CHECK_INCLUDE_FILE_CXX("x86intrin.h" CPP_UTILITY_HAS_SPINLOCK_HINT)
+
+  # check a header for byteswap functions
+  CHECK_INCLUDE_FILE_CXX("byteswap.h" CPP_UTILITY_HAS_BYTESWAP)
 
   # set the default number of threads if needed
   if ("${DBGROUP_MAX_THREAD_NUM}" STREQUAL "")
@@ -101,8 +122,12 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
     "${CMAKE_CURRENT_SOURCE_DIR}/include"
   )
   target_compile_definitions(${PROJECT_NAME} PUBLIC
-    $<$<BOOL:${CPP_UTILITY_HAS_SPINLOCK_HINT}>:CPP_UTILITY_HAS_SPINLOCK_HINT>
+    DBGROUP_WORD_SIZE=${DBGROUP_WORD_SIZE}
+    DBGROUP_CACHE_LINE_SIZE=${DBGROUP_CACHE_LINE_SIZE}
+    DBGROUP_VIRTUAL_PAGE_SIZE=${DBGROUP_VIRTUAL_PAGE_SIZE}
     DBGROUP_MAX_THREAD_NUM=${DBGROUP_MAX_THREAD_NUM}
+    $<$<BOOL:${CPP_UTILITY_HAS_SPINLOCK_HINT}>:CPP_UTILITY_HAS_SPINLOCK_HINT>
+    $<$<BOOL:${CPP_UTILITY_HAS_BYTESWAP}>:CPP_UTILITY_HAS_BYTESWAP>
     CPP_UTILITY_SPINLOCK_RETRY_NUM=${CPP_UTILITY_SPINLOCK_RETRY_NUM}
     CPP_UTILITY_BACKOFF_TIME=${CPP_UTILITY_BACKOFF_TIME}
   )

@@ -27,6 +27,7 @@
 #include <vector>
 
 // local sources
+#include "dbgroup/constants.hpp"
 #include "dbgroup/thread/id_manager.hpp"
 
 namespace dbgroup::thread
@@ -48,7 +49,7 @@ EpochManager::EpochManager()
 EpochManager::~EpochManager()
 {
   // remove the retained protected epochs
-  [[maybe_unused]] const auto dummy = global_epoch_.load(std::memory_order_acquire);
+  [[maybe_unused]] const auto dummy = global_epoch_.load(kAcquire);
   auto *pro_next = protected_lists_;
   while (pro_next != nullptr) {
     auto *current = pro_next;
@@ -65,14 +66,14 @@ auto
 EpochManager::GetCurrentEpoch() const  //
     -> size_t
 {
-  return global_epoch_.load(std::memory_order_relaxed);
+  return global_epoch_.load(kRelaxed);
 }
 
 auto
 EpochManager::GetMinEpoch() const  //
     -> size_t
 {
-  return min_epoch_.load(std::memory_order_relaxed);
+  return min_epoch_.load(kRelaxed);
 }
 
 auto
@@ -102,7 +103,7 @@ EpochManager::CreateEpochGuard()  //
 void
 EpochManager::ForwardGlobalEpoch()
 {
-  const auto cur_epoch = global_epoch_.load(std::memory_order_relaxed);
+  const auto cur_epoch = global_epoch_.load(kRelaxed);
   const auto next_epoch = cur_epoch + 1;
 
   // create a new node if needed
@@ -116,8 +117,8 @@ EpochManager::ForwardGlobalEpoch()
   RemoveOutDatedLists(protected_epochs);
 
   // store the max/min epoch values for efficiency
-  global_epoch_.store(next_epoch, std::memory_order_release);
-  min_epoch_.store(protected_epochs.back(), std::memory_order_relaxed);
+  global_epoch_.store(next_epoch, kRelease);
+  min_epoch_.store(protected_epochs.back(), kRelaxed);
 }
 
 /*##############################################################################

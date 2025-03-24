@@ -23,7 +23,7 @@
 #include <limits>
 
 // local sources
-#include "dbgroup/thread/common.hpp"
+#include "dbgroup/constants.hpp"
 
 namespace dbgroup::thread::component
 {
