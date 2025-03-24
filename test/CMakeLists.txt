@@ -58,6 +58,7 @@ function(ADD_DBGROUP_TEST DBGROUP_TEST_TARGET)
 endfunction()
 
 # add unit tests to build targets
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/index")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/lock")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/random")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/thread")

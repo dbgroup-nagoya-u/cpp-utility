@@ -59,6 +59,7 @@
     "ignore": false,
   },
   "cSpell.words": [
+    "byteswap",
     "Chlebus",
     "constexpr",
     "cout",
