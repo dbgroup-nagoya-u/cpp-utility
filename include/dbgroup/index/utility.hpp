@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <tuple>
 #include <type_traits>
 
 // external system libraries
@@ -118,6 +119,20 @@ IsVarLenData()  //
 }
 
 /**
+ * @tparam T A target class.
+ * @retval true if a target class is trivially copyable.
+ * @retval false otherwise.
+ */
+template <class T>
+constexpr auto
+IsTriviallyCopyable()  //
+    -> bool
+{
+  using Target = std::conditional_t<IsVarLenData<T>(), std::remove_pointer_t<T>, T>;
+  return std::is_trivially_copyable_v<Target>;
+}
+
+/**
  * @tparam Comp A comparator class.
  * @tparam T A target class.
  * @param lhs A left-hand side instance.
@@ -149,6 +164,119 @@ ShiftAddr(  //
     -> void *
 {
   return std::bit_cast<std::byte *>(addr) + offset;
+}
+
+/**
+ * @tparam T A target class.
+ * @param obj A target instance.
+ * @return The address of a given instance for `std::memcpy` or `std::memcmp`.
+ */
+template <class T>
+constexpr auto
+GetSrcAddr(        //
+    const T &obj)  //
+    -> std::conditional_t<IsVarLenData<T>(), const T, const T *>
+{
+  if constexpr (IsVarLenData<T>()) {
+    return obj;
+  } else {
+    return &obj;
+  }
+}
+
+/**
+ * @brief Parse an entry for bulkload.
+ *
+ * @tparam Entry std::pair or std::tuple for storing entries.
+ * @param entry A bulkload entry.
+ * @retval 1st: A target key.
+ * @retval 2nd: A target payload.
+ * @retval 3rd: The length of a target key.
+ * @retval 4th: The length of a target payload.
+ */
+template <class Entry>
+constexpr auto
+ParseEntry(              //
+    const Entry &entry)  //
+    -> std::tuple<std::tuple_element_t<0, Entry>, std::tuple_element_t<1, Entry>, size_t, size_t>
+{
+  using Key = std::tuple_element_t<0, Entry>;
+  using Payload = std::tuple_element_t<1, Entry>;
+
+  constexpr auto kTupleSize = std::tuple_size_v<Entry>;
+  static_assert(2 <= kTupleSize && kTupleSize <= 4);
+
+  if constexpr (kTupleSize == 4) {
+    return entry;
+  } else if constexpr (kTupleSize == 3) {
+    const auto &[key, payload, key_len] = entry;
+    return {key, payload, key_len, sizeof(Payload)};
+  } else {
+    const auto &[key, payload] = entry;
+    return {key, payload, sizeof(Key), sizeof(Payload)};
+  }
+}
+
+/**
+ * @brief Parse and extract a key from an entry for bulkload.
+ *
+ * @tparam Entry std::pair or std::tuple for containing entries.
+ * @param entry A bulkload entry.
+ * @retval 1st: A target key.
+ * @retval 2nd: The length of a target key.
+ */
+template <class Entry>
+constexpr auto
+ParseKey(                //
+    const Entry &entry)  //
+    -> std::pair<std::tuple_element_t<0, Entry>, size_t>
+{
+  using Key = std::tuple_element_t<0, Entry>;
+
+  constexpr auto kTupleSize = std::tuple_size_v<Entry>;
+  static_assert(2 <= kTupleSize && kTupleSize <= 4);
+
+  if constexpr (kTupleSize == 4) {
+    const auto &[key, payload, key_len, pay_len] = entry;
+    return {key, key_len};
+  } else if constexpr (kTupleSize == 3) {
+    const auto &[key, payload, key_len] = entry;
+    return {key, key_len};
+  } else {
+    const auto &[key, payload] = entry;
+    return {key, sizeof(Key)};
+  }
+}
+
+/**
+ * @brief Parse and extract a payload from an entry for bulkload.
+ *
+ * @tparam Entry std::pair or std::tuple for storing entries.
+ * @param entry A bulkload entry.
+ * @retval 1st: A target payload.
+ * @retval 2nd: The length of a target payload.
+ */
+template <class Entry>
+constexpr auto
+ParsePayload(            //
+    const Entry &entry)  //
+    -> std::tuple<std::tuple_element_t<1, Entry>, size_t>
+{
+  using Payload = std::tuple_element_t<1, Entry>;
+
+  constexpr auto kTupleSize = std::tuple_size_v<Entry>;
+  static_assert(2 <= kTupleSize && kTupleSize <= 4);
+
+  if constexpr (kTupleSize == 4) {
+    const auto &[key, payload, key_len, pay_len] = entry;
+    return {payload, pay_len};
+  } else if constexpr (kTupleSize == 3) {
+    const auto &[key, payload, key_len] = entry;
+    return {payload, sizeof(Payload)};
+  } else {
+    const auto &[key, payload] = entry;
+    return {payload, sizeof(Payload)};
+  }
 }
 
 /**
