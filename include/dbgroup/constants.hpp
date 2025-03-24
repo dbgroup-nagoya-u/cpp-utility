@@ -50,7 +50,7 @@ constexpr std::memory_order kRelaxed = std::memory_order_relaxed;
 constexpr size_t kWordSize = static_cast<size_t>(DBGROUP_WORD_SIZE);
 
 /// @brief The expected cache-line size.
-constexpr size_t kCashLineSize = static_cast<size_t>(DBGROUP_CACHE_LINE_SIZE);
+constexpr size_t kCacheLineSize = static_cast<size_t>(DBGROUP_CACHE_LINE_SIZE);
 
 /// @brief The expected cache-line size.
 constexpr size_t kVMPageSize = static_cast<size_t>(DBGROUP_VIRTUAL_PAGE_SIZE);
