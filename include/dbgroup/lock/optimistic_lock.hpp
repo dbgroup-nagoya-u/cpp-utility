@@ -338,12 +338,13 @@ class OptimisticLock
      *########################################################################*/
 
     /**
-     * @return false.
+     * @retval true if this instance has a valid version.
+     * @retval false otherwise.
      */
     constexpr explicit
     operator bool() const
     {
-      return false;
+      return dest_;
     }
 
     /**
@@ -471,13 +472,13 @@ class OptimisticLock
      *########################################################################*/
 
     /**
-     * @retval true if this instance has the lock ownership.
+     * @retval true if this instance has any ownership.
      * @retval false otherwise.
      */
     constexpr explicit
-    operator bool() const
+    operator bool() const noexcept
     {
-      return has_lock_;
+      return dest_;
     }
 
     /**
