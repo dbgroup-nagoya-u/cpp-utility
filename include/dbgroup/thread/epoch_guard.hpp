@@ -39,7 +39,7 @@ class EpochGuard
    * Public constructors and assignment operators
    *##########################################################################*/
 
-  constexpr EpochGuard() = default;
+  constexpr EpochGuard() noexcept = default;
 
   /**
    * @brief Construct a new instance and protect a current epoch.
@@ -47,7 +47,7 @@ class EpochGuard
    * @param epoch A reference to a target epoch.
    */
   explicit EpochGuard(  //
-      Epoch *epoch);
+      Epoch *epoch) noexcept;
 
   /**
    * @brief Construct a new instance.
@@ -91,7 +91,7 @@ class EpochGuard
   /**
    * @return The epoch value protected by this object.
    */
-  [[nodiscard]] auto GetProtectedEpoch() const  //
+  [[nodiscard]] auto GetProtectedEpoch() const noexcept  //
       -> size_t;
 
  private:

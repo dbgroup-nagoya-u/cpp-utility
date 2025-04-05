@@ -112,7 +112,7 @@ constexpr bool kOpen = false;
  */
 template <class T>
 constexpr auto
-IsVarLenData()  //
+IsVarLenData() noexcept  //
     -> bool
 {
   return std::is_same_v<T, std::byte *>;
@@ -125,7 +125,7 @@ IsVarLenData()  //
  */
 template <class T>
 constexpr auto
-IsTriviallyCopyable()  //
+IsTriviallyCopyable() noexcept  //
     -> bool
 {
   using Target = std::conditional_t<IsVarLenData<T>(), std::remove_pointer_t<T>, T>;
@@ -160,7 +160,7 @@ IsEqual(  //
 constexpr auto
 ShiftAddr(  //
     const void *addr,
-    const int64_t offset)  //
+    const int64_t offset) noexcept  //
     -> void *
 {
   return std::bit_cast<std::byte *>(addr) + offset;
@@ -173,8 +173,8 @@ ShiftAddr(  //
  */
 template <class T>
 constexpr auto
-GetSrcAddr(        //
-    const T &obj)  //
+GetSrcAddr(                 //
+    const T &obj) noexcept  //
     -> std::conditional_t<IsVarLenData<T>(), const T, const T *>
 {
   if constexpr (IsVarLenData<T>()) {
@@ -196,8 +196,8 @@ GetSrcAddr(        //
  */
 template <class Entry>
 constexpr auto
-ParseEntry(              //
-    const Entry &entry)  //
+ParseEntry(                       //
+    const Entry &entry) noexcept  //
     -> std::tuple<std::tuple_element_t<0, Entry>, std::tuple_element_t<1, Entry>, size_t, size_t>
 {
   using Key = std::tuple_element_t<0, Entry>;
@@ -227,8 +227,8 @@ ParseEntry(              //
  */
 template <class Entry>
 constexpr auto
-ParseKey(                //
-    const Entry &entry)  //
+ParseKey(                         //
+    const Entry &entry) noexcept  //
     -> std::pair<std::tuple_element_t<0, Entry>, size_t>
 {
   using Key = std::tuple_element_t<0, Entry>;
@@ -258,8 +258,8 @@ ParseKey(                //
  */
 template <class Entry>
 constexpr auto
-ParsePayload(            //
-    const Entry &entry)  //
+ParsePayload(                     //
+    const Entry &entry) noexcept  //
     -> std::tuple<std::tuple_element_t<1, Entry>, size_t>
 {
   using Payload = std::tuple_element_t<1, Entry>;

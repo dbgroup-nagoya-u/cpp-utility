@@ -48,7 +48,7 @@ class MCSLock
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr SGuard() = default;
+    constexpr SGuard() noexcept = default;
 
     /**
      * @param dest The address of a target lock.
@@ -56,7 +56,7 @@ class MCSLock
      */
     constexpr SGuard(  //
         MCSLock *dest,
-        MCSLock *qnode)
+        MCSLock *qnode) noexcept
         : dest_{dest}, qnode_{qnode}
     {
     }
@@ -91,7 +91,7 @@ class MCSLock
      * @retval false otherwise.
      */
     constexpr explicit
-    operator bool() const
+    operator bool() const noexcept
     {
       return dest_;
     }
@@ -119,7 +119,7 @@ class MCSLock
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr SIXGuard() = default;
+    constexpr SIXGuard() noexcept = default;
 
     /**
      * @param dest The address of a target lock.
@@ -127,7 +127,7 @@ class MCSLock
      */
     constexpr SIXGuard(  //
         MCSLock *dest,
-        MCSLock *qnode)
+        MCSLock *qnode) noexcept
         : dest_{dest}, qnode_{qnode}
     {
     }
@@ -162,7 +162,7 @@ class MCSLock
      * @retval false otherwise.
      */
     constexpr explicit
-    operator bool() const
+    operator bool() const noexcept
     {
       return dest_;
     }
@@ -200,7 +200,7 @@ class MCSLock
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr XGuard() = default;
+    constexpr XGuard() noexcept = default;
 
     /**
      * @param dest The address of a target lock.
@@ -208,7 +208,7 @@ class MCSLock
      */
     constexpr XGuard(  //
         MCSLock *dest,
-        MCSLock *qnode)
+        MCSLock *qnode) noexcept
         : dest_{dest}, qnode_{qnode}
     {
     }
@@ -243,7 +243,7 @@ class MCSLock
      * @retval false otherwise.
      */
     constexpr explicit
-    operator bool() const
+    operator bool() const noexcept
     {
       return dest_;
     }
@@ -274,7 +274,7 @@ class MCSLock
    * Public constructors and assignment operators
    *##########################################################################*/
 
-  constexpr MCSLock() = default;
+  constexpr MCSLock() noexcept = default;
 
   MCSLock(const MCSLock &) = delete;
   MCSLock(MCSLock &&) = delete;

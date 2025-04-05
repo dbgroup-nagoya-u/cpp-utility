@@ -101,19 +101,19 @@ PessimisticLock::LockSIX()  //
  *############################################################################*/
 
 void
-PessimisticLock::UnlockS()
+PessimisticLock::UnlockS() noexcept
 {
   lock_.fetch_sub(kSLock, kRelaxed);
 }
 
 void
-PessimisticLock::UnlockSIX()
+PessimisticLock::UnlockSIX() noexcept
 {
   lock_.fetch_xor(kSIXLock, kRelaxed);
 }
 
 void
-PessimisticLock::UnlockX()
+PessimisticLock::UnlockX() noexcept
 {
   lock_.store(kNoLocks, kRelease);
 }
@@ -209,7 +209,7 @@ PessimisticLock::XGuard::~XGuard()
 }
 
 auto
-PessimisticLock::XGuard::DowngradeToSIX()  //
+PessimisticLock::XGuard::DowngradeToSIX() noexcept  //
     -> SIXGuard
 {
   if (dest_ == nullptr) return SIXGuard{};

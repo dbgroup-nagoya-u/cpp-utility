@@ -42,10 +42,10 @@ class IDManager
   ~IDManager() = delete;
 
   IDManager(const IDManager &) = delete;
-  IDManager(IDManager &&) noexcept = delete;
+  IDManager(IDManager &&) = delete;
 
   auto operator=(const IDManager &) -> IDManager & = delete;
-  auto operator=(IDManager &&) noexcept -> IDManager & = delete;
+  auto operator=(IDManager &&) -> IDManager & = delete;
 
   /*##########################################################################*
    * Public static utilities
@@ -108,7 +108,7 @@ class IDManager
      * @retval true if this object has a unique thread ID.
      * @retval false otherwise.
      */
-    [[nodiscard]] auto HasID() const  //
+    [[nodiscard]] auto HasID() const noexcept  //
         -> bool;
 
     /**
@@ -120,7 +120,7 @@ class IDManager
     /**
      * @return A weak pointer object to check heart beats of this object.
      */
-    [[nodiscard]] auto GetHeartBeat() const  //
+    [[nodiscard]] auto GetHeartBeat() const noexcept  //
         -> std::weak_ptr<size_t>;
 
     /*########################################################################*

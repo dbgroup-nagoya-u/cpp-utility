@@ -39,7 +39,7 @@ class Epoch
    * @brief Construct a new instance.
    *
    */
-  constexpr Epoch() = default;
+  constexpr Epoch() noexcept = default;
 
   Epoch(const Epoch &) = delete;
   Epoch(Epoch &&orig) = delete;
@@ -64,13 +64,13 @@ class Epoch
   /**
    * @return size_t A current epoch value.
    */
-  [[nodiscard]] auto GetCurrentEpoch() const  //
+  [[nodiscard]] auto GetCurrentEpoch() const noexcept  //
       -> size_t;
 
   /**
    * @return size_t A protected epoch value.
    */
-  [[nodiscard]] auto GetProtectedEpoch() const  //
+  [[nodiscard]] auto GetProtectedEpoch() const noexcept  //
       -> size_t;
 
   /**
@@ -78,7 +78,7 @@ class Epoch
    */
   constexpr void
   SetGlobalEpoch(  //
-      std::atomic_size_t *global_epoch)
+      std::atomic_size_t *global_epoch) noexcept
   {
     current_ = global_epoch;
   }
@@ -91,13 +91,13 @@ class Epoch
    * @brief Keep a current epoch value to protect new garbages.
    *
    */
-  void EnterEpoch();
+  void EnterEpoch() noexcept;
 
   /**
    * @brief Release a protected epoch value to allow GC to delete old garbages.
    *
    */
-  void LeaveEpoch();
+  void LeaveEpoch() noexcept;
 
  private:
   /*##########################################################################*

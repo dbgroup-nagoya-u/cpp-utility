@@ -160,7 +160,7 @@ RetainQID(  //
  *############################################################################*/
 
 auto
-OptiQL::GetVersion() const  //
+OptiQL::GetVersion() const noexcept  //
     -> OptGuard
 {
   uint64_t cur{};
@@ -267,7 +267,7 @@ OptiQL::XGuard::~XGuard()
  *############################################################################*/
 
 auto
-OptiQL::OptGuard::VerifyVersion()  //
+OptiQL::OptGuard::VerifyVersion() noexcept  //
     -> bool
 {
   uint64_t cur{};

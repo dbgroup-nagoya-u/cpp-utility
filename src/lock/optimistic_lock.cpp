@@ -71,7 +71,7 @@ namespace dbgroup::lock
  *############################################################################*/
 
 auto
-OptimisticLock::GetVersion()  //
+OptimisticLock::GetVersion() noexcept  //
     -> OptGuard
 {
   uint64_t cur{};
@@ -162,20 +162,20 @@ OptimisticLock::LockX()  //
  *############################################################################*/
 
 void
-OptimisticLock::UnlockS()
+OptimisticLock::UnlockS() noexcept
 {
   lock_.fetch_sub(kSLock, kRelaxed);
 }
 
 void
-OptimisticLock::UnlockSIX()
+OptimisticLock::UnlockSIX() noexcept
 {
   lock_.fetch_xor(kSIXLock, kRelaxed);
 }
 
 void
 OptimisticLock::UnlockX(  //
-    const uint64_t ver)
+    const uint64_t ver) noexcept
 {
   lock_.store(ver, kRelease);
 }
@@ -275,7 +275,7 @@ OptimisticLock::XGuard::~XGuard()
 }
 
 auto
-OptimisticLock::XGuard::DowngradeToSIX()  //
+OptimisticLock::XGuard::DowngradeToSIX() noexcept  //
     -> SIXGuard
 {
   if (dest_ == nullptr) return SIXGuard{};
@@ -291,7 +291,7 @@ OptimisticLock::XGuard::DowngradeToSIX()  //
  *############################################################################*/
 
 auto
-OptimisticLock::OptGuard::VerifyVersion()  //
+OptimisticLock::OptGuard::VerifyVersion() noexcept  //
     -> bool
 {
   auto expected = ver_;
@@ -391,7 +391,7 @@ OptimisticLock::CompositeGuard::~CompositeGuard()
 }
 
 auto
-OptimisticLock::CompositeGuard::VerifyVersion()  //
+OptimisticLock::CompositeGuard::VerifyVersion() noexcept  //
     -> bool
 {
   if (has_lock_) return true;

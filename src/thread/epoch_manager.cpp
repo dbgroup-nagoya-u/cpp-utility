@@ -63,14 +63,14 @@ EpochManager::~EpochManager()
  *############################################################################*/
 
 auto
-EpochManager::GetCurrentEpoch() const  //
+EpochManager::GetCurrentEpoch() const noexcept  //
     -> size_t
 {
   return global_epoch_.load(kRelaxed);
 }
 
 auto
-EpochManager::GetMinEpoch() const  //
+EpochManager::GetMinEpoch() const noexcept  //
     -> size_t
 {
   return min_epoch_.load(kRelaxed);
@@ -194,7 +194,7 @@ EpochManager::RemoveOutDatedLists(  //
 
 EpochManager::ProtectedNode::ProtectedNode(  //
     const size_t epoch,
-    ProtectedNode *next)
+    ProtectedNode *next) noexcept
     : next{next}, upper_epoch_(epoch)
 {
 }
