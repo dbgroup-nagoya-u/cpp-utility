@@ -363,9 +363,6 @@ class MCSLock
 
   /// @brief The current lock state.
   std::atomic_uint64_t lock_{0};
-
-  /// @brief A thread local queue node container.
-  static thread_local inline std::unique_ptr<MCSLock> tls_node_{};  // NOLINT
 };
 
 }  // namespace dbgroup::lock

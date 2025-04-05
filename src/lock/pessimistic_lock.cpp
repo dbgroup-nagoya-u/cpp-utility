@@ -25,6 +25,8 @@
 #include "dbgroup/constants.hpp"
 #include "dbgroup/lock/common.hpp"
 
+namespace dbgroup::lock
+{
 namespace
 {
 /*############################################################################*
@@ -48,8 +50,6 @@ constexpr uint64_t kXMask = kSIXLock | kXLock;
 
 }  // namespace
 
-namespace dbgroup::lock
-{
 /*############################################################################*
  * Public APIs
  *############################################################################*/

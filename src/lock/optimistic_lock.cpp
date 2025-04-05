@@ -26,6 +26,8 @@
 #include "dbgroup/constants.hpp"
 #include "dbgroup/lock/common.hpp"
 
+namespace dbgroup::lock
+{
 namespace
 {
 /*############################################################################*
@@ -64,8 +66,6 @@ constexpr uint64_t kXAndVersionMask = kXLock | kVersionMask;
 
 }  // namespace
 
-namespace dbgroup::lock
-{
 /*############################################################################*
  * Optimistic read APIs
  *############################################################################*/
