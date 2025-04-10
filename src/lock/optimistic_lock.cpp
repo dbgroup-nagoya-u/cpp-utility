@@ -89,24 +89,13 @@ OptimisticLock::PrepareRead()  //
     -> CompositeGuard
 {
   uint64_t cur{};
-  for (size_t i = 0; true; ++i) {
+  while (true) {
     cur = lock_.load(kAcquire);
-    if ((cur & kXLock) == kNoLocks) return CompositeGuard{this, static_cast<uint32_t>(cur)};
-    if (i >= kRetryNum) break;
-    CPP_UTILITY_SPINLOCK_HINT
+    if ((cur & kXLock) == kNoLocks) break;
+    std::this_thread::yield();
   }
 
-  SpinWithBackoff(
-      [](std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
-        *cur = lock->load(kAcquire);
-        return (*cur & kXLock) == kNoLocks
-               && ((*cur & kAllLockMask)
-                   || lock->compare_exchange_weak(*cur, *cur + kSLock, kRelaxed, kRelaxed));
-      },
-      &lock_, &cur);
-
-  return (cur & kAllLockMask) ? CompositeGuard{this, static_cast<uint32_t>(cur)}
-                              : CompositeGuard{this};
+  return CompositeGuard{this, static_cast<uint32_t>(cur)};
 }
 
 /*############################################################################*
@@ -395,22 +384,38 @@ OptimisticLock::CompositeGuard::~CompositeGuard()
 }
 
 auto
-OptimisticLock::CompositeGuard::VerifyVersion() noexcept  //
+OptimisticLock::CompositeGuard::VerifyVersion(  //
+    const uint32_t mask) noexcept               //
     -> bool
 {
-  if (has_lock_) return true;
+  if (has_lock_) return true;  // the lock has been acquired
 
-  auto expected = ver_;
-  uint64_t cur{};
+  // verify using the optimistic read procedure
+  uint64_t cur;
+  const auto expected = ver_;
   while (true) {
     std::atomic_thread_fence(kRelease);
-    cur = dest_->lock_.load(kRelaxed);
-    if ((cur & kXLock) == kNoLocks) break;
+    cur = dest_->lock_.load(kAcquire);
+    if ((cur & kXLock) == kNoLocks) {
+      ver_ = static_cast<uint32_t>(cur);
+      break;
+    }
     std::this_thread::yield();
   }
+  if (((ver_ ^ expected) & mask) == 0) return true;
 
-  ver_ = static_cast<uint32_t>(cur & kVersionMask);
-  return ver_ == expected;
+  // try to acquire a shared lock
+  SpinWithBackoff(
+      [](std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
+        *cur = lock->load(kAcquire);
+        return (*cur & kXLock) == kNoLocks
+               && ((*cur & kSMask)
+                   || lock->compare_exchange_weak(*cur, *cur + kSLock, kRelaxed, kRelaxed));
+      },
+      &dest_->lock_, &cur);
+
+  has_lock_ = (cur & kSMask) == kNoLocks;
+  return false;
 }
 
 }  // namespace dbgroup::lock

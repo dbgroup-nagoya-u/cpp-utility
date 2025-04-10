@@ -135,19 +135,13 @@ class OptimisticLockFixture : public ::testing::Test
     {
       [[maybe_unused]] const auto &guard = GetLock(with_lock_type);
 
-      auto worker = [](LockType lock_type, OptimisticLock *lock, std::promise<void> p) {
+      auto worker = [](OptimisticLock *lock, std::promise<void> p) {
         auto &&guard = lock->PrepareRead();
-
+        ASSERT_TRUE(guard);
         ASSERT_TRUE(guard.VerifyVersion());
-        if (lock_type != kXLock) {
-          ASSERT_FALSE(guard);
-        } else {
-          ASSERT_TRUE(guard);
-        }
-
         p.set_value();
       };
-      std::thread{worker, with_lock_type, &lock_, std::move(p)}.detach();
+      std::thread{worker, &lock_, std::move(p)}.detach();
 
       // after short sleep, give up on acquiring the lock
       const auto rc = f.wait_for(kWaitTimeMill);

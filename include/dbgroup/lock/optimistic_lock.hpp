@@ -507,10 +507,12 @@ class OptimisticLock
      *########################################################################*/
 
     /**
+     * @param mask A bitmask for representing bits to be verified.
      * @retval true if a target version does not change from an expected one.
      * @retval false otherwise.
      */
-    [[nodiscard]] auto VerifyVersion() noexcept  //
+    [[nodiscard]] auto VerifyVersion(      //
+        uint32_t mask = kNoMask) noexcept  //
         -> bool;
 
    private:
