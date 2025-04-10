@@ -31,6 +31,7 @@
   "C_Cpp.codeAnalysis.clangTidy.enabled": true,
   "C_Cpp.codeAnalysis.clangTidy.path": "/usr/bin/clang-tidy",
   "C_Cpp.codeAnalysis.clangTidy.useBuildPath": true,
+  "C_Cpp.codeAnalysis.clangTidy.headerFilter": "${workspaceFolder}/include/*",
   // unit test settings
   "testMate.cpp.test.runtimeLimit": 60,
   "testMate.cpp.test.executables": "build/vscode/test/**/*_test",

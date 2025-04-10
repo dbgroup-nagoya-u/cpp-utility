@@ -44,6 +44,9 @@ constexpr size_t kRetryNum{CPP_UTILITY_SPINLOCK_RETRY_NUM};
 /// @brief A back-off time interval for preventing busy loops.
 constexpr std::chrono::microseconds kBackOffTime{CPP_UTILITY_BACKOFF_TIME};
 
+/// @brief A bitmask for extracting all 32 bits.
+constexpr uint32_t kNoMask = ~0U;
+
 /*############################################################################*
  * Internal utilities
  *############################################################################*/
