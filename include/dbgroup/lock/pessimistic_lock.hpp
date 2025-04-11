@@ -20,6 +20,9 @@
 // C++ standard libraries
 #include <atomic>
 
+// local sources
+#include "dbgroup/lock/utility.hpp"
+
 namespace dbgroup::lock
 {
 /**
@@ -47,13 +50,13 @@ class PessimisticLock
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr SGuard() = default;
+    constexpr SGuard() noexcept = default;
 
     /**
      * @param dest The address of a target lock.
      */
     constexpr explicit SGuard(  //
-        PessimisticLock *dest)
+        PessimisticLock *dest) noexcept
         : dest_{dest}
     {
     }
@@ -88,7 +91,7 @@ class PessimisticLock
      * @retval false otherwise.
      */
     constexpr explicit
-    operator bool() const
+    operator bool() const noexcept
     {
       return dest_;
     }
@@ -113,13 +116,13 @@ class PessimisticLock
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr SIXGuard() = default;
+    constexpr SIXGuard() noexcept = default;
 
     /**
      * @param dest The address of a target lock.
      */
     constexpr explicit SIXGuard(  //
-        PessimisticLock *dest)
+        PessimisticLock *dest) noexcept
         : dest_{dest}
     {
     }
@@ -154,7 +157,7 @@ class PessimisticLock
      * @retval false otherwise.
      */
     constexpr explicit
-    operator bool() const
+    operator bool() const noexcept
     {
       return dest_;
     }
@@ -189,13 +192,13 @@ class PessimisticLock
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr XGuard() = default;
+    constexpr XGuard() noexcept = default;
 
     /**
      * @param dest The address of a target lock.
      */
     constexpr explicit XGuard(  //
-        PessimisticLock *dest)
+        PessimisticLock *dest) noexcept
         : dest_{dest}
     {
     }
@@ -230,7 +233,7 @@ class PessimisticLock
      * @retval false otherwise.
      */
     constexpr explicit
-    operator bool() const
+    operator bool() const noexcept
     {
       return dest_;
     }
@@ -242,7 +245,7 @@ class PessimisticLock
      * @note After calling the function, this lock guard abandons the lock's
      * ownership.
      */
-    [[nodiscard]] auto DowngradeToSIX()  //
+    [[nodiscard]] auto DowngradeToSIX() noexcept  //
         -> SIXGuard;
 
    private:
@@ -258,7 +261,7 @@ class PessimisticLock
    * Public constructors and assignment operators
    *##########################################################################*/
 
-  constexpr PessimisticLock() = default;
+  constexpr PessimisticLock() noexcept = default;
 
   PessimisticLock(const PessimisticLock &) = delete;
   PessimisticLock(PessimisticLock &&) = delete;
@@ -317,7 +320,7 @@ class PessimisticLock
    * @note If a thread calls this function without acquiring an S lock, it will
    * corrupt an internal lock state.
    */
-  void UnlockS();
+  void UnlockS() noexcept;
 
   /**
    * @brief Release a shared-with-intent-exclusive lock.
@@ -325,7 +328,7 @@ class PessimisticLock
    * @note If a thread calls this function without acquiring an SIX lock, it
    * will corrupt an internal lock state.
    */
-  void UnlockSIX();
+  void UnlockSIX() noexcept;
 
   /**
    * @brief Release an exclusive lock.
@@ -333,7 +336,7 @@ class PessimisticLock
    * @note If a thread calls this function without acquiring an X lock, it will
    * corrupt an internal lock state.
    */
-  void UnlockX();
+  void UnlockX() noexcept;
 
   /*##########################################################################*
    * Internal member variables
@@ -342,6 +345,13 @@ class PessimisticLock
   /// @brief The current lock state.
   std::atomic_uint64_t lock_{0};
 };
+
+/*############################################################################*
+ * Static assertions
+ *############################################################################*/
+
+static_assert(Lockable<PessimisticLock>);
+static_assert(PessimisticallyLockable<PessimisticLock>);
 
 }  // namespace dbgroup::lock
 

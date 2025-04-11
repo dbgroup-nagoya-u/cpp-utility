@@ -92,13 +92,13 @@ class EpochManager
   /**
    * @return A current global epoch value.
    */
-  [[nodiscard]] auto GetCurrentEpoch() const  //
+  [[nodiscard]] auto GetCurrentEpoch() const noexcept  //
       -> size_t;
 
   /**
    * @return The minimum protected epoch value.
    */
-  [[nodiscard]] auto GetMinEpoch() const  //
+  [[nodiscard]] auto GetMinEpoch() const noexcept  //
       -> size_t;
 
   /**
@@ -165,7 +165,7 @@ class EpochManager
      */
     ProtectedNode(  //
         size_t epoch,
-        ProtectedNode *next);
+        ProtectedNode *next) noexcept;
 
     ProtectedNode(const ProtectedNode &) = delete;
     ProtectedNode(ProtectedNode &&) = delete;
@@ -213,7 +213,7 @@ class EpochManager
      * @return The upper bits of the current epoch.
      */
     [[nodiscard]] constexpr auto
-    GetUpperBits() const  //
+    GetUpperBits() const noexcept  //
         -> size_t
     {
       return upper_epoch_;

@@ -20,7 +20,7 @@
 namespace dbgroup::thread
 {
 EpochGuard::EpochGuard(  //
-    Epoch *epoch)
+    Epoch *epoch) noexcept
     : epoch_{epoch}
 {
   epoch_->EnterEpoch();
@@ -47,7 +47,7 @@ EpochGuard::~EpochGuard()
 }
 
 auto
-EpochGuard::GetProtectedEpoch() const  //
+EpochGuard::GetProtectedEpoch() const noexcept  //
     -> size_t
 {
   return epoch_->GetProtectedEpoch();

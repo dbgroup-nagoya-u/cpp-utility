@@ -23,8 +23,10 @@
 
 // local sources
 #include "dbgroup/constants.hpp"
-#include "dbgroup/lock/common.hpp"
+#include "dbgroup/lock/utility.hpp"
 
+namespace dbgroup::lock
+{
 namespace
 {
 /*############################################################################*
@@ -48,8 +50,6 @@ constexpr uint64_t kXMask = kSIXLock | kXLock;
 
 }  // namespace
 
-namespace dbgroup::lock
-{
 /*############################################################################*
  * Public APIs
  *############################################################################*/
@@ -101,19 +101,19 @@ PessimisticLock::LockSIX()  //
  *############################################################################*/
 
 void
-PessimisticLock::UnlockS()
+PessimisticLock::UnlockS() noexcept
 {
   lock_.fetch_sub(kSLock, kRelaxed);
 }
 
 void
-PessimisticLock::UnlockSIX()
+PessimisticLock::UnlockSIX() noexcept
 {
   lock_.fetch_xor(kSIXLock, kRelaxed);
 }
 
 void
-PessimisticLock::UnlockX()
+PessimisticLock::UnlockX() noexcept
 {
   lock_.store(kNoLocks, kRelease);
 }
@@ -209,7 +209,7 @@ PessimisticLock::XGuard::~XGuard()
 }
 
 auto
-PessimisticLock::XGuard::DowngradeToSIX()  //
+PessimisticLock::XGuard::DowngradeToSIX() noexcept  //
     -> SIXGuard
 {
   if (dest_ == nullptr) return SIXGuard{};

@@ -89,7 +89,7 @@ IDManager::HeartBeater::~HeartBeater()
 }
 
 auto
-IDManager::HeartBeater::HasID() const  //
+IDManager::HeartBeater::HasID() const noexcept  //
     -> bool
 {
   return id_.use_count() > 0;
@@ -103,7 +103,7 @@ IDManager::HeartBeater::GetID() const  //
 }
 
 auto
-IDManager::HeartBeater::GetHeartBeat() const  //
+IDManager::HeartBeater::GetHeartBeat() const noexcept  //
     -> std::weak_ptr<size_t>
 {
   return std::weak_ptr<size_t>{id_};

@@ -52,7 +52,7 @@ class OptiQL
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr XGuard() = default;
+    constexpr XGuard() noexcept = default;
 
     /**
      * @param dest The address of a target lock.
@@ -61,7 +61,7 @@ class OptiQL
     constexpr XGuard(  //
         OptiQL *dest,
         const uint64_t qid,
-        const uint32_t ver)
+        const uint32_t ver) noexcept
         : dest_{dest}, qid_{qid}, old_ver_{ver}, new_ver_{ver + 1U}
     {
     }
@@ -100,7 +100,7 @@ class OptiQL
      * @retval false otherwise.
      */
     constexpr explicit
-    operator bool() const
+    operator bool() const noexcept
     {
       return dest_;
     }
@@ -109,7 +109,7 @@ class OptiQL
      * @return The version when this guard was created.
      */
     [[nodiscard]] constexpr auto
-    GetVersion() const  //
+    GetVersion() const noexcept  //
         -> uint32_t
     {
       return old_ver_;
@@ -122,7 +122,7 @@ class OptiQL
      */
     constexpr void
     SetVersion(  //
-        const uint32_t ver)
+        const uint32_t ver) noexcept
     {
       new_ver_ = ver;
     }
@@ -156,7 +156,7 @@ class OptiQL
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr OptGuard() = default;
+    constexpr OptGuard() noexcept = default;
 
     /**
      * @param dest The address of a target lock.
@@ -164,12 +164,12 @@ class OptiQL
      */
     constexpr OptGuard(  //
         const OptiQL *dest,
-        const uint32_t ver)
+        const uint32_t ver) noexcept
         : dest_{dest}, ver_{ver}
     {
     }
 
-    constexpr OptGuard(const OptGuard &) = default;
+    constexpr OptGuard(const OptGuard &) noexcept = default;
     constexpr OptGuard(OptGuard &&) noexcept = default;
 
     constexpr auto operator=(const OptGuard &) noexcept -> OptGuard & = default;
@@ -186,19 +186,20 @@ class OptiQL
      *########################################################################*/
 
     /**
-     * @return false.
+     * @retval true if this instance has a valid version.
+     * @retval false otherwise.
      */
     constexpr explicit
-    operator bool() const
+    operator bool() const noexcept
     {
-      return false;
+      return dest_;
     }
 
     /**
      * @return The version when this guard was created.
      */
     [[nodiscard]] constexpr auto
-    GetVersion() const  //
+    GetVersion() const noexcept  //
         -> uint32_t
     {
       return ver_;
@@ -212,7 +213,7 @@ class OptiQL
      * @retval true if a target version does not change from an expected one.
      * @retval false otherwise.
      */
-    [[nodiscard]] auto VerifyVersion()  //
+    [[nodiscard]] auto VerifyVersion() noexcept  //
         -> bool;
 
    private:
@@ -231,7 +232,7 @@ class OptiQL
    * Public constructors and assignment operators
    *##########################################################################*/
 
-  constexpr OptiQL() = default;
+  constexpr OptiQL() noexcept = default;
 
   OptiQL(const OptiQL &) = delete;
   OptiQL(OptiQL &&) = delete;
@@ -255,7 +256,7 @@ class OptiQL
    * @note This function does not give up reading a version value and continues
    * with spinlock and back-off.
    */
-  [[nodiscard]] auto GetVersion() const  //
+  [[nodiscard]] auto GetVersion() const noexcept  //
       -> OptGuard;
 
   /**

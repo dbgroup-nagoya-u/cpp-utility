@@ -25,8 +25,10 @@
 
 // local sources
 #include "dbgroup/constants.hpp"
-#include "dbgroup/lock/common.hpp"
+#include "dbgroup/lock/utility.hpp"
 
+namespace dbgroup::lock
+{
 namespace
 {
 /*############################################################################*
@@ -60,10 +62,11 @@ constexpr uint64_t kXMask = kXLock | kSIXLock;
 /// @brief A bit mask for extracting a sharedlock state.
 constexpr uint64_t kSMask = kLockMask ^ kXMask;
 
+/// @brief A thread local queue node container.
+thread_local std::unique_ptr<MCSLock> _tls{};  // NOLINT
+
 }  // namespace
 
-namespace dbgroup::lock
-{
 /*############################################################################*
  * Public APIs
  *############################################################################*/
@@ -72,7 +75,7 @@ auto
 MCSLock::LockS()  //
     -> SGuard
 {
-  auto *tail = tls_node_ ? tls_node_.release() : new MCSLock{};
+  auto *tail = _tls ? _tls.release() : new MCSLock{};
   tail->lock_.store(kNull, kRelaxed);
   auto tail_ptr = std::bit_cast<uint64_t>(tail) | kSLock;
 
@@ -87,7 +90,7 @@ MCSLock::LockS()  //
   }
 
   // wait until predecessor gives up the lock
-  tls_node_.reset(tail);
+  _tls.reset(tail);
   tail_ptr = cur & kPtrMask;
   tail = std::bit_cast<MCSLock *>(tail_ptr);
   if (cur & kXMask) {
@@ -116,7 +119,7 @@ auto
 MCSLock::LockSIX()  //
     -> SIXGuard
 {
-  auto *qnode = tls_node_ ? tls_node_.release() : new MCSLock{};
+  auto *qnode = _tls ? _tls.release() : new MCSLock{};
   const auto new_tail = std::bit_cast<uint64_t>(qnode) | kSIXLock;
 
   auto cur = lock_.load(kRelaxed);
@@ -140,7 +143,7 @@ auto
 MCSLock::LockX()  //
     -> XGuard
 {
-  auto *qnode = tls_node_ ? tls_node_.release() : new MCSLock{};
+  auto *qnode = _tls ? _tls.release() : new MCSLock{};
   const auto new_tail = std::bit_cast<uint64_t>(qnode) | kXLock;
 
   auto cur = lock_.load(kRelaxed);
@@ -177,7 +180,7 @@ MCSLock::UnlockS(  //
       if (unlock & (kSMask | kSIXLock)) {
         if (lock_.compare_exchange_weak(cur, unlock, kRelaxed, kRelaxed)) return;
       } else if (lock_.compare_exchange_weak(cur, kNull, kRelaxed, kRelaxed)) {
-        tls_node_.reset(qnode);
+        _tls.reset(qnode);
         return;
       }
       CPP_UTILITY_SPINLOCK_HINT
@@ -192,7 +195,7 @@ MCSLock::UnlockS(  //
 
   auto *next = std::bit_cast<MCSLock *>(next_ptr);
   if ((next->lock_.fetch_sub(kSLock, kRelease) & kSMask) == kNoLocks) {
-    tls_node_.reset(qnode);
+    _tls.reset(qnode);
   }
 }
 
@@ -216,7 +219,7 @@ MCSLock::UnlockSIX(  //
       if (cur & kSMask) {
         if (lock_.compare_exchange_weak(cur, cur ^ kSIXLock, kRelease, kRelaxed)) return;
       } else if (lock_.compare_exchange_weak(cur, kNull, kRelease, kRelaxed)) {
-        tls_node_.reset(qnode);
+        _tls.reset(qnode);
         return;
       }
       CPP_UTILITY_SPINLOCK_HINT
@@ -231,7 +234,7 @@ MCSLock::UnlockSIX(  //
 
   auto *next = std::bit_cast<MCSLock *>(next_ptr);
   if ((next->lock_.fetch_xor(kSIXLock, kRelease) & kSMask) == kNoLocks) {
-    tls_node_.reset(qnode);
+    _tls.reset(qnode);
   }
 }
 
@@ -247,7 +250,7 @@ MCSLock::UnlockX(  //
       if (cur & kSMask) {
         if (lock_.compare_exchange_weak(cur, cur ^ kXLock, kRelease, kRelaxed)) return;
       } else if (lock_.compare_exchange_weak(cur, kNull, kRelease, kRelaxed)) {
-        tls_node_.reset(qnode);
+        _tls.reset(qnode);
         return;
       }
       CPP_UTILITY_SPINLOCK_HINT
@@ -262,7 +265,7 @@ MCSLock::UnlockX(  //
 
   auto *next = std::bit_cast<MCSLock *>(next_ptr);
   if ((next->lock_.fetch_xor(kXLock, kRelease) & kSMask) == kNoLocks) {
-    tls_node_.reset(qnode);
+    _tls.reset(qnode);
   }
 }
 

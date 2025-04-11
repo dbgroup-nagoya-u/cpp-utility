@@ -105,8 +105,8 @@ class ZipfDistribution
       RandEngine &g) const  //
       -> IntType
   {
-    thread_local std::uniform_real_distribution<double> uniform_dist{0.0, 1.0};  // NOLINT
-    const auto target_prob = uniform_dist(g);
+    static std::uniform_real_distribution<double> uniform{0.0, 1.0};  // NOLINT
+    const auto target_prob = uniform(g);
 
     // find a target bin by using a binary search
     int64_t begin_pos = 0;
@@ -248,7 +248,7 @@ class ApproxZipfDistribution
       -> IntType
   {
     // NOLINTBEGIN
-    const auto p = _uniform_dist(g);
+    const auto p = _uniform(g);
     const auto bin =
         pow_ == 0 ? (-3.0 + std::sqrt(9.0 - 4.0 * (2.0 - std::exp(c_ * p - 1.0)))) / 2.0 + kBase
                   : std::pow((c_ * pow_ * p - pow_ + 2.0) / 2.0, 1.0 / pow_) - 1.0 + base_;
@@ -266,7 +266,7 @@ class ApproxZipfDistribution
       RandEngine &g) const  //
       -> IntType
   {
-    const auto p = _uniform_dist(g);
+    const auto p = _uniform(g);
 
     // find a target bin by using a binary search
     int64_t begin_pos = 0;
@@ -357,19 +357,17 @@ class ApproxZipfDistribution
   /// @brief Equal to `1 - alpha_`.
   double pow_{1.0 - alpha_};
 
-  // NOLINTBEGIN
   /// @brief Equal to `2 * GetHarmonicNum(n_)`.
   double c_{2 * GetHarmonicNum(n_)};
 
   /// @brief An offset for ensuring positive IDs.
-  double base_{-(std::pow((-pow_ + 2.0) / 2.0, 1.0 / pow_) - 1.0)};
+  double base_{-(std::pow((-pow_ + 2.0) / 2.0, 1.0 / pow_) - 1.0)};  // NOLINT
 
   /// @brief A cumulative distribution function according to Zipf's law.
   std::array<double, kExactBinNum> zipf_cdf_{};
 
-  static thread_local inline auto _uniform_dist =
-      std::uniform_real_distribution<double>{0.0, kMaxP};
-  // NOLINTEND
+  /// @brief A uniform distribution for random generators.
+  static inline std::uniform_real_distribution<double> _uniform{0.0, kMaxP};  // NOLINT
 };
 
 }  // namespace dbgroup::random

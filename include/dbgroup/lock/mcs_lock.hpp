@@ -21,6 +21,9 @@
 #include <atomic>
 #include <memory>
 
+// local sources
+#include "dbgroup/lock/utility.hpp"
+
 namespace dbgroup::lock
 {
 /**
@@ -48,7 +51,7 @@ class MCSLock
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr SGuard() = default;
+    constexpr SGuard() noexcept = default;
 
     /**
      * @param dest The address of a target lock.
@@ -56,7 +59,7 @@ class MCSLock
      */
     constexpr SGuard(  //
         MCSLock *dest,
-        MCSLock *qnode)
+        MCSLock *qnode) noexcept
         : dest_{dest}, qnode_{qnode}
     {
     }
@@ -91,7 +94,7 @@ class MCSLock
      * @retval false otherwise.
      */
     constexpr explicit
-    operator bool() const
+    operator bool() const noexcept
     {
       return dest_;
     }
@@ -119,7 +122,7 @@ class MCSLock
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr SIXGuard() = default;
+    constexpr SIXGuard() noexcept = default;
 
     /**
      * @param dest The address of a target lock.
@@ -127,7 +130,7 @@ class MCSLock
      */
     constexpr SIXGuard(  //
         MCSLock *dest,
-        MCSLock *qnode)
+        MCSLock *qnode) noexcept
         : dest_{dest}, qnode_{qnode}
     {
     }
@@ -162,7 +165,7 @@ class MCSLock
      * @retval false otherwise.
      */
     constexpr explicit
-    operator bool() const
+    operator bool() const noexcept
     {
       return dest_;
     }
@@ -200,7 +203,7 @@ class MCSLock
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr XGuard() = default;
+    constexpr XGuard() noexcept = default;
 
     /**
      * @param dest The address of a target lock.
@@ -208,7 +211,7 @@ class MCSLock
      */
     constexpr XGuard(  //
         MCSLock *dest,
-        MCSLock *qnode)
+        MCSLock *qnode) noexcept
         : dest_{dest}, qnode_{qnode}
     {
     }
@@ -243,7 +246,7 @@ class MCSLock
      * @retval false otherwise.
      */
     constexpr explicit
-    operator bool() const
+    operator bool() const noexcept
     {
       return dest_;
     }
@@ -274,7 +277,7 @@ class MCSLock
    * Public constructors and assignment operators
    *##########################################################################*/
 
-  constexpr MCSLock() = default;
+  constexpr MCSLock() noexcept = default;
 
   MCSLock(const MCSLock &) = delete;
   MCSLock(MCSLock &&) = delete;
@@ -363,10 +366,14 @@ class MCSLock
 
   /// @brief The current lock state.
   std::atomic_uint64_t lock_{0};
-
-  /// @brief A thread local queue node container.
-  static thread_local inline std::unique_ptr<MCSLock> tls_node_{};  // NOLINT
 };
+
+/*############################################################################*
+ * Static assertions
+ *############################################################################*/
+
+static_assert(Lockable<MCSLock>);
+static_assert(PessimisticallyLockable<MCSLock>);
 
 }  // namespace dbgroup::lock
 

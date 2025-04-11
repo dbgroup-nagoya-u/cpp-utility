@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-#ifndef CPP_UTILITY_DBGROUP_LOCK_COMMON_HPP_
-#define CPP_UTILITY_DBGROUP_LOCK_COMMON_HPP_
+#ifndef CPP_UTILITY_DBGROUP_LOCK_UTILITY_HPP_
+#define CPP_UTILITY_DBGROUP_LOCK_UTILITY_HPP_
 
 // C++ standard libraries
 #include <atomic>
 #include <chrono>
+#include <concepts>
 #include <cstddef>
 #include <functional>
 #include <thread>
@@ -35,6 +36,74 @@
 namespace dbgroup::lock
 {
 /*############################################################################*
+ * Lock concepts
+ *############################################################################*/
+
+/**
+ * @brief A concept for representing guard classes.
+ *
+ * @tparam T A target class.
+ */
+template <class T>
+concept GuardClass = requires(T &x) {
+  { static_cast<bool>(x) } -> std::convertible_to<bool>;
+};
+
+/**
+ * @brief A concept for representing pessimistic locks.
+ *
+ * @tparam T A target class.
+ */
+template <class T>
+concept PessimisticallyLockable = requires(T &x) {
+  typename T::SGuard;
+  typename T::SIXGuard;
+  typename T::XGuard;
+  GuardClass<typename T::SGuard>;
+  GuardClass<typename T::SIXGuard>;
+  GuardClass<typename T::XGuard>;
+
+  // public APIs
+  { x.LockS() } -> std::convertible_to<typename T::SGuard>;
+  { x.LockSIX() } -> std::convertible_to<typename T::SIXGuard>;
+  { x.LockX() } -> std::convertible_to<typename T::XGuard>;
+};
+
+/**
+ * @brief A concept for representing optimistic locks.
+ *
+ * @tparam T A target class.
+ */
+template <class T>
+concept OptimisticallyLockable = requires(T &x, uint32_t ver, uint32_t mask) {
+  typename T::XGuard;
+  typename T::OptGuard;
+  GuardClass<typename T::XGuard>;
+  GuardClass<typename T::OptGuard>;
+
+  // public APIs
+  { x.LockX() } -> std::convertible_to<typename T::XGuard>;
+  { x.GetVersion() } -> std::convertible_to<typename T::OptGuard>;
+
+  // XGuard's APIs
+  { x.LockX().GetVersion() } -> std::convertible_to<uint32_t>;
+  x.LockX().SetVersion(ver);
+
+  // OptGuard's APIs
+  { x.GetVersion().GetVersion() } -> std::convertible_to<uint32_t>;
+  { x.GetVersion().VerifyVersion(mask) } -> std::convertible_to<bool>;
+  { x.GetVersion().TryLockX(mask) } -> std::convertible_to<typename T::XGuard>;
+};
+
+/**
+ * @brief A concept for representing locks.
+ *
+ * @tparam T A target class.
+ */
+template <class T>
+concept Lockable = PessimisticallyLockable<T> || OptimisticallyLockable<T>;
+
+/*############################################################################*
  * Global constants
  *############################################################################*/
 
@@ -43,6 +112,9 @@ constexpr size_t kRetryNum{CPP_UTILITY_SPINLOCK_RETRY_NUM};
 
 /// @brief A back-off time interval for preventing busy loops.
 constexpr std::chrono::microseconds kBackOffTime{CPP_UTILITY_BACKOFF_TIME};
+
+/// @brief A bitmask for extracting all 32 bits.
+constexpr uint32_t kNoMask = ~0U;
 
 /*############################################################################*
  * Internal utilities
@@ -74,4 +146,4 @@ SpinWithBackoff(  //
 
 }  // namespace dbgroup::lock
 
-#endif  // CPP_UTILITY_DBGROUP_LOCK_COMMON_HPP_
+#endif  // CPP_UTILITY_DBGROUP_LOCK_UTILITY_HPP_

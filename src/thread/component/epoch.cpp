@@ -32,14 +32,14 @@ namespace dbgroup::thread::component
  *############################################################################*/
 
 auto
-Epoch::GetCurrentEpoch() const  //
+Epoch::GetCurrentEpoch() const noexcept  //
     -> size_t
 {
   return current_->load(kAcquire);
 }
 
 auto
-Epoch::GetProtectedEpoch() const  //
+Epoch::GetProtectedEpoch() const noexcept  //
     -> size_t
 {
   return entered_.load(kRelaxed);
@@ -50,13 +50,13 @@ Epoch::GetProtectedEpoch() const  //
  *############################################################################*/
 
 void
-Epoch::EnterEpoch()
+Epoch::EnterEpoch() noexcept
 {
   entered_.store(GetCurrentEpoch(), kRelaxed);
 }
 
 void
-Epoch::LeaveEpoch()
+Epoch::LeaveEpoch() noexcept
 {
   entered_.store(std::numeric_limits<size_t>::max(), kRelaxed);
 }

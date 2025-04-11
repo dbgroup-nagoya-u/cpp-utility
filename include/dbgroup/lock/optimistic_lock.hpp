@@ -21,6 +21,9 @@
 #include <atomic>
 #include <cstdint>
 
+// local sources
+#include "dbgroup/lock/utility.hpp"
+
 namespace dbgroup::lock
 {
 /**
@@ -48,13 +51,13 @@ class OptimisticLock
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr SGuard() = default;
+    constexpr SGuard() noexcept = default;
 
     /**
      * @param dest The address of a target lock.
      */
     constexpr explicit SGuard(  //
-        OptimisticLock *dest)
+        OptimisticLock *dest) noexcept
         : dest_{dest}
     {
     }
@@ -93,7 +96,7 @@ class OptimisticLock
      * @retval false otherwise.
      */
     constexpr explicit
-    operator bool() const
+    operator bool() const noexcept
     {
       return dest_;
     }
@@ -118,13 +121,13 @@ class OptimisticLock
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr SIXGuard() = default;
+    constexpr SIXGuard() noexcept = default;
 
     /**
      * @param dest The address of a target lock.
      */
     constexpr explicit SIXGuard(  //
-        OptimisticLock *dest)
+        OptimisticLock *dest) noexcept
         : dest_{dest}
     {
     }
@@ -163,7 +166,7 @@ class OptimisticLock
      * @retval false otherwise.
      */
     constexpr explicit
-    operator bool() const
+    operator bool() const noexcept
     {
       return dest_;
     }
@@ -198,7 +201,7 @@ class OptimisticLock
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr XGuard() = default;
+    constexpr XGuard() noexcept = default;
 
     /**
      * @param dest The address of a target lock.
@@ -206,7 +209,7 @@ class OptimisticLock
      */
     constexpr XGuard(  //
         OptimisticLock *dest,
-        const uint32_t ver)
+        const uint32_t ver) noexcept
         : dest_{dest}, old_ver_{ver}, new_ver_{ver + 1U}
     {
     }
@@ -245,7 +248,7 @@ class OptimisticLock
      * @retval false otherwise.
      */
     constexpr explicit
-    operator bool() const
+    operator bool() const noexcept
     {
       return dest_;
     }
@@ -254,7 +257,7 @@ class OptimisticLock
      * @return The version when this guard was created.
      */
     [[nodiscard]] constexpr auto
-    GetVersion() const  //
+    GetVersion() const noexcept  //
         -> uint32_t
     {
       return old_ver_;
@@ -267,7 +270,7 @@ class OptimisticLock
      */
     constexpr void
     SetVersion(  //
-        const uint32_t ver)
+        const uint32_t ver) noexcept
     {
       new_ver_ = ver;
     }
@@ -279,7 +282,7 @@ class OptimisticLock
      * @note After calling the function, this lock guard abandons the lock's
      * ownership.
      */
-    [[nodiscard]] auto DowngradeToSIX()  //
+    [[nodiscard]] auto DowngradeToSIX() noexcept  //
         -> SIXGuard;
 
    private:
@@ -308,7 +311,7 @@ class OptimisticLock
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr OptGuard() = default;
+    constexpr OptGuard() noexcept = default;
 
     /**
      * @param dest The address of a target lock.
@@ -316,12 +319,12 @@ class OptimisticLock
      */
     constexpr OptGuard(  //
         OptimisticLock *dest,
-        const uint32_t ver)
+        const uint32_t ver) noexcept
         : dest_{dest}, ver_{ver}
     {
     }
 
-    constexpr OptGuard(const OptGuard &) = default;
+    constexpr OptGuard(const OptGuard &) noexcept = default;
     constexpr OptGuard(OptGuard &&) noexcept = default;
 
     constexpr auto operator=(const OptGuard &) noexcept -> OptGuard & = default;
@@ -338,19 +341,20 @@ class OptimisticLock
      *########################################################################*/
 
     /**
-     * @return false.
+     * @retval true if this instance has a valid version.
+     * @retval false otherwise.
      */
     constexpr explicit
-    operator bool() const
+    operator bool() const noexcept
     {
-      return false;
+      return dest_;
     }
 
     /**
      * @return The version when this guard was created.
      */
     [[nodiscard]] constexpr auto
-    GetVersion() const  //
+    GetVersion() const noexcept  //
         -> uint32_t
     {
       return ver_;
@@ -361,39 +365,47 @@ class OptimisticLock
      *########################################################################*/
 
     /**
+     * @param mask A bitmask for representing bits to be verified.
      * @retval true if a target version does not change from an expected one.
      * @retval false otherwise.
      */
-    [[nodiscard]] auto VerifyVersion()  //
+    [[nodiscard]] auto VerifyVersion(      //
+        uint32_t mask = kNoMask) noexcept  //
         -> bool;
 
     /**
      * @brief Get a shared lock if a given version is the same as the current one.
      *
+     * @param mask A bitmask for representing bits to be verified.
      * @retval A guard instance if the lock is acquired.
      * @retval An empty guard instance otherwise.
      * @note This function does not give up acquiring a lock and continues with
      * spinlock and back-off.
      */
-    [[nodiscard]] auto TryLockS()  //
+    [[nodiscard]] auto TryLockS(  //
+        uint32_t mask = kNoMask)  //
         -> SGuard;
 
     /**
      * @brief Get an SIX lock if a given version is the same as the current one.
      *
+     * @param mask A bitmask for representing bits to be verified.
      * @retval A guard instance if the lock is acquired.
      * @retval An empty guard instance otherwise.
      */
-    [[nodiscard]] auto TryLockSIX()  //
+    [[nodiscard]] auto TryLockSIX(  //
+        uint32_t mask = kNoMask)    //
         -> SIXGuard;
 
     /**
      * @brief Get an X lock if a given version is the same as the current one.
      *
+     * @param mask A bitmask for representing bits to be verified.
      * @retval A guard instance if the lock is acquired.
      * @retval An empty guard instance otherwise.
      */
-    [[nodiscard]] auto TryLockX()  //
+    [[nodiscard]] auto TryLockX(  //
+        uint32_t mask = kNoMask)  //
         -> XGuard;
 
    private:
@@ -419,13 +431,13 @@ class OptimisticLock
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr CompositeGuard() = default;
+    constexpr CompositeGuard() noexcept = default;
 
     /**
      * @param dest The address of a target lock.
      */
     constexpr explicit CompositeGuard(  //
-        OptimisticLock *dest)
+        OptimisticLock *dest) noexcept
         : dest_{dest}, has_lock_{true}
     {
     }
@@ -436,7 +448,7 @@ class OptimisticLock
      */
     constexpr CompositeGuard(  //
         OptimisticLock *dest,
-        const uint32_t ver)
+        const uint32_t ver) noexcept
         : dest_{dest}, ver_{ver}
     {
     }
@@ -471,20 +483,20 @@ class OptimisticLock
      *########################################################################*/
 
     /**
-     * @retval true if this instance has the lock ownership.
+     * @retval true if this instance has any ownership.
      * @retval false otherwise.
      */
     constexpr explicit
-    operator bool() const
+    operator bool() const noexcept
     {
-      return has_lock_;
+      return dest_;
     }
 
     /**
      * @return The version when this guard was created.
      */
     [[nodiscard]] constexpr auto
-    GetVersion() const  //
+    GetVersion() const noexcept  //
         -> uint32_t
     {
       return ver_;
@@ -495,10 +507,12 @@ class OptimisticLock
      *########################################################################*/
 
     /**
+     * @param mask A bitmask for representing bits to be verified.
      * @retval true if a target version does not change from an expected one.
      * @retval false otherwise.
      */
-    [[nodiscard]] auto VerifyVersion()  //
+    [[nodiscard]] auto VerifyVersion(      //
+        uint32_t mask = kNoMask) noexcept  //
         -> bool;
 
    private:
@@ -520,7 +534,7 @@ class OptimisticLock
    * Public constructors and assignment operators
    *##########################################################################*/
 
-  constexpr OptimisticLock() = default;
+  constexpr OptimisticLock() noexcept = default;
 
   OptimisticLock(const OptimisticLock &) = delete;
   OptimisticLock(OptimisticLock &&) = delete;
@@ -544,7 +558,7 @@ class OptimisticLock
    * @note This function does not give up reading a version value and continues
    * with spinlock and back-off.
    */
-  [[nodiscard]] auto GetVersion()  //
+  [[nodiscard]] auto GetVersion() noexcept  //
       -> OptGuard;
 
   /**
@@ -603,7 +617,7 @@ class OptimisticLock
    * @note If a thread calls this function without acquiring an S lock, it will
    * corrupt an internal lock state.
    */
-  void UnlockS();
+  void UnlockS() noexcept;
 
   /**
    * @brief Release a shared-with-intent-exclusive lock.
@@ -611,7 +625,7 @@ class OptimisticLock
    * @note If a thread calls this function without acquiring an SIX lock, it
    * will corrupt an internal lock state.
    */
-  void UnlockSIX();
+  void UnlockSIX() noexcept;
 
   /**
    * @brief Release an exclusive lock.
@@ -621,7 +635,7 @@ class OptimisticLock
    * corrupt an internal lock state.
    */
   void UnlockX(  //
-      uint64_t ver);
+      uint64_t ver) noexcept;
 
   /*##########################################################################*
    * Internal member variables
@@ -630,6 +644,14 @@ class OptimisticLock
   /// @brief The current lock state.
   std::atomic_uint64_t lock_{0};
 };
+
+/*############################################################################*
+ * Static assertions
+ *############################################################################*/
+
+static_assert(Lockable<OptimisticLock>);
+static_assert(PessimisticallyLockable<OptimisticLock>);
+static_assert(OptimisticallyLockable<OptimisticLock>);
 
 }  // namespace dbgroup::lock
 
