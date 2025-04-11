@@ -645,6 +645,14 @@ class OptimisticLock
   std::atomic_uint64_t lock_{0};
 };
 
+/*############################################################################*
+ * Static assertions
+ *############################################################################*/
+
+static_assert(Lockable<OptimisticLock>);
+static_assert(PessimisticallyLockable<OptimisticLock>);
+static_assert(OptimisticallyLockable<OptimisticLock>);
+
 }  // namespace dbgroup::lock
 
 #endif  // CPP_UTILITY_DBGROUP_LOCK_OPTIMISTIC_LOCK_HPP_

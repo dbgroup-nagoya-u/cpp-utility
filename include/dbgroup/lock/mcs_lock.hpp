@@ -365,6 +365,13 @@ class MCSLock
   std::atomic_uint64_t lock_{0};
 };
 
+/*############################################################################*
+ * Static assertions
+ *############################################################################*/
+
+static_assert(Lockable<MCSLock>);
+static_assert(PessimisticallyLockable<MCSLock>);
+
 }  // namespace dbgroup::lock
 
 #endif  // CPP_UTILITY_DBGROUP_LOCK_MCS_LOCK_HPP_

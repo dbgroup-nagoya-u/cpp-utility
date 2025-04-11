@@ -343,6 +343,13 @@ class PessimisticLock
   std::atomic_uint64_t lock_{0};
 };
 
+/*############################################################################*
+ * Static assertions
+ *############################################################################*/
+
+static_assert(Lockable<PessimisticLock>);
+static_assert(PessimisticallyLockable<PessimisticLock>);
+
 }  // namespace dbgroup::lock
 
 #endif  // CPP_UTILITY_DBGROUP_LOCK_PESSIMISTIC_LOCK_HPP_
