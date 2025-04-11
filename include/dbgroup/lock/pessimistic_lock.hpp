@@ -20,6 +20,9 @@
 // C++ standard libraries
 #include <atomic>
 
+// local sources
+#include "dbgroup/lock/utility.hpp"
+
 namespace dbgroup::lock
 {
 /**

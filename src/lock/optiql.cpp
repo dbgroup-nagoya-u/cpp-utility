@@ -31,7 +31,7 @@
 
 // local sources
 #include "dbgroup/constants.hpp"
-#include "dbgroup/lock/common.hpp"
+#include "dbgroup/lock/utility.hpp"
 
 namespace dbgroup::lock
 {

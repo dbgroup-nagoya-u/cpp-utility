@@ -22,7 +22,7 @@
 #include <cstdint>
 
 // local sources
-#include "dbgroup/lock/common.hpp"
+#include "dbgroup/lock/utility.hpp"
 
 namespace dbgroup::lock
 {

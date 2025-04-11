@@ -21,6 +21,9 @@
 #include <atomic>
 #include <memory>
 
+// local sources
+#include "dbgroup/lock/utility.hpp"
+
 namespace dbgroup::lock
 {
 /**
