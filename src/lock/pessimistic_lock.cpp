@@ -181,7 +181,7 @@ PessimisticLock::SIXGuard::UpgradeToX()  //
       },
       &(dest->lock_));
 
-  return XGuard{dest_};
+  return XGuard{dest};
 }
 
 /*############################################################################*
