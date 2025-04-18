@@ -257,9 +257,17 @@ class MCSLock
      * @return The lock guard for an SIX lock.
      * @note After calling the function, this lock guard abandons the lock's
      * ownership.
+     * @note This function does not do anything actually due to a queue lock
+     * structure.
      */
-    [[nodiscard]] auto DowngradeToSIX()  //
-        -> SIXGuard;
+    [[nodiscard]] auto
+    DowngradeToSIX()  //
+        -> SIXGuard
+    {
+      auto *dest = dest_;
+      dest_ = nullptr;  // release the ownership
+      return SIXGuard{dest, qnode_};
+    }
 
    private:
     /*########################################################################*

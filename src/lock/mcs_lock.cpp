@@ -75,44 +75,42 @@ auto
 MCSLock::LockS()  //
     -> SGuard
 {
-  auto *tail = _tls ? _tls.release() : new MCSLock{};
-  tail->lock_.store(kNull, kRelaxed);
-  auto tail_ptr = std::bit_cast<uint64_t>(tail) | kSLock;
+  auto *qnode = _tls ? _tls.release() : new MCSLock{};
+  qnode->lock_.store(kNull, kRelaxed);
+  auto ptr = std::bit_cast<uint64_t>(qnode) | kSLock;
 
   auto cur = lock_.load(kRelaxed);
   while (true) {
-    if (cur) {  // there are successors
+    if (cur) {  // there is the predecessor
       if (lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) break;
-    } else if (lock_.compare_exchange_weak(cur, tail_ptr, kAcquire, kRelaxed)) {
-      goto end;
+    } else if (lock_.compare_exchange_weak(cur, ptr, kAcquire, kRelaxed)) {
+      goto end;  // the initial shared lock
     }
     CPP_UTILITY_SPINLOCK_HINT
   }
 
-  // wait until predecessor gives up the lock
-  _tls.reset(tail);
-  tail_ptr = cur & kPtrMask;
-  tail = std::bit_cast<MCSLock *>(tail_ptr);
-  if (cur & kXMask) {
-    while ((cur & kPtrMask) == tail_ptr && (cur & kXMask)) {
-      CPP_UTILITY_SPINLOCK_HINT
+  _tls.reset(qnode);
+  ptr = cur & kPtrMask;
+  qnode = std::bit_cast<MCSLock *>(ptr);
+  if (cur & kXLock) {  // wait for the predecessor to release the lock
+    while ((cur & kPtrMask) == ptr && (cur & kXLock)) {
+      std::this_thread::yield();
       cur = lock_.load(kAcquire);
     }
-    if ((cur & kPtrMask) != tail_ptr) {
-      tail = std::bit_cast<MCSLock *>(tail_ptr);
-      while (true) {
-        cur = tail->lock_.load(kAcquire);
-        if (cur & kPtrMask) break;
+    if ((cur & kPtrMask) != ptr) {
+      while (true) {  // wait for the successor to fill its pointer
+        ptr = qnode->lock_.load(kAcquire) & kPtrMask;
+        if (ptr) break;
         CPP_UTILITY_SPINLOCK_HINT
       }
-      const auto *qnode = std::bit_cast<MCSLock *>(tail_ptr);
-      while (qnode->lock_.load(kAcquire) & kXMask) {
+      auto *next = std::bit_cast<MCSLock *>(ptr);
+      while (next->lock_.load(kAcquire) & kXLock) {
         std::this_thread::yield();
       }
     }
   }
 end:
-  return SGuard{this, tail};
+  return SGuard{this, qnode};
 }
 
 auto
@@ -120,7 +118,7 @@ MCSLock::LockSIX()  //
     -> SIXGuard
 {
   auto *qnode = _tls ? _tls.release() : new MCSLock{};
-  const auto new_tail = std::bit_cast<uint64_t>(qnode) | kSIXLock;
+  const auto new_tail = std::bit_cast<uint64_t>(qnode) | kXLock;
 
   auto cur = lock_.load(kRelaxed);
   while (true) {
@@ -130,9 +128,9 @@ MCSLock::LockSIX()  //
   }
 
   auto *tail = std::bit_cast<MCSLock *>(cur & kPtrMask);
-  if (tail != nullptr) {  // wait until predecessor gives up the lock
-    cur = tail->lock_.fetch_add(new_tail & kPtrMask, kRelease);
-    while (qnode->lock_.load(kAcquire) & kXMask) {
+  if (tail != nullptr) {  // wait for the predecessor to release the lock
+    tail->lock_.fetch_add(new_tail & kPtrMask, kRelease);
+    while (qnode->lock_.load(kAcquire) & kXLock) {
       std::this_thread::yield();
     }
   }
@@ -154,8 +152,8 @@ MCSLock::LockX()  //
   }
 
   auto *tail = std::bit_cast<MCSLock *>(cur & kPtrMask);
-  if (tail != nullptr) {  // wait until predecessor gives up the lock
-    cur = tail->lock_.fetch_add(new_tail & kPtrMask, kRelease);
+  if (tail != nullptr) {  // wait for the predecessor to release the lock
+    tail->lock_.fetch_add(new_tail & kPtrMask, kRelease);
     while (qnode->lock_.load(kAcquire) & kLockMask) {
       std::this_thread::yield();
     }
@@ -177,7 +175,7 @@ MCSLock::UnlockS(  //
     auto cur = lock_.load(kRelaxed);
     while ((cur & kPtrMask) == this_ptr) {
       const auto unlock = cur - kSLock;
-      if (unlock & (kSMask | kSIXLock)) {
+      if (unlock & kLockMask) {
         if (lock_.compare_exchange_weak(cur, unlock, kRelaxed, kRelaxed)) return;
       } else if (lock_.compare_exchange_weak(cur, kNull, kRelaxed, kRelaxed)) {
         _tls.reset(qnode);
@@ -186,7 +184,7 @@ MCSLock::UnlockS(  //
       CPP_UTILITY_SPINLOCK_HINT
     }
 
-    while (true) {  // wait until successor fills in its next field
+    while (true) {  // wait for the successor to fill its pointer
       next_ptr = qnode->lock_.load(kAcquire) & kPtrMask;
       if (next_ptr) break;
       CPP_UTILITY_SPINLOCK_HINT
@@ -194,7 +192,7 @@ MCSLock::UnlockS(  //
   }
 
   auto *next = std::bit_cast<MCSLock *>(next_ptr);
-  if ((next->lock_.fetch_sub(kSLock, kRelease) & kSMask) == kNoLocks) {
+  if ((next->lock_.fetch_sub(kSLock, kRelease) & kLockMask) == kSLock) {
     _tls.reset(qnode);
   }
 }
@@ -217,7 +215,7 @@ MCSLock::UnlockSIX(  //
     auto cur = lock_.load(kRelaxed);
     while ((cur & kPtrMask) == this_ptr) {
       if (cur & kSMask) {
-        if (lock_.compare_exchange_weak(cur, cur ^ kSIXLock, kRelease, kRelaxed)) return;
+        if (lock_.compare_exchange_weak(cur, cur ^ kXLock, kRelease, kRelaxed)) return;
       } else if (lock_.compare_exchange_weak(cur, kNull, kRelease, kRelaxed)) {
         _tls.reset(qnode);
         return;
@@ -233,7 +231,7 @@ MCSLock::UnlockSIX(  //
   }
 
   auto *next = std::bit_cast<MCSLock *>(next_ptr);
-  if ((next->lock_.fetch_xor(kSIXLock, kRelease) & kSMask) == kNoLocks) {
+  if ((next->lock_.fetch_xor(kXLock, kRelease) & kLockMask) == kXLock) {
     _tls.reset(qnode);
   }
 }
@@ -264,7 +262,7 @@ MCSLock::UnlockX(  //
   }
 
   auto *next = std::bit_cast<MCSLock *>(next_ptr);
-  if ((next->lock_.fetch_xor(kXLock, kRelease) & kSMask) == kNoLocks) {
+  if ((next->lock_.fetch_xor(kXLock, kRelease) & kLockMask) == kXLock) {
     _tls.reset(qnode);
   }
 }
@@ -327,32 +325,12 @@ MCSLock::SIXGuard::UpgradeToX()  //
   auto *dest = dest_;
   dest_ = nullptr;  // release the ownership
 
-  // wait for shared lock holders to release their locks
-  auto next_ptr = qnode_->lock_.load(kRelaxed);
-  while (next_ptr & kSMask) {
-    std::this_thread::yield();
+  uint64_t next_ptr;
+  while (true) {  // wait for shared lock holders to release their locks
     next_ptr = qnode_->lock_.load(kRelaxed);
+    if ((next_ptr & kSMask) == kNoLocks) break;
+    std::this_thread::yield();
   }
-
-  const auto this_ptr = std::bit_cast<uint64_t>(qnode_);
-  if (next_ptr == kNull) {  // this is the tail node
-    auto cur = dest->lock_.load(kRelaxed);
-    while ((cur & kPtrMask) == this_ptr) {
-      if (dest->lock_.compare_exchange_weak(cur, cur ^ kXMask, kRelaxed, kRelaxed)) {
-        return XGuard{dest, qnode_};
-      }
-      CPP_UTILITY_SPINLOCK_HINT
-    }
-
-    while (true) {  // wait until successor fills in its next field
-      next_ptr = qnode_->lock_.load(kRelaxed) & kPtrMask;
-      if (next_ptr) break;
-      CPP_UTILITY_SPINLOCK_HINT
-    }
-  }
-
-  auto *next = std::bit_cast<MCSLock *>(next_ptr);
-  next->lock_.fetch_xor(kXMask, kRelaxed);
   return XGuard{dest, qnode_};
 }
 
@@ -379,37 +357,6 @@ MCSLock::XGuard::~XGuard()
   if (dest_) {
     dest_->UnlockX(qnode_);
   }
-}
-
-auto
-MCSLock::XGuard::DowngradeToSIX()  //
-    -> SIXGuard
-{
-  if (dest_ == nullptr) return SIXGuard{};
-  auto *dest = dest_;
-  dest_ = nullptr;  // release the ownership
-
-  const auto this_ptr = std::bit_cast<uint64_t>(qnode_);
-  auto next_ptr = qnode_->lock_.load(kRelaxed) & kPtrMask;
-  if (next_ptr == kNull) {  // this is the tail node
-    auto cur = dest->lock_.load(kRelaxed);
-    while ((cur & kPtrMask) == this_ptr) {
-      if (dest->lock_.compare_exchange_weak(cur, cur ^ kXMask, kRelease, kRelaxed)) {
-        return SIXGuard{dest, qnode_};
-      }
-      CPP_UTILITY_SPINLOCK_HINT
-    }
-
-    while (true) {  // wait until successor fills in its next field
-      next_ptr = qnode_->lock_.load(kRelaxed) & kPtrMask;
-      if (next_ptr) break;
-      CPP_UTILITY_SPINLOCK_HINT
-    }
-  }
-
-  auto *next = std::bit_cast<MCSLock *>(next_ptr);
-  next->lock_.fetch_xor(kXMask, kRelease);
-  return SIXGuard{dest, qnode_};
 }
 
 }  // namespace dbgroup::lock
