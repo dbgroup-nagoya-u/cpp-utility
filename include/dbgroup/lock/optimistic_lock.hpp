@@ -66,9 +66,8 @@ class OptimisticLock
 
     constexpr SGuard(  //
         SGuard &&obj) noexcept
-        : dest_{obj.dest_}
+        : dest_{std::exchange(obj.dest_, nullptr)}
     {
-      obj.dest_ = nullptr;
     }
 
     auto operator=(const SGuard &) -> SGuard & = delete;
@@ -136,9 +135,8 @@ class OptimisticLock
 
     constexpr SIXGuard(  //
         SIXGuard &&obj) noexcept
-        : dest_{obj.dest_}
+        : dest_{std::exchange(obj.dest_, nullptr)}
     {
-      obj.dest_ = nullptr;
     }
 
     auto operator=(const SIXGuard &) -> SIXGuard & = delete;
@@ -218,9 +216,8 @@ class OptimisticLock
 
     constexpr XGuard(  //
         XGuard &&obj) noexcept
-        : dest_{obj.dest_}, old_ver_{obj.old_ver_}, new_ver_{obj.new_ver_}
+        : dest_{std::exchange(obj.dest_, nullptr)}, old_ver_{obj.old_ver_}, new_ver_{obj.new_ver_}
     {
-      obj.dest_ = nullptr;
     }
 
     auto operator=(const XGuard &) -> XGuard & = delete;

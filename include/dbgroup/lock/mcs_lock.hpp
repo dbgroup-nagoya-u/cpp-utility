@@ -68,9 +68,8 @@ class MCSLock
 
     constexpr SGuard(  //
         SGuard &&obj) noexcept
-        : dest_{obj.dest_}, qnode_{obj.qnode_}
+        : dest_{std::exchange(obj.dest_, nullptr)}, qnode_{obj.qnode_}
     {
-      obj.dest_ = nullptr;
     }
 
     auto operator=(const SGuard &) -> SGuard & = delete;
@@ -105,10 +104,10 @@ class MCSLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    MCSLock *dest_{nullptr};
+    MCSLock *dest_{};
 
     /// @brief The corresponding queue node for unlocking.
-    MCSLock *qnode_{nullptr};
+    MCSLock *qnode_{};
   };
 
   /**
@@ -139,9 +138,8 @@ class MCSLock
 
     constexpr SIXGuard(  //
         SIXGuard &&obj) noexcept
-        : dest_{obj.dest_}, qnode_{obj.qnode_}
+        : dest_{std::exchange(obj.dest_, nullptr)}, qnode_{obj.qnode_}
     {
-      obj.dest_ = nullptr;
     }
 
     auto operator=(const SIXGuard &) -> SIXGuard & = delete;
@@ -186,10 +184,10 @@ class MCSLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    MCSLock *dest_{nullptr};
+    MCSLock *dest_{};
 
     /// @brief The corresponding queue node for unlocking.
-    MCSLock *qnode_{nullptr};
+    MCSLock *qnode_{};
   };
 
   /**
@@ -220,9 +218,8 @@ class MCSLock
 
     constexpr XGuard(  //
         XGuard &&obj) noexcept
-        : dest_{obj.dest_}, qnode_{obj.qnode_}
+        : dest_{std::exchange(obj.dest_, nullptr)}, qnode_{obj.qnode_}
     {
-      obj.dest_ = nullptr;
     }
 
     auto operator=(const XGuard &) -> XGuard & = delete;
@@ -264,9 +261,7 @@ class MCSLock
     DowngradeToSIX()  //
         -> SIXGuard
     {
-      auto *dest = dest_;
-      dest_ = nullptr;  // release the ownership
-      return SIXGuard{dest, qnode_};
+      return SIXGuard{std::exchange(dest_, nullptr), qnode_};
     }
 
    private:
@@ -275,10 +270,10 @@ class MCSLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    MCSLock *dest_{nullptr};
+    MCSLock *dest_{};
 
     /// @brief The corresponding queue node for unlocking.
-    MCSLock *qnode_{nullptr};
+    MCSLock *qnode_{};
   };
 
   /*##########################################################################*
@@ -373,7 +368,7 @@ class MCSLock
    *##########################################################################*/
 
   /// @brief The current lock state.
-  std::atomic_uint64_t lock_{0};
+  std::atomic_uint64_t lock_{};
 };
 
 /*############################################################################*

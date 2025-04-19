@@ -186,8 +186,7 @@ OptimisticLock::SGuard::operator=(  //
   if (dest_) {
     dest_->UnlockS();
   }
-  dest_ = rhs.dest_;
-  rhs.dest_ = nullptr;
+  dest_ = std::exchange(rhs.dest_, nullptr);
   return *this;
 }
 
@@ -210,8 +209,7 @@ OptimisticLock::SIXGuard::operator=(  //
   if (dest_) {
     dest_->UnlockSIX();
   }
-  dest_ = rhs.dest_;
-  rhs.dest_ = nullptr;
+  dest_ = std::exchange(rhs.dest_, nullptr);
   return *this;
 }
 
@@ -227,8 +225,6 @@ OptimisticLock::SIXGuard::UpgradeToX()  //
     -> XGuard
 {
   if (dest_ == nullptr) return XGuard{};
-  auto *dest = dest_;
-  dest_ = nullptr;  // release the ownership
 
   uint64_t cur{};
   SpinWithBackoff(
@@ -237,9 +233,9 @@ OptimisticLock::SIXGuard::UpgradeToX()  //
         return (*cur & kSMask) == kNoLocks
                && lock->compare_exchange_weak(*cur, *cur ^ kXMask, kAcquire, kRelaxed);
       },
-      &(dest->lock_), &cur);
+      &(dest_->lock_), &cur);
 
-  return XGuard{dest, static_cast<uint32_t>(cur)};
+  return XGuard{std::exchange(dest_, nullptr), static_cast<uint32_t>(cur)};
 }
 
 /*############################################################################*
@@ -254,10 +250,9 @@ OptimisticLock::XGuard::operator=(  //
   if (dest_) {
     dest_->UnlockX(new_ver_);
   }
-  dest_ = rhs.dest_;
+  dest_ = std::exchange(rhs.dest_, nullptr);
   old_ver_ = rhs.old_ver_;
   new_ver_ = rhs.new_ver_;
-  rhs.dest_ = nullptr;
   return *this;
 }
 
@@ -273,16 +268,14 @@ OptimisticLock::XGuard::DowngradeToSIX() noexcept  //
     -> SIXGuard
 {
   if (dest_ == nullptr) return SIXGuard{};
-  auto *dest = dest_;
-  dest_ = nullptr;  // release the ownership
 
-  auto cur = dest->lock_.load(kRelaxed);
+  auto cur = dest_->lock_.load(kRelaxed);
   while (true) {
     const auto state = (cur & kSMask) | kSIXLock | new_ver_;
-    if (dest->lock_.compare_exchange_weak(cur, state, kRelease, kRelaxed)) break;
+    if (dest_->lock_.compare_exchange_weak(cur, state, kRelease, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
-  return SIXGuard{dest};
+  return SIXGuard{std::exchange(dest_, nullptr)};
 }
 
 /*############################################################################*

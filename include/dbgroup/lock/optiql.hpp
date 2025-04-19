@@ -20,6 +20,7 @@
 // C++ standard libraries
 #include <atomic>
 #include <cstdint>
+#include <utility>
 
 namespace dbgroup::lock
 {
@@ -70,9 +71,11 @@ class OptiQL
 
     constexpr XGuard(  //
         XGuard &&obj) noexcept
-        : dest_{obj.dest_}, qid_{obj.qid_}, old_ver_{obj.old_ver_}, new_ver_{obj.new_ver_}
+        : dest_{std::exchange(obj.dest_, nullptr)},
+          qid_{obj.qid_},
+          old_ver_{obj.old_ver_},
+          new_ver_{obj.new_ver_}
     {
-      obj.dest_ = nullptr;
     }
 
     auto operator=(const XGuard &) -> XGuard & = delete;
@@ -291,7 +294,7 @@ class OptiQL
    *##########################################################################*/
 
   /// @brief The current lock state.
-  std::atomic_uint64_t lock_{0};
+  std::atomic_uint64_t lock_{};
 };
 
 }  // namespace dbgroup::lock
