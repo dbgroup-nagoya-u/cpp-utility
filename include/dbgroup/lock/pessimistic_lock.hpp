@@ -102,7 +102,7 @@ class PessimisticLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    PessimisticLock *dest_{nullptr};
+    PessimisticLock *dest_{};
   };
 
   /**
@@ -178,7 +178,7 @@ class PessimisticLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    PessimisticLock *dest_{nullptr};
+    PessimisticLock *dest_{};
   };
 
   /**
@@ -254,7 +254,7 @@ class PessimisticLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    PessimisticLock *dest_{nullptr};
+    PessimisticLock *dest_{};
   };
 
   /*##########################################################################*
@@ -343,7 +343,7 @@ class PessimisticLock
    *##########################################################################*/
 
   /// @brief The current lock state.
-  std::atomic_uint64_t lock_{0};
+  std::atomic_uint64_t lock_{};
 };
 
 /*############################################################################*
