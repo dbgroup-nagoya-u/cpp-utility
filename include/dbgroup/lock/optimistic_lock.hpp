@@ -20,6 +20,7 @@
 // C++ standard libraries
 #include <atomic>
 #include <cstdint>
+#include <limits>
 
 // local sources
 #include "dbgroup/lock/utility.hpp"
@@ -321,17 +322,28 @@ class OptimisticLock
     {
     }
 
-    constexpr OptGuard(const OptGuard &) noexcept = default;
-    constexpr OptGuard(OptGuard &&) noexcept = default;
+    OptGuard(const OptGuard &) = delete;
 
-    constexpr auto operator=(const OptGuard &) noexcept -> OptGuard & = default;
-    constexpr auto operator=(OptGuard &&) noexcept -> OptGuard & = default;
+    constexpr OptGuard(  //
+        OptGuard &&obj) noexcept
+        : dest_{std::exchange(obj.dest_, nullptr)},
+          ver_{obj.ver_},
+          retry_num_{obj.retry_num_},
+          has_lock_{std::exchange(obj.has_lock_, false)}
+    {
+    }
+
+    auto operator=(const OptGuard &) -> OptGuard & = delete;
+
+    auto operator=(               //
+        OptGuard &&rhs) noexcept  //
+        -> OptGuard &;
 
     /*########################################################################*
      * Public destructors
      *########################################################################*/
 
-    ~OptGuard() = default;
+    ~OptGuard();
 
     /*########################################################################*
      * Public getters
@@ -363,11 +375,24 @@ class OptimisticLock
 
     /**
      * @param mask A bitmask for representing bits to be verified.
+     * @param max_retry Using a shared lock after retrying this number of times.
+     * @retval true if a target version does not change from an expected one.
+     * @retval false otherwise.
+     * @note If the version verification failed, this function may wait to
+     * update internal fields.
+     */
+    [[nodiscard]] auto VerifyVersion(  //
+        uint32_t mask = kNoMask,
+        size_t max_retry = std::numeric_limits<size_t>::max()) noexcept  //
+        -> bool;
+
+    /**
+     * @param mask A bitmask for representing bits to be verified.
      * @retval true if a target version does not change from an expected one.
      * @retval false otherwise.
      */
-    [[nodiscard]] auto VerifyVersion(      //
-        uint32_t mask = kNoMask) noexcept  //
+    [[nodiscard]] auto ImmediateVerify(          //
+        uint32_t mask = kNoMask) const noexcept  //
         -> bool;
 
     /**
@@ -415,113 +440,9 @@ class OptimisticLock
 
     /// @brief A version when creating this guard.
     uint32_t ver_{};
-  };
 
-  /**
-   * @brief A class for representing a guard instance for composite locks.
-   *
-   */
-  class CompositeGuard
-  {
-   public:
-    /*########################################################################*
-     * Public constructors and assignment operators
-     *########################################################################*/
-
-    constexpr CompositeGuard() noexcept = default;
-
-    /**
-     * @param dest The address of a target lock.
-     */
-    constexpr explicit CompositeGuard(  //
-        OptimisticLock *dest) noexcept
-        : dest_{dest}, has_lock_{true}
-    {
-    }
-
-    /**
-     * @param dest The address of a target lock.
-     * @param ver The current version.
-     */
-    constexpr CompositeGuard(  //
-        OptimisticLock *dest,
-        const uint32_t ver) noexcept
-        : dest_{dest}, ver_{ver}
-    {
-    }
-
-    CompositeGuard(const CompositeGuard &) = delete;
-
-    constexpr CompositeGuard(  //
-        CompositeGuard &&obj) noexcept
-        : dest_{obj.dest_}, ver_{obj.ver_}, has_lock_{obj.has_lock_}
-    {
-      obj.has_lock_ = false;
-    }
-
-    auto operator=(const CompositeGuard &) -> CompositeGuard & = delete;
-
-    auto operator=(                     //
-        CompositeGuard &&rhs) noexcept  //
-        -> CompositeGuard &;
-
-    /*########################################################################*
-     * Public destructors
-     *########################################################################*/
-
-    /**
-     * @brief Destroy this instance and release a lock if holding.
-     *
-     */
-    ~CompositeGuard();
-
-    /*########################################################################*
-     * Public getters
-     *########################################################################*/
-
-    /**
-     * @retval true if this instance has any ownership.
-     * @retval false otherwise.
-     */
-    constexpr explicit
-    operator bool() const noexcept
-    {
-      return dest_;
-    }
-
-    /**
-     * @return The version when this guard was created.
-     */
-    [[nodiscard]] constexpr auto
-    GetVersion() const noexcept  //
-        -> uint32_t
-    {
-      return ver_;
-    }
-
-    /*########################################################################*
-     * Public APIs
-     *########################################################################*/
-
-    /**
-     * @param mask A bitmask for representing bits to be verified.
-     * @retval true if a target version does not change from an expected one.
-     * @retval false otherwise.
-     */
-    [[nodiscard]] auto VerifyVersion(      //
-        uint32_t mask = kNoMask) noexcept  //
-        -> bool;
-
-   private:
-    /*########################################################################*
-     * Internal member variables
-     *########################################################################*/
-
-    /// @brief The address of a target lock.
-    OptimisticLock *dest_{};
-
-    /// @brief A version when creating this guard.
-    uint32_t ver_{};
+    /// @brief The number of retries for version verification.
+    uint16_t retry_num_{};
 
     /// @brief A flag indicating whether this instance is holding a lock.
     bool has_lock_{};
@@ -557,17 +478,6 @@ class OptimisticLock
    */
   [[nodiscard]] auto GetVersion() noexcept  //
       -> OptGuard;
-
-  /**
-   * @brief Prepare a guard instance to read contents.
-   *
-   * @retval A guard instance with a shared lock if the lock is busy.
-   * @retval A guard instance with a version value otherwise.
-   * @note This function does not give up preparing a guard instance and
-   * continues with spinlock and back-off.
-   */
-  [[nodiscard]] auto PrepareRead()  //
-      -> CompositeGuard;
 
   /*##########################################################################*
    * Pessimistic lock APIs
