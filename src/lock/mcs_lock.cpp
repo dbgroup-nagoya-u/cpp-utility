@@ -22,6 +22,7 @@
 #include <bitset>
 #include <cstdint>
 #include <thread>
+#include <utility>
 
 // local sources
 #include "dbgroup/constants.hpp"
@@ -279,9 +280,8 @@ MCSLock::SGuard::operator=(  //
   if (dest_) {
     dest_->UnlockS(qnode_);
   }
-  dest_ = rhs.dest_;
+  dest_ = std::exchange(rhs.dest_, nullptr);
   qnode_ = rhs.qnode_;
-  rhs.dest_ = nullptr;
   return *this;
 }
 
@@ -304,9 +304,8 @@ MCSLock::SIXGuard::operator=(  //
   if (dest_) {
     dest_->UnlockSIX(qnode_);
   }
-  dest_ = rhs.dest_;
+  dest_ = std::exchange(rhs.dest_, nullptr);
   qnode_ = rhs.qnode_;
-  rhs.dest_ = nullptr;
   return *this;
 }
 
@@ -322,8 +321,6 @@ MCSLock::SIXGuard::UpgradeToX()  //
     -> XGuard
 {
   if (dest_ == nullptr) return XGuard{};
-  auto *dest = dest_;
-  dest_ = nullptr;  // release the ownership
 
   uint64_t next_ptr;
   while (true) {  // wait for shared lock holders to release their locks
@@ -331,7 +328,7 @@ MCSLock::SIXGuard::UpgradeToX()  //
     if ((next_ptr & kSMask) == kNoLocks) break;
     std::this_thread::yield();
   }
-  return XGuard{dest, qnode_};
+  return XGuard{std::exchange(dest_, nullptr), qnode_};
 }
 
 /*############################################################################*
@@ -346,9 +343,8 @@ MCSLock::XGuard::operator=(  //
   if (dest_) {
     dest_->UnlockX(qnode_);
   }
-  dest_ = rhs.dest_;
+  dest_ = std::exchange(rhs.dest_, nullptr);
   qnode_ = rhs.qnode_;
-  rhs.dest_ = nullptr;
   return *this;
 }
 

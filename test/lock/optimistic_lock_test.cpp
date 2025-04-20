@@ -91,7 +91,7 @@ class OptimisticLockFixture : public ::testing::Test
     auto &&opt_guard = lock_.GetVersion();
     {
       [[maybe_unused]] const auto &guard = GetLock(with_lock_type);
-      TryTryLock(lock_type, with_lock_type, opt_guard, expected_rc);
+      TryTryLock(lock_type, with_lock_type, std::move(opt_guard), expected_rc);
     }
     t_.join();
   }
@@ -121,42 +121,6 @@ class OptimisticLockFixture : public ::testing::Test
     t_.join();
 
     ASSERT_FALSE(opt_guard.VerifyVersion());
-  }
-
-  void
-  VerifyPrepareRead(  //
-      const LockType with_lock_type,
-      const bool expected_rc)
-  {
-    auto &&read_guard = lock_.PrepareRead();
-
-    std::promise<void> p{};
-    auto &&f = p.get_future();
-    {
-      [[maybe_unused]] const auto &guard = GetLock(with_lock_type);
-
-      auto worker = [](OptimisticLock *lock, std::promise<void> p) {
-        auto &&guard = lock->PrepareRead();
-        ASSERT_TRUE(guard);
-        ASSERT_TRUE(guard.VerifyVersion());
-        p.set_value();
-      };
-      std::thread{worker, &lock_, std::move(p)}.detach();
-
-      // after short sleep, give up on acquiring the lock
-      const auto rc = f.wait_for(kWaitTimeMill);
-
-      // verify status to check locking is succeeded
-      if (expected_rc) {
-        ASSERT_EQ(rc, std::future_status::ready);
-      } else {
-        ASSERT_EQ(rc, std::future_status::timeout);
-      }
-    }
-    f.get();
-
-    std::ignore = lock_.LockX();  // NOLINT
-    ASSERT_FALSE(read_guard.VerifyVersion());
   }
 
   void
@@ -347,7 +311,7 @@ class OptimisticLockFixture : public ::testing::Test
     // try to get an exclusive lock by another thread
     std::promise<void> p{};
     auto &&f = p.get_future();
-    t_ = std::thread{try_lock, lock_type, conflict_type, opt_guard, std::move(p)};
+    t_ = std::thread{try_lock, lock_type, conflict_type, std::move(opt_guard), std::move(p)};
 
     // after short sleep, give up on acquiring the lock
     const auto rc = f.wait_for(kWaitTimeMill);
@@ -592,38 +556,6 @@ TEST_F(  //
     UpgradeToXWithSLockNeedWait)
 {
   VerifyUpgradeToXWith(kSLock, kExpectFail);
-}
-
-/*----------------------------------------------------------------------------*
- * Composite lock tests
- *----------------------------------------------------------------------------*/
-
-TEST_F(  //
-    OptimisticLockFixture,
-    PrepareReadWithoutLocksSucceed)
-{
-  VerifyPrepareRead(kFree, kExpectSucceed);
-}
-
-TEST_F(  //
-    OptimisticLockFixture,
-    PrepareReadWithSLockSucceed)
-{
-  VerifyPrepareRead(kSLock, kExpectSucceed);
-}
-
-TEST_F(  //
-    OptimisticLockFixture,
-    PrepareReadWithSIXLockSucceed)
-{
-  VerifyPrepareRead(kSIXLock, kExpectSucceed);
-}
-
-TEST_F(  //
-    OptimisticLockFixture,
-    PrepareReadWithXLockNeedWait)
-{
-  VerifyPrepareRead(kXLock, kExpectFail);
 }
 
 /*----------------------------------------------------------------------------*

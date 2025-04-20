@@ -17,6 +17,9 @@
 #ifndef CPP_UTILITY_DBGROUP_THREAD_EPOCH_GUARD_HPP_
 #define CPP_UTILITY_DBGROUP_THREAD_EPOCH_GUARD_HPP_
 
+// C++ standard libraries
+#include <utility>
+
 // local sources
 #include "dbgroup/thread/component/epoch.hpp"
 
@@ -56,9 +59,8 @@ class EpochGuard
    */
   constexpr EpochGuard(  //
       EpochGuard &&obj) noexcept
-      : epoch_{obj.epoch_}
+      : epoch_{std::exchange(obj.epoch_, nullptr)}
   {
-    obj.epoch_ = nullptr;
   }
 
   /**
@@ -100,7 +102,7 @@ class EpochGuard
    *##########################################################################*/
 
   /// @brief A reference to a target epoch.
-  Epoch *epoch_{nullptr};
+  Epoch *epoch_{};
 };
 
 }  // namespace dbgroup::thread

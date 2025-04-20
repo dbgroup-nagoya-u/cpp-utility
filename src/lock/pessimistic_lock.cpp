@@ -20,6 +20,7 @@
 // C++ standard libraries
 #include <atomic>
 #include <cstdint>
+#include <utility>
 
 // local sources
 #include "dbgroup/constants.hpp"
@@ -34,16 +35,16 @@ namespace
  *############################################################################*/
 
 /// @brief A lock state representing no locks.
-constexpr uint64_t kNoLocks = 0b000UL;
+constexpr uint64_t kNoLocks = 0UL;
 
 /// @brief A lock state representing a shared lock.
-constexpr uint64_t kSLock = 0b001UL;
+constexpr uint64_t kSLock = 1UL;
 
 /// @brief A lock state representing a shared-with-intent-exclusive lock.
-constexpr uint64_t kSIXLock = 0b001UL << 62UL;
+constexpr uint64_t kSIXLock = 1UL << 62UL;
 
 /// @brief A lock state representing an exclusive lock.
-constexpr uint64_t kXLock = 0b010UL << 62UL;
+constexpr uint64_t kXLock = 1UL << 63UL;
 
 /// @brief A bit mask for extracting an SIX/X-lock state.
 constexpr uint64_t kXMask = kSIXLock | kXLock;
@@ -58,14 +59,29 @@ auto
 PessimisticLock::LockS()  //
     -> SGuard
 {
+  if (lock_.fetch_add(kSLock, kAcquire) & kXLock) {
+    do {
+      std::this_thread::yield();
+    } while (lock_.load(kAcquire) & kXLock);
+  }
+  return SGuard{this};
+}
+
+auto
+PessimisticLock::LockSIX()  //
+    -> SIXGuard
+{
   SpinWithBackoff(
       [](std::atomic_uint64_t *lock) -> bool {
-        auto cur = lock->load(kRelaxed);
-        return (cur & kXLock) == kNoLocks
-               && lock->compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed);
+        while (true) {
+          auto cur = lock->load(kRelaxed);
+          if (cur & kXMask) return false;
+          if (lock->compare_exchange_weak(cur, cur | kSIXLock, kAcquire, kRelaxed)) return true;
+          CPP_UTILITY_SPINLOCK_HINT
+        }
       },
       &lock_);
-  return SGuard{this};
+  return SIXGuard{this};
 }
 
 auto
@@ -75,25 +91,11 @@ PessimisticLock::LockX()  //
   SpinWithBackoff(
       [](std::atomic_uint64_t *lock) -> bool {
         auto cur = lock->load(kRelaxed);
-        return cur == kNoLocks
-               && lock->compare_exchange_weak(cur, cur | kXLock, kAcquire, kRelaxed);
+        return cur == kNoLocks  //
+               && lock->compare_exchange_weak(cur, kXLock, kAcquire, kRelaxed);
       },
       &lock_);
   return XGuard{this};
-}
-
-auto
-PessimisticLock::LockSIX()  //
-    -> SIXGuard
-{
-  SpinWithBackoff(
-      [](std::atomic_uint64_t *lock) -> bool {
-        auto cur = lock->load(kRelaxed);
-        return (cur & kXMask) == kNoLocks
-               && lock->compare_exchange_weak(cur, cur | kSIXLock, kAcquire, kRelaxed);
-      },
-      &lock_);
-  return SIXGuard{this};
 }
 
 /*############################################################################*
@@ -115,7 +117,7 @@ PessimisticLock::UnlockSIX() noexcept
 void
 PessimisticLock::UnlockX() noexcept
 {
-  lock_.store(kNoLocks, kRelease);
+  lock_.fetch_xor(kXLock, kRelease);
 }
 
 /*############################################################################*
@@ -130,8 +132,7 @@ PessimisticLock::SGuard::operator=(  //
   if (dest_) {
     dest_->UnlockS();
   }
-  dest_ = rhs.dest_;
-  rhs.dest_ = nullptr;
+  dest_ = std::exchange(rhs.dest_, nullptr);
   return *this;
 }
 
@@ -154,8 +155,7 @@ PessimisticLock::SIXGuard::operator=(  //
   if (dest_) {
     dest_->UnlockSIX();
   }
-  dest_ = rhs.dest_;
-  rhs.dest_ = nullptr;
+  dest_ = std::exchange(rhs.dest_, nullptr);
   return *this;
 }
 
@@ -171,17 +171,15 @@ PessimisticLock::SIXGuard::UpgradeToX()  //
     -> XGuard
 {
   if (dest_ == nullptr) return XGuard{};
-  auto *dest = dest_;
-  dest_ = nullptr;  // release the ownership
 
   SpinWithBackoff(
       [](std::atomic_uint64_t *lock) -> bool {
         auto cur = lock->load(kRelaxed);
         return cur == kSIXLock && lock->compare_exchange_weak(cur, kXLock, kRelaxed, kRelaxed);
       },
-      &(dest->lock_));
+      &(dest_->lock_));
 
-  return XGuard{dest};
+  return XGuard{std::exchange(dest_, nullptr)};
 }
 
 /*############################################################################*
@@ -196,8 +194,7 @@ PessimisticLock::XGuard::operator=(  //
   if (dest_) {
     dest_->UnlockX();
   }
-  dest_ = rhs.dest_;
-  rhs.dest_ = nullptr;
+  dest_ = std::exchange(rhs.dest_, nullptr);
   return *this;
 }
 
@@ -213,11 +210,9 @@ PessimisticLock::XGuard::DowngradeToSIX() noexcept  //
     -> SIXGuard
 {
   if (dest_ == nullptr) return SIXGuard{};
-  auto *dest = dest_;
-  dest_ = nullptr;  // release the ownership
 
-  dest->lock_.store(kSIXLock, kRelease);
-  return SIXGuard{dest};
+  dest_->lock_.fetch_xor(kXMask, kRelease);
+  return SIXGuard{std::exchange(dest_, nullptr)};
 }
 
 }  // namespace dbgroup::lock

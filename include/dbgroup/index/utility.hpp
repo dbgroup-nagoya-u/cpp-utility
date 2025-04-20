@@ -58,7 +58,7 @@ struct CompareAsCString {
    * @retval true if `lhs < rhs`.
    * @retval false otherwise.
    */
-  constexpr auto
+  auto
   operator()(  //
       const void *lhs,
       const void *rhs) const noexcept  //
@@ -68,24 +68,6 @@ struct CompareAsCString {
     if (rhs == nullptr) return true;
     return std::strcmp(static_cast<const char *>(lhs), static_cast<const char *>(rhs)) < 0;
   }
-};
-
-/**
- * @brief A dummy struct for filling zeros in garbage collection.
- *
- * @tparam kPageSize A target page size.
- */
-template <size_t kPageSize>
-struct ZeroFilling {
-  // Do not use as a general class.
-  ZeroFilling() = delete;
-  ZeroFilling(const ZeroFilling &) = delete;
-  ZeroFilling(ZeroFilling &&) = delete;
-  auto operator=(const ZeroFilling &) -> ZeroFilling & = delete;
-  auto operator=(ZeroFilling &&) -> ZeroFilling & = delete;
-
-  /// @brief Fill this page with zeros.
-  ~ZeroFilling() { std::memset(std::bit_cast<void *>(this), 0, kPageSize); }
 };
 
 /*############################################################################*

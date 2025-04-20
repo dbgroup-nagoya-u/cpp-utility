@@ -19,6 +19,7 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <utility>
 
 // local sources
 #include "dbgroup/lock/utility.hpp"
@@ -65,9 +66,8 @@ class PessimisticLock
 
     constexpr SGuard(  //
         SGuard &&obj) noexcept
-        : dest_{obj.dest_}
+        : dest_{std::exchange(obj.dest_, nullptr)}
     {
-      obj.dest_ = nullptr;
     }
 
     auto operator=(const SGuard &) -> SGuard & = delete;
@@ -102,7 +102,7 @@ class PessimisticLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    PessimisticLock *dest_{nullptr};
+    PessimisticLock *dest_{};
   };
 
   /**
@@ -131,9 +131,8 @@ class PessimisticLock
 
     constexpr SIXGuard(  //
         SIXGuard &&obj) noexcept
-        : dest_{obj.dest_}
+        : dest_{std::exchange(obj.dest_, nullptr)}
     {
-      obj.dest_ = nullptr;
     }
 
     auto operator=(const SIXGuard &) -> SIXGuard & = delete;
@@ -178,7 +177,7 @@ class PessimisticLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    PessimisticLock *dest_{nullptr};
+    PessimisticLock *dest_{};
   };
 
   /**
@@ -207,9 +206,8 @@ class PessimisticLock
 
     constexpr XGuard(  //
         XGuard &&obj) noexcept
-        : dest_{obj.dest_}
+        : dest_{std::exchange(obj.dest_, nullptr)}
     {
-      obj.dest_ = nullptr;
     }
 
     auto operator=(const XGuard &) -> XGuard & = delete;
@@ -254,7 +252,7 @@ class PessimisticLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    PessimisticLock *dest_{nullptr};
+    PessimisticLock *dest_{};
   };
 
   /*##########################################################################*
@@ -343,7 +341,7 @@ class PessimisticLock
    *##########################################################################*/
 
   /// @brief The current lock state.
-  std::atomic_uint64_t lock_{0};
+  std::atomic_uint64_t lock_{};
 };
 
 /*############################################################################*

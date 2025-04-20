@@ -247,11 +247,10 @@ OptiQL::XGuard::operator=(  //
   if (dest_) {
     dest_->UnlockX(qid_, new_ver_);
   }
-  dest_ = rhs.dest_;
+  dest_ = std::exchange(rhs.dest_, nullptr);
   qid_ = rhs.qid_;
   old_ver_ = rhs.old_ver_;
   new_ver_ = rhs.new_ver_;
-  rhs.dest_ = nullptr;
   return *this;
 }
 

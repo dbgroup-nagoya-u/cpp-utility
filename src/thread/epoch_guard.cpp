@@ -17,6 +17,9 @@
 // the corresponding header
 #include "dbgroup/thread/epoch_guard.hpp"
 
+// C++ standard libraries
+#include <utility>
+
 namespace dbgroup::thread
 {
 EpochGuard::EpochGuard(  //
@@ -31,17 +34,16 @@ EpochGuard::operator=(          //
     EpochGuard &&rhs) noexcept  //
     -> EpochGuard &
 {
-  if (epoch_ != nullptr) {
+  if (epoch_) {
     epoch_->LeaveEpoch();
   }
-  epoch_ = rhs.epoch_;
-  rhs.epoch_ = nullptr;
+  epoch_ = std::exchange(rhs.epoch_, nullptr);
   return *this;
 }
 
 EpochGuard::~EpochGuard()
 {
-  if (epoch_ != nullptr) {
+  if (epoch_) {
     epoch_->LeaveEpoch();
   }
 }

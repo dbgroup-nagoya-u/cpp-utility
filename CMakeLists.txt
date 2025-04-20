@@ -7,7 +7,7 @@ endif()
 
 # project information
 project(cpp_utility
-  VERSION "0.12.1"
+  VERSION "0.13.0"
   DESCRIPTION "An open-source C++ utility library for research use."
   LANGUAGES "CXX"
 )
