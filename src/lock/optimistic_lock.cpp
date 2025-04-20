@@ -295,7 +295,11 @@ OptimisticLock::OptGuard::VerifyVersion(  //
     const size_t max_retry) noexcept  //
     -> bool
 {
-  if (has_lock_) return true;
+  if (has_lock_) {
+    dest_->UnlockS();
+    has_lock_ = false;
+    return true;
+  }
 
   // verify using the optimistic read procedure
   uint64_t cur;
@@ -323,10 +327,14 @@ OptimisticLock::OptGuard::VerifyVersion(  //
 
 auto
 OptimisticLock::OptGuard::ImmediateVerify(  //
-    const uint32_t mask) const noexcept     //
+    const uint32_t mask) noexcept           //
     -> bool
 {
-  if (has_lock_) return true;
+  if (has_lock_) {
+    dest_->UnlockS();
+    has_lock_ = false;
+    return true;
+  }
 
   // verify using the optimistic read procedure
   while (true) {

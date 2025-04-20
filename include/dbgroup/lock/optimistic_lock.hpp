@@ -391,8 +391,8 @@ class OptimisticLock
      * @retval true if a target version does not change from an expected one.
      * @retval false otherwise.
      */
-    [[nodiscard]] auto ImmediateVerify(          //
-        uint32_t mask = kNoMask) const noexcept  //
+    [[nodiscard]] auto ImmediateVerify(    //
+        uint32_t mask = kNoMask) noexcept  //
         -> bool;
 
     /**
