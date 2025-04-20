@@ -20,6 +20,7 @@
 // C++ standard libraries
 #include <atomic>
 #include <cstdint>
+#include <utility>
 
 // local sources
 #include "dbgroup/constants.hpp"

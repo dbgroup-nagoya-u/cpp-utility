@@ -22,6 +22,7 @@
 #include <bitset>
 #include <cstdint>
 #include <thread>
+#include <utility>
 
 // local sources
 #include "dbgroup/constants.hpp"

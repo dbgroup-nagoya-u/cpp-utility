@@ -21,6 +21,7 @@
 #include <atomic>
 #include <cstdint>
 #include <limits>
+#include <utility>
 
 // local sources
 #include "dbgroup/lock/utility.hpp"

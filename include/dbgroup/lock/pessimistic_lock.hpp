@@ -19,6 +19,7 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <utility>
 
 // local sources
 #include "dbgroup/lock/utility.hpp"
