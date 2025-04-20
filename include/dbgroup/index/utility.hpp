@@ -58,7 +58,7 @@ struct CompareAsCString {
    * @retval true if `lhs < rhs`.
    * @retval false otherwise.
    */
-  constexpr auto
+  auto
   operator()(  //
       const void *lhs,
       const void *rhs) const noexcept  //
