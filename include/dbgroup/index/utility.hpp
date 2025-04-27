@@ -38,16 +38,6 @@ namespace dbgroup::index
  *############################################################################*/
 
 /**
- * @brief Return codes for DB Group's index implementations.
- *
- */
-enum ReturnCode {
-  kSuccess = 0,
-  kKeyNotExist = -100,
-  kKeyExist,
-};
-
-/**
  * @brief Compare binary keys as CString. The end of every key must be '\\0'.
  *
  */
