@@ -46,7 +46,36 @@ namespace dbgroup::lock
  */
 template <class T>
 concept GuardClass = requires(T &x) {
+  // public APIs
   { static_cast<bool>(x) } -> std::convertible_to<bool>;
+};
+
+/**
+ * @brief A concept for representing guard classes of exclusive locks in OCC.
+ *
+ * @tparam T A target class.
+ */
+template <class T>
+concept OptimisticXGuard = requires(T &x, uint32_t ver) {
+  // public APIs
+  { static_cast<bool>(x) } -> std::convertible_to<bool>;
+  { x.GetVersion() } -> std::convertible_to<uint32_t>;
+  x.SetVersion(ver);
+};
+
+/**
+ * @brief A concept for representing guard classes of OCC-based read procedures.
+ *
+ * @tparam T A target class.
+ * @tparam XGuard A corresponding exclusive guard class.
+ */
+template <class T, class XGuard>
+concept OptimisticReadGuard = requires(T &x, uint32_t mask, size_t max_retry) {
+  // public APIs
+  { static_cast<bool>(x) } -> std::convertible_to<bool>;
+  { x.GetVersion() } -> std::convertible_to<uint32_t>;
+  { x.VerifyVersion(mask, max_retry) } -> std::convertible_to<bool>;
+  { x.TryLockX(mask) } -> std::convertible_to<XGuard>;
 };
 
 /**
@@ -56,11 +85,12 @@ concept GuardClass = requires(T &x) {
  */
 template <class T>
 concept PessimisticallyLockable = requires(T &x) {
+  // public types
   typename T::SGuard;
-  typename T::SIXGuard;
-  typename T::XGuard;
   GuardClass<typename T::SGuard>;
+  typename T::SIXGuard;
   GuardClass<typename T::SIXGuard>;
+  typename T::XGuard;
   GuardClass<typename T::XGuard>;
 
   // public APIs
@@ -75,24 +105,16 @@ concept PessimisticallyLockable = requires(T &x) {
  * @tparam T A target class.
  */
 template <class T>
-concept OptimisticallyLockable = requires(T &x, uint32_t ver, uint32_t mask) {
+concept OptimisticallyLockable = requires(T &x) {
+  // public types
   typename T::XGuard;
+  OptimisticXGuard<typename T::XGuard>;
   typename T::OptGuard;
-  GuardClass<typename T::XGuard>;
-  GuardClass<typename T::OptGuard>;
+  OptimisticReadGuard<typename T::OptGuard, typename T::XGuard>;
 
   // public APIs
   { x.LockX() } -> std::convertible_to<typename T::XGuard>;
   { x.GetVersion() } -> std::convertible_to<typename T::OptGuard>;
-
-  // XGuard's APIs
-  { x.LockX().GetVersion() } -> std::convertible_to<uint32_t>;
-  x.LockX().SetVersion(ver);
-
-  // OptGuard's APIs
-  { x.GetVersion().GetVersion() } -> std::convertible_to<uint32_t>;
-  { x.GetVersion().VerifyVersion(mask) } -> std::convertible_to<bool>;
-  { x.GetVersion().TryLockX(mask) } -> std::convertible_to<typename T::XGuard>;
 };
 
 /**
