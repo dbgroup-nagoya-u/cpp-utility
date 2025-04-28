@@ -59,12 +59,6 @@ constexpr uint64_t kXMask = kXLock | kSIXLock;
 /// @brief A bit mask for extracting an S-lock state.
 constexpr uint64_t kSMask = kAllLockMask ^ kXMask;
 
-/// @brief A bit mask for extracting an S/SIX-lock state.
-constexpr uint64_t kSAndSIXMask = kSMask | kSIXLock;
-
-/// @brief A bit mask for extracting an X-lock state and version values.
-constexpr uint64_t kXAndVersionMask = kXLock | kVersionMask;
-
 }  // namespace
 
 /*############################################################################*

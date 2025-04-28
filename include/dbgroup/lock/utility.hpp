@@ -86,12 +86,9 @@ concept OptimisticReadGuard = requires(T &x, uint32_t mask, size_t max_retry) {
 template <class T>
 concept PessimisticallyLockable = requires(T &x) {
   // public types
-  typename T::SGuard;
-  GuardClass<typename T::SGuard>;
-  typename T::SIXGuard;
-  GuardClass<typename T::SIXGuard>;
-  typename T::XGuard;
-  GuardClass<typename T::XGuard>;
+  requires GuardClass<typename T::SGuard>;
+  requires GuardClass<typename T::SIXGuard>;
+  requires GuardClass<typename T::XGuard>;
 
   // public APIs
   { x.LockS() } -> std::convertible_to<typename T::SGuard>;
@@ -107,10 +104,8 @@ concept PessimisticallyLockable = requires(T &x) {
 template <class T>
 concept OptimisticallyLockable = requires(T &x) {
   // public types
-  typename T::XGuard;
-  OptimisticXGuard<typename T::XGuard>;
-  typename T::OptGuard;
-  OptimisticReadGuard<typename T::OptGuard, typename T::XGuard>;
+  requires OptimisticXGuard<typename T::XGuard>;
+  requires OptimisticReadGuard<typename T::OptGuard, typename T::XGuard>;
 
   // public APIs
   { x.LockX() } -> std::convertible_to<typename T::XGuard>;
