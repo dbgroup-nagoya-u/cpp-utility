@@ -45,9 +45,6 @@ constexpr uint64_t kNoLocks = 0b000;
 /// @brief A lock state representing a shared lock.
 constexpr uint64_t kSLock = 1UL << 47UL;
 
-/// @brief A lock state representing a shared-with-intent-exclusive lock.
-constexpr uint64_t kSIXLock = 1UL << 62UL;
-
 /// @brief A lock state representing an exclusive lock.
 constexpr uint64_t kXLock = 1UL << 63UL;
 
@@ -57,11 +54,8 @@ constexpr uint64_t kPtrMask = kSLock - 1UL;
 /// @brief A bit mask for extracting a lock state.
 constexpr uint64_t kLockMask = ~kPtrMask;
 
-/// @brief A bit mask for extracting X and SIX states.
-constexpr uint64_t kXMask = kXLock | kSIXLock;
-
 /// @brief A bit mask for extracting a sharedlock state.
-constexpr uint64_t kSMask = kLockMask ^ kXMask;
+constexpr uint64_t kSMask = kLockMask ^ kXLock;
 
 /// @brief A thread local queue node container.
 thread_local std::unique_ptr<MCSLock> _tls{};  // NOLINT
