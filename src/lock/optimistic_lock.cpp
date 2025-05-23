@@ -168,6 +168,7 @@ OptimisticLock::SGuard::operator=(  //
     dest_->UnlockS();
   }
   dest_ = std::exchange(rhs.dest_, nullptr);
+  ver_ = rhs.ver_;
   return *this;
 }
 
@@ -191,6 +192,7 @@ OptimisticLock::SIXGuard::operator=(  //
     dest_->UnlockSIX();
   }
   dest_ = std::exchange(rhs.dest_, nullptr);
+  ver_ = rhs.ver_;
   return *this;
 }
 

@@ -35,11 +35,26 @@ class MCSLock
 {
  public:
   /*##########################################################################*
+   * Public constants
+   *##########################################################################*/
+
+  /// @brief The maximum number of queue nodes.
+  static constexpr uint64_t kQNodeNum = 1UL << 16UL;
+
+  /*##########################################################################*
    * Public types
    *##########################################################################*/
 
   // forward declarations
   class XGuard;
+
+  struct QNode {
+    /// @brief The next queue node if exist.
+    std::atomic<QNode *> next;
+
+    /// @brief The lock state of this node.
+    std::atomic_uint64_t state;
+  };
 
   /**
    * @brief A class for representing a guard instance for shared locks.
@@ -56,12 +71,13 @@ class MCSLock
 
     /**
      * @param dest The address of a target lock.
-     * @param qnode The corresponding queue node for unlocking.
+     * @param qid The corresponding queue node ID for unlocking.
      */
     constexpr SGuard(  //
         MCSLock *dest,
-        MCSLock *qnode) noexcept
-        : dest_{dest}, qnode_{qnode}
+        uint32_t qid,
+        const uint32_t ver) noexcept
+        : dest_{dest}, qid_{qid}, ver_{ver}
     {
     }
 
@@ -69,7 +85,7 @@ class MCSLock
 
     constexpr SGuard(  //
         SGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)}, qnode_{obj.qnode_}
+        : dest_{std::exchange(obj.dest_, nullptr)}, qid_{obj.qid_}, ver_{obj.ver_}
     {
     }
 
@@ -99,6 +115,16 @@ class MCSLock
       return dest_;
     }
 
+    /**
+     * @return The version when this guard was created.
+     */
+    [[nodiscard]] constexpr auto
+    GetVersion() const noexcept  //
+        -> uint32_t
+    {
+      return ver_;
+    }
+
    private:
     /*########################################################################*
      * Internal member variables
@@ -107,8 +133,11 @@ class MCSLock
     /// @brief The address of a target lock.
     MCSLock *dest_{};
 
-    /// @brief The corresponding queue node for unlocking.
-    MCSLock *qnode_{};
+    /// @brief The corresponding queue node ID for unlocking.
+    uint32_t qid_{};
+
+    /// @brief A version when creating this guard.
+    uint32_t ver_{};
   };
 
   /**
@@ -126,12 +155,13 @@ class MCSLock
 
     /**
      * @param dest The address of a target lock.
-     * @param qnode The corresponding queue node for unlocking.
+     * @param qid The corresponding queue node ID for unlocking.
      */
     constexpr SIXGuard(  //
         MCSLock *dest,
-        MCSLock *qnode) noexcept
-        : dest_{dest}, qnode_{qnode}
+        uint32_t qid,
+        const uint32_t ver) noexcept
+        : dest_{dest}, qid_{qid}, ver_{ver}
     {
     }
 
@@ -139,7 +169,7 @@ class MCSLock
 
     constexpr SIXGuard(  //
         SIXGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)}, qnode_{obj.qnode_}
+        : dest_{std::exchange(obj.dest_, nullptr)}, qid_{obj.qid_}, ver_{obj.ver_}
     {
     }
 
@@ -170,6 +200,16 @@ class MCSLock
     }
 
     /**
+     * @return The version when this guard was created.
+     */
+    [[nodiscard]] constexpr auto
+    GetVersion() const noexcept  //
+        -> uint32_t
+    {
+      return ver_;
+    }
+
+    /**
      * @brief Upgrade this lock to an X lock.
      *
      * @return The lock guard for an X lock.
@@ -187,8 +227,11 @@ class MCSLock
     /// @brief The address of a target lock.
     MCSLock *dest_{};
 
-    /// @brief The corresponding queue node for unlocking.
-    MCSLock *qnode_{};
+    /// @brief The corresponding queue node ID for unlocking.
+    uint32_t qid_{};
+
+    /// @brief A version when creating this guard.
+    uint32_t ver_{};
   };
 
   /**
@@ -206,12 +249,14 @@ class MCSLock
 
     /**
      * @param dest The address of a target lock.
-     * @param qnode The corresponding queue node for unlocking.
+     * @param qid The corresponding queue node ID for unlocking.
+     * @param ver The current version.
      */
     constexpr XGuard(  //
         MCSLock *dest,
-        MCSLock *qnode) noexcept
-        : dest_{dest}, qnode_{qnode}
+        uint32_t qid,
+        const uint32_t ver) noexcept
+        : dest_{dest}, qid_{qid}, old_ver_{ver}, new_ver_{ver + 1}
     {
     }
 
@@ -219,7 +264,10 @@ class MCSLock
 
     constexpr XGuard(  //
         XGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)}, qnode_{obj.qnode_}
+        : dest_{std::exchange(obj.dest_, nullptr)},
+          qid_{obj.qid_},
+          old_ver_{obj.old_ver_},
+          new_ver_{obj.new_ver_}
     {
     }
 
@@ -250,6 +298,28 @@ class MCSLock
     }
 
     /**
+     * @return The version when this guard was created.
+     */
+    [[nodiscard]] constexpr auto
+    GetVersion() const noexcept  //
+        -> uint32_t
+    {
+      return old_ver_;
+    }
+
+    /**
+     * @brief Set a desired version after unlocking.
+     *
+     * @param ver A desired version after unlocking.
+     */
+    constexpr void
+    SetVersion(  //
+        const uint32_t ver) noexcept
+    {
+      new_ver_ = ver;
+    }
+
+    /**
      * @brief Downgrade this lock to an SIX lock.
      *
      * @return The lock guard for an SIX lock.
@@ -262,7 +332,7 @@ class MCSLock
     DowngradeToSIX()  //
         -> SIXGuard
     {
-      return SIXGuard{std::exchange(dest_, nullptr), qnode_};
+      return SIXGuard{std::exchange(dest_, nullptr), qid_, new_ver_};
     }
 
    private:
@@ -273,8 +343,14 @@ class MCSLock
     /// @brief The address of a target lock.
     MCSLock *dest_{};
 
-    /// @brief The corresponding queue node for unlocking.
-    MCSLock *qnode_{};
+    /// @brief The corresponding queue node ID for unlocking.
+    uint32_t qid_{};
+
+    /// @brief A version when creating this guard.
+    uint32_t old_ver_{};
+
+    /// @brief A version when failing verification.
+    uint32_t new_ver_{};
   };
 
   /*##########################################################################*
@@ -337,32 +413,36 @@ class MCSLock
   /**
    * @brief Release a shared lock.
    *
-   * @param qnode The queue node corresponding to this lock.
+   * @param qid The queue node ID corresponding to this lock.
    * @note If a thread calls this function without acquiring an S lock, it will
    * corrupt an internal lock state.
    */
   void UnlockS(  //
-      MCSLock *qnode);
+      uint32_t qid);
 
   /**
    * @brief Release a shared-with-intent-exclusive lock.
    *
-   * @param qnode The queue node corresponding to this lock.
+   * @param qid The queue node ID corresponding to this lock.
+   * @param ver A desired version after unlocking.
    * @note If a thread calls this function without acquiring an SIX lock, it
    * will corrupt an internal lock state.
    */
   void UnlockSIX(  //
-      MCSLock *qnode);
+      uint32_t qid,
+      uint64_t ver);
 
   /**
    * @brief Release an exclusive lock.
    *
-   * @param qnode The queue node corresponding to this lock.
+   * @param qid The queue node ID corresponding to this lock.
+   * @param ver A desired version after unlocking.
    * @note If a thread calls this function without acquiring an X lock, it will
    * corrupt an internal lock state.
    */
   void UnlockX(  //
-      MCSLock *qnode);
+      uint32_t qid,
+      uint64_t ver);
 
   /*##########################################################################*
    * Internal member variables
