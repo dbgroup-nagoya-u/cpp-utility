@@ -51,12 +51,24 @@ concept GuardClass = requires(T &x) {
 };
 
 /**
+ * @brief A concept for representing guard classes with version APIs.
+ *
+ * @tparam T A target class.
+ */
+template <class T>
+concept VersionedGuard = requires(T &x, uint32_t ver) {
+  // public APIs
+  { static_cast<bool>(x) } -> std::convertible_to<bool>;
+  { x.GetVersion() } -> std::convertible_to<uint32_t>;
+};
+
+/**
  * @brief A concept for representing guard classes of exclusive locks in OCC.
  *
  * @tparam T A target class.
  */
 template <class T>
-concept OptimisticXGuard = requires(T &x, uint32_t ver) {
+concept VersionedXGuard = requires(T &x, uint32_t ver) {
   // public APIs
   { static_cast<bool>(x) } -> std::convertible_to<bool>;
   { x.GetVersion() } -> std::convertible_to<uint32_t>;
@@ -104,7 +116,7 @@ concept PessimisticallyLockable = requires(T &x) {
 template <class T>
 concept OptimisticallyLockable = requires(T &x) {
   // public types
-  requires OptimisticXGuard<typename T::XGuard>;
+  requires VersionedXGuard<typename T::XGuard>;
   requires OptimisticReadGuard<typename T::OptGuard, typename T::XGuard>;
 
   // public APIs
@@ -119,6 +131,19 @@ concept OptimisticallyLockable = requires(T &x) {
  */
 template <class T>
 concept Lockable = PessimisticallyLockable<T> || OptimisticallyLockable<T>;
+
+/**
+ * @brief A concept for guaranteeing versioned guards.
+ *
+ * @tparam T A target class.
+ */
+template <class T>
+concept HasVersionedGuards = requires(T &x) {
+  // public types
+  requires VersionedGuard<typename T::SGuard>;
+  requires VersionedGuard<typename T::SIXGuard>;
+  requires VersionedXGuard<typename T::XGuard>;
+};
 
 /*############################################################################*
  * Global constants
