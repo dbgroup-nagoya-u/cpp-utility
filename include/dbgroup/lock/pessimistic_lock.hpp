@@ -19,6 +19,7 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <cstdint>
 #include <utility>
 
 // local sources
@@ -27,7 +28,7 @@
 namespace dbgroup::lock
 {
 /**
- * @brief A class for representing a simple pessimistic lock.
+ * @brief A class for representing simple pessimistic locks.
  *
  */
 class PessimisticLock
@@ -57,8 +58,9 @@ class PessimisticLock
      * @param dest The address of a target lock.
      */
     constexpr explicit SGuard(  //
-        PessimisticLock *dest) noexcept
-        : dest_{dest}
+        PessimisticLock *dest,
+        const uint32_t ver) noexcept
+        : dest_{dest}, ver_{ver}
     {
     }
 
@@ -66,7 +68,7 @@ class PessimisticLock
 
     constexpr SGuard(  //
         SGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)}
+        : dest_{std::exchange(obj.dest_, nullptr)}, ver_{obj.ver_}
     {
     }
 
@@ -80,6 +82,10 @@ class PessimisticLock
      * Public destructors
      *########################################################################*/
 
+    /**
+     * @brief Destroy this instance and release a lock if holding.
+     *
+     */
     ~SGuard();
 
     /*########################################################################*
@@ -96,6 +102,16 @@ class PessimisticLock
       return dest_;
     }
 
+    /**
+     * @return The version when this guard was created.
+     */
+    [[nodiscard]] constexpr auto
+    GetVersion() const noexcept  //
+        -> uint32_t
+    {
+      return ver_;
+    }
+
    private:
     /*########################################################################*
      * Internal member variables
@@ -103,6 +119,9 @@ class PessimisticLock
 
     /// @brief The address of a target lock.
     PessimisticLock *dest_{};
+
+    /// @brief A version when creating this guard.
+    uint32_t ver_{};
   };
 
   /**
@@ -122,8 +141,9 @@ class PessimisticLock
      * @param dest The address of a target lock.
      */
     constexpr explicit SIXGuard(  //
-        PessimisticLock *dest) noexcept
-        : dest_{dest}
+        PessimisticLock *dest,
+        const uint32_t ver) noexcept
+        : dest_{dest}, ver_{ver}
     {
     }
 
@@ -131,7 +151,7 @@ class PessimisticLock
 
     constexpr SIXGuard(  //
         SIXGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)}
+        : dest_{std::exchange(obj.dest_, nullptr)}, ver_{obj.ver_}
     {
     }
 
@@ -145,6 +165,10 @@ class PessimisticLock
      * Public destructors
      *########################################################################*/
 
+    /**
+     * @brief Destroy this instance and release a lock if holding.
+     *
+     */
     ~SIXGuard();
 
     /*########################################################################*
@@ -159,6 +183,16 @@ class PessimisticLock
     operator bool() const noexcept
     {
       return dest_;
+    }
+
+    /**
+     * @return The version when this guard was created.
+     */
+    [[nodiscard]] constexpr auto
+    GetVersion() const noexcept  //
+        -> uint32_t
+    {
+      return ver_;
     }
 
     /**
@@ -178,6 +212,9 @@ class PessimisticLock
 
     /// @brief The address of a target lock.
     PessimisticLock *dest_{};
+
+    /// @brief A version when creating this guard.
+    uint32_t ver_{};
   };
 
   /**
@@ -195,10 +232,12 @@ class PessimisticLock
 
     /**
      * @param dest The address of a target lock.
+     * @param ver The current version.
      */
-    constexpr explicit XGuard(  //
-        PessimisticLock *dest) noexcept
-        : dest_{dest}
+    constexpr XGuard(  //
+        PessimisticLock *dest,
+        const uint32_t ver) noexcept
+        : dest_{dest}, old_ver_{ver}, new_ver_{ver + 1U}
     {
     }
 
@@ -206,7 +245,7 @@ class PessimisticLock
 
     constexpr XGuard(  //
         XGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)}
+        : dest_{std::exchange(obj.dest_, nullptr)}, old_ver_{obj.old_ver_}, new_ver_{obj.new_ver_}
     {
     }
 
@@ -220,6 +259,10 @@ class PessimisticLock
      * Public destructors
      *########################################################################*/
 
+    /**
+     * @brief Destroy this instance and release a lock if holding.
+     *
+     */
     ~XGuard();
 
     /*########################################################################*
@@ -234,6 +277,28 @@ class PessimisticLock
     operator bool() const noexcept
     {
       return dest_;
+    }
+
+    /**
+     * @return The version when this guard was created.
+     */
+    [[nodiscard]] constexpr auto
+    GetVersion() const noexcept  //
+        -> uint32_t
+    {
+      return old_ver_;
+    }
+
+    /**
+     * @brief Set a desired version after unlocking.
+     *
+     * @param ver A desired version after unlocking.
+     */
+    constexpr void
+    SetVersion(  //
+        const uint32_t ver) noexcept
+    {
+      new_ver_ = ver;
     }
 
     /**
@@ -253,6 +318,12 @@ class PessimisticLock
 
     /// @brief The address of a target lock.
     PessimisticLock *dest_{};
+
+    /// @brief A version when creating this guard.
+    uint32_t old_ver_{};
+
+    /// @brief A version when failing verification.
+    uint32_t new_ver_{};
   };
 
   /*##########################################################################*
@@ -331,10 +402,14 @@ class PessimisticLock
   /**
    * @brief Release an exclusive lock.
    *
+   * @param old_ver A version before unlocking.
+   * @param new_ver A desired version after unlocking.
    * @note If a thread calls this function without acquiring an X lock, it will
    * corrupt an internal lock state.
    */
-  void UnlockX() noexcept;
+  void UnlockX(  //
+      uint32_t old_ver,
+      uint32_t new_ver) noexcept;
 
   /*##########################################################################*
    * Internal member variables
