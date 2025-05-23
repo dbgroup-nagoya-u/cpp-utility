@@ -59,8 +59,9 @@ class OptimisticLock
      * @param dest The address of a target lock.
      */
     constexpr explicit SGuard(  //
-        OptimisticLock *dest) noexcept
-        : dest_{dest}
+        OptimisticLock *dest,
+        const uint32_t ver) noexcept
+        : dest_{dest}, ver_{ver}
     {
     }
 
@@ -68,7 +69,7 @@ class OptimisticLock
 
     constexpr SGuard(  //
         SGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)}
+        : dest_{std::exchange(obj.dest_, nullptr)}, ver_{obj.ver_}
     {
     }
 
@@ -102,6 +103,16 @@ class OptimisticLock
       return dest_;
     }
 
+    /**
+     * @return The version when this guard was created.
+     */
+    [[nodiscard]] constexpr auto
+    GetVersion() const noexcept  //
+        -> uint32_t
+    {
+      return ver_;
+    }
+
    private:
     /*########################################################################*
      * Internal member variables
@@ -109,6 +120,9 @@ class OptimisticLock
 
     /// @brief The address of a target lock.
     OptimisticLock *dest_{};
+
+    /// @brief A version when creating this guard.
+    uint32_t ver_{};
   };
 
   /**
@@ -128,8 +142,9 @@ class OptimisticLock
      * @param dest The address of a target lock.
      */
     constexpr explicit SIXGuard(  //
-        OptimisticLock *dest) noexcept
-        : dest_{dest}
+        OptimisticLock *dest,
+        const uint32_t ver) noexcept
+        : dest_{dest}, ver_{ver}
     {
     }
 
@@ -137,7 +152,7 @@ class OptimisticLock
 
     constexpr SIXGuard(  //
         SIXGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)}
+        : dest_{std::exchange(obj.dest_, nullptr)}, ver_{obj.ver_}
     {
     }
 
@@ -172,6 +187,16 @@ class OptimisticLock
     }
 
     /**
+     * @return The version when this guard was created.
+     */
+    [[nodiscard]] constexpr auto
+    GetVersion() const noexcept  //
+        -> uint32_t
+    {
+      return ver_;
+    }
+
+    /**
      * @brief Upgrade this lock to an X lock.
      *
      * @return The lock guard for an X lock.
@@ -188,6 +213,9 @@ class OptimisticLock
 
     /// @brief The address of a target lock.
     OptimisticLock *dest_{};
+
+    /// @brief A version when creating this guard.
+    uint32_t ver_{};
   };
 
   /**
@@ -538,12 +566,14 @@ class OptimisticLock
   /**
    * @brief Release an exclusive lock.
    *
-   * @param ver A desired version after unlocking.
+   * @param old_ver A version before unlocking.
+   * @param new_ver A desired version after unlocking.
    * @note If a thread calls this function without acquiring an X lock, it will
    * corrupt an internal lock state.
    */
   void UnlockX(  //
-      uint64_t ver) noexcept;
+      uint32_t old_ver,
+      uint32_t new_ver) noexcept;
 
   /*##########################################################################*
    * Internal member variables
