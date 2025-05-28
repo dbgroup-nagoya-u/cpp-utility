@@ -305,13 +305,15 @@ MCSLock::LockSIX()  //
     CPP_UTILITY_SPINLOCK_HINT
   }
 
-  if (cur & kLockMask) {  // wait for the predecessor to release the lock
+  if (cur & kLockMask) {
+    if ((cur & kXLock) == kNoLocks) {  // S-lock holders do not pass a version
+      qnode->state.fetch_add(cur & kVersionMask, kRelaxed);
+    }
     auto *tail = TLS::GetQNode((cur & kQIDMask) >> kQIDShift);
     tail->next.store(qnode, kRelease);
-    while (true) {
-      cur = qnode->state.load(kAcquire);
-      if ((cur & kXLock) == kNoLocks) break;
+    while (cur & kXLock) {  // wait for the predecessor to release the lock
       std::this_thread::yield();
+      cur = qnode->state.load(kAcquire);
     }
   }
   return SIXGuard{this, qid, static_cast<uint32_t>(cur)};
@@ -331,10 +333,13 @@ MCSLock::LockX()  //
     CPP_UTILITY_SPINLOCK_HINT
   }
 
-  if (cur & kLockMask) {  // wait for the predecessor to release the lock
+  if (cur & kLockMask) {
+    if ((cur & kXLock) == kNoLocks) {  // S-lock holders do not pass a version
+      qnode->state.fetch_add(cur & kVersionMask, kRelaxed);
+    }
     auto *tail = TLS::GetQNode((cur & kQIDMask) >> kQIDShift);
     tail->next.store(qnode, kRelease);
-    while (true) {
+    while (true) {  // wait for the predecessor to release the lock
       cur = qnode->state.load(kAcquire);
       if ((cur & kLockMask) == kNoLocks) break;
       std::this_thread::yield();

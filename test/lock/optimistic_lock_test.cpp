@@ -148,8 +148,8 @@ class OptimisticLockFixture : public ::testing::Test
   void
   VerifyLockXWithMultiThread()
   {
-    auto &&opt_guard = lock_.GetVersion();
-
+    constexpr auto kWriterNum = kThreadNum / 2;
+    std::atomic_size_t end_num{};
     std::vector<std::thread> threads{};
     threads.reserve(kThreadNum);
 
@@ -158,12 +158,32 @@ class OptimisticLockFixture : public ::testing::Test
 
       // create incrementor threads
       for (size_t i = 0; i < kThreadNum; ++i) {
-        threads.emplace_back([this]() {
-          for (size_t i = 0; i < kWriteNumPerThread; i++) {
-            auto &&x_guard = lock_.LockX();
-            ++counter_;
-          }
-        });
+        if (i % 2 == 0) {
+          threads.emplace_back([&]() {
+            size_t cnt = 0;
+            while (end_num < kWriterNum) {
+              size_t cur;
+              auto &&opt_guard = lock_.GetVersion();
+              while (true) {
+                cur = counter_;
+                if (opt_guard.VerifyVersion()) break;
+              }
+
+              ASSERT_LE(cnt, cur);
+              ASSERT_EQ(cur, opt_guard.GetVersion());
+              cnt = cur;
+            }
+          });
+        } else {
+          threads.emplace_back([&]() {
+            for (size_t j = 0; j < kWriteNumPerThread; j++) {
+              auto &&x_guard = lock_.LockX();
+              ASSERT_EQ(counter_, x_guard.GetVersion());
+              ++counter_;
+            }
+            ++end_num;
+          });
+        }
       }
 
       // after short sleep, check that the counter has not incremented
@@ -175,11 +195,11 @@ class OptimisticLockFixture : public ::testing::Test
     for (auto &&t : threads) {
       t.join();
     }
-    ASSERT_FALSE(opt_guard.VerifyVersion());
 
     // check the counter
     auto &&s_guard = lock_.LockS();
-    ASSERT_EQ(counter_, kThreadNum * kWriteNumPerThread);
+    ASSERT_EQ(counter_, kWriterNum * kWriteNumPerThread);
+    ASSERT_EQ(counter_, s_guard.GetVersion());
   }
 
   /*##########################################################################*

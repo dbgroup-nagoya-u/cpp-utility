@@ -155,6 +155,8 @@ class PessimisticLockFixture : public ::testing::Test
   void
   VerifyLockXWithMultiThread()
   {
+    constexpr auto kWriterNum = kThreadNum / 2;
+    std::atomic_size_t end_num{};
     std::vector<std::thread> threads{};
     threads.reserve(kThreadNum);
 
@@ -163,12 +165,27 @@ class PessimisticLockFixture : public ::testing::Test
 
       // create incrementor threads
       for (size_t i = 0; i < kThreadNum; ++i) {
-        threads.emplace_back([this]() {
-          for (size_t i = 0; i < kWriteNumPerThread; i++) {
-            auto &&x_guard = lock_.LockX();
-            ++counter_;
-          }
-        });
+        if (i % 2 == 0) {
+          threads.emplace_back([&]() {
+            size_t cnt = 0;
+            while (end_num < kWriterNum) {
+              CPP_UTILITY_SPINLOCK_HINT
+              const auto &s_guard = lock_.LockS();
+              ASSERT_LE(cnt, counter_);
+              ASSERT_EQ(counter_, s_guard.GetVersion());
+              cnt = counter_;
+            }
+          });
+        } else {
+          threads.emplace_back([&]() {
+            for (size_t j = 0; j < kWriteNumPerThread; j++) {
+              auto &&x_guard = lock_.LockX();
+              ASSERT_EQ(counter_, x_guard.GetVersion());
+              ++counter_;
+            }
+            ++end_num;
+          });
+        }
       }
 
       // after short sleep, check that the counter has not incremented
@@ -183,7 +200,8 @@ class PessimisticLockFixture : public ::testing::Test
 
     // check the counter
     auto &&s_guard = lock_.LockS();
-    ASSERT_EQ(counter_, kThreadNum * kWriteNumPerThread);
+    ASSERT_EQ(counter_, kWriterNum * kWriteNumPerThread);
+    ASSERT_EQ(counter_, s_guard.GetVersion());
   }
 
   /*##########################################################################*
