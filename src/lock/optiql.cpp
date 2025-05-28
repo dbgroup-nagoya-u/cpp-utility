@@ -41,12 +41,174 @@ namespace
  * Local types
  *############################################################################*/
 
+/**
+ * @brief A class for representing queue nodes.
+ *
+ */
 struct QNode {
   /// @brief The next queue node if exist.
   std::atomic<QNode *> next;
 
   /// @brief A flag for indicating this node's owner holds a lock.
   std::atomic_bool hold_lock;
+};
+
+/**
+ * @brief A class for managing thread local QIDs.
+ *
+ */
+class TLS
+{
+ public:
+  /*##########################################################################*
+   * Public constructors and assignment operators
+   *##########################################################################*/
+
+  constexpr TLS() = default;
+
+  TLS(const TLS &) = delete;
+  TLS(TLS &&) = delete;
+
+  auto operator=(const TLS &) -> TLS & = delete;
+  auto operator=(TLS &&) -> TLS & = delete;
+
+  /*##########################################################################*
+   * Public destructors
+   *##########################################################################*/
+
+  ~TLS()
+  {
+    for (uint32_t i = 0; i < cnt_; ++i) {
+      FreeQID(qid_arr_[i]);
+    }
+  }
+
+  /*##########################################################################*
+   * Public APIs
+   *##########################################################################*/
+
+  /**
+   * @param qid A target QID.
+   * @return The corresponding queue node.
+   */
+  static constexpr auto
+  GetQNode(          //
+      uint32_t qid)  //
+      -> QNode *
+  {
+    return &_qnodes[qid];
+  }
+
+  /**
+   * @retval 1st: A reserved QID.
+   * @retval 2nd: The corresponding queue node.
+   */
+  auto
+  GetQID()  //
+      -> std::pair<uint32_t, QNode *>
+  {
+    const auto qid = (cnt_ > 0) ? qid_arr_[--cnt_] : AllocQID();
+    return {qid, &_qnodes[qid]};
+  }
+
+  /**
+   * @brief Retain or release a given QID.
+   *
+   * @param qid A qid to be retained or released.
+   */
+  void
+  ReleaseQID(  //
+      const uint32_t qid)
+  {
+    auto &qnode = _qnodes[qid];
+    qnode.next.store(nullptr, kRelaxed);
+    qnode.hold_lock.store(false, kRelaxed);
+    if (cnt_ < kMaxTLSNum) {
+      qid_arr_[cnt_++] = qid;
+    } else {
+      FreeQID(qid);
+    }
+  }
+
+ private:
+  /*##########################################################################*
+   * Internal constants
+   *##########################################################################*/
+
+  /// @brief The number of bits in one word.
+  static constexpr uint32_t kBitNum = 64;
+
+  /// @brief The maximum number of thread local queue nodes.
+  static constexpr uint32_t kMaxTLSNum = 8;
+
+  /// @brief The maximum number of queue nodes.
+  static constexpr uint64_t kQNodeNum = 1UL << 16UL;
+
+  /// @brief The size of a buffer for managing queue node IDs.
+  static constexpr uint32_t kIDBufSize = kQNodeNum / kBitNum;
+
+  /*##########################################################################*
+   * Internal APIs
+   *##########################################################################*/
+
+  /**
+   * @return A unique QID.
+   */
+  static auto
+  AllocQID()  //
+      -> uint32_t
+  {
+    constexpr uint32_t kIDBufMask = kIDBufSize - 1U;
+    constexpr uint64_t kFilledIDs = ~0UL;
+    thread_local const auto base = std::hash<std::thread::id>{}(std::this_thread::get_id());
+    for (uint32_t pos = base; true; ++pos) {
+      pos &= kIDBufMask;
+      auto cur = _id_buf[pos].load(kRelaxed);
+      while (cur < kFilledIDs) {
+        const uint32_t cto = std::countr_one(cur);
+        const auto flag = 1UL << cto;
+        cur = _id_buf[pos].fetch_or(flag, kAcquire);
+        if ((cur & flag) == 0UL) return pos * kBitNum + cto;
+        CPP_UTILITY_SPINLOCK_HINT
+      }
+    }
+  }
+
+  /**
+   * @brief Retain a QID for reusing in the future.
+   *
+   * @param qid A QID to be reused.
+   */
+  static void
+  FreeQID(  //
+      const uint32_t qid)
+  {
+    constexpr uint32_t kFlagMask = kBitNum - 1U;
+    _id_buf[qid / kBitNum].fetch_xor(1UL << (qid & kFlagMask), kRelease);
+  }
+
+  /*##########################################################################*
+   * Internal member variables
+   *##########################################################################*/
+
+  /// @brief The number of QIDs in a thread local storage.
+  uint32_t cnt_{};
+
+  /// @brief Thread local QIDs.
+  uint32_t qid_arr_[kMaxTLSNum] = {};
+
+  /*##########################################################################*
+   * Static variables
+   *##########################################################################*/
+  // NOLINTBEGIN
+
+  /// @brief The actual queue nodes.
+  static inline QNode _qnodes[kQNodeNum] = {};
+
+  /// @brief The container of queue node IDs.
+  alignas(kVMPageSize) static inline std::atomic_uint64_t _id_buf[kIDBufSize] = {};
+
+  // NOLINTEND
 };
 
 /*############################################################################*
@@ -77,82 +239,15 @@ constexpr uint64_t kQIDShift = 32UL;
 /// @brief A bit mask for extracting a lock state.
 constexpr uint64_t kLockMask = ~(kVersionMask | kQIDMask);
 
-/// @brief The number of bits in one word.
-constexpr uint64_t kBitNum = 64UL;
-
-/// @brief The maximum number of thread local queue nodes.
-constexpr uint32_t kMaxTLSNum = 8;
-
-/// @brief The size of a buffer for managing queue node IDs.
-constexpr uint64_t kIDBufSize = OptiQL::kQNodeNum / kBitNum;
-
 /*############################################################################*
  * Static variables
  *############################################################################*/
-
-// The definition of a static member.
-QNode _qnodes[OptiQL::kQNodeNum] = {};  // NOLINT
-
-/// @brief The container of queue node IDs.
-alignas(kVMPageSize) std::atomic_uint64_t _id_buf[kIDBufSize] = {};  // NOLINT
+// NOLINTBEGIN
 
 /// @brief A thread local queue node container.
-thread_local std::vector<uint32_t> _tls{};  // NOLINT
+thread_local TLS _tls{};
 
-/*############################################################################*
- * Local utilities
- *############################################################################*/
-
-/**
- * @return A unique QID.
- */
-auto
-GetQID()  //
-    -> uint32_t
-{
-  if (!_tls.empty()) {
-    const auto qid = _tls.back();
-    _tls.pop_back();
-    return qid;
-  }
-
-  constexpr uint32_t kIDBufMask = kIDBufSize - 1U;
-  constexpr uint64_t kFilledIDs = ~0UL;
-  thread_local const auto base = std::hash<std::thread::id>{}(std::this_thread::get_id());
-  for (uint32_t pos = base; true; ++pos) {
-    pos &= kIDBufMask;
-    auto cur = _id_buf[pos].load(kRelaxed);
-    while (cur < kFilledIDs) {
-      const uint32_t cto = std::countr_one(cur);
-      const auto flag = 1UL << cto;
-      cur = _id_buf[pos].fetch_or(flag, kRelaxed);
-      if ((cur & flag) == 0UL) return pos * kBitNum + cto;
-      CPP_UTILITY_SPINLOCK_HINT
-    }
-  }
-}
-
-/**
- * @brief Retain a QID for reusing in the future.
- *
- * @param qid A QID to be reused.
- */
-void
-RetainQID(  //
-    const uint32_t qid)
-{
-  auto *qnode = &(_qnodes[qid]);
-  qnode->next.store(nullptr, kRelaxed);
-  qnode->hold_lock.store(false, kRelaxed);
-
-  if (_tls.size() < kMaxTLSNum) {
-    _tls.emplace_back(qid);
-  } else {
-    constexpr uint32_t kFlagMask = kBitNum - 1U;
-    _id_buf[qid / kBitNum].fetch_xor(qid & kFlagMask, kRelaxed);
-  }
-}
-
+// NOLINTEND
 }  // namespace
 
 /*############################################################################*
@@ -177,8 +272,7 @@ auto
 OptiQL::LockX()  //
     -> XGuard
 {
-  const auto qid = GetQID();
-  auto *qnode = &(_qnodes[qid]);
+  auto [qid, qnode] = _tls.GetQID();
   const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
   auto cur = lock_.load(kRelaxed);
@@ -189,7 +283,7 @@ OptiQL::LockX()  //
 
   if ((cur & kLockMask) != kNoLocks) {
     // wait until predecessor gives up the lock
-    auto *pred_qnode = &(_qnodes[(cur & kQIDMask) >> kQIDShift]);
+    auto *pred_qnode = TLS::GetQNode((cur & kQIDMask) >> kQIDShift);
     pred_qnode->next.store(qnode, kRelaxed);
     while (!qnode->hold_lock.load(kRelaxed)) {
       std::this_thread::yield();
@@ -210,16 +304,13 @@ OptiQL::UnlockX(  //
     const uint64_t qid,
     const uint64_t ver)
 {
-  auto *qnode = &(_qnodes[qid]);
+  auto *qnode = TLS::GetQNode(qid);
 
   auto *next_ptr = qnode->next.load(kAcquire);
   if (next_ptr == nullptr) {  // this is the tail node
     auto cur = lock_.load(kRelaxed);
     while (((cur & kQIDMask) >> kQIDShift) == qid) {
-      if (lock_.compare_exchange_weak(cur, ver, kRelease, kRelaxed)) {
-        RetainQID(qid);
-        return;
-      }
+      if (lock_.compare_exchange_weak(cur, ver, kRelease, kRelaxed)) goto end;
       CPP_UTILITY_SPINLOCK_HINT
     }
   }
@@ -232,7 +323,9 @@ OptiQL::UnlockX(  //
     CPP_UTILITY_SPINLOCK_HINT
   }
   next_ptr->hold_lock.store(true, kRelaxed);
-  RetainQID(qid);
+
+end:
+  _tls.ReleaseQID(qid);
 }
 
 /*############################################################################*

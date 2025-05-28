@@ -35,26 +35,11 @@ class MCSLock
 {
  public:
   /*##########################################################################*
-   * Public constants
-   *##########################################################################*/
-
-  /// @brief The maximum number of queue nodes.
-  static constexpr uint64_t kQNodeNum = 1UL << 16UL;
-
-  /*##########################################################################*
    * Public types
    *##########################################################################*/
 
   // forward declarations
   class XGuard;
-
-  struct QNode {
-    /// @brief The next queue node if exist.
-    std::atomic<QNode *> next;
-
-    /// @brief The lock state of this node.
-    std::atomic_uint64_t state;
-  };
 
   /**
    * @brief A class for representing a guard instance for shared locks.
