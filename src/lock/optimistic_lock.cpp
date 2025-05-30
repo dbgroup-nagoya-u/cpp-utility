@@ -67,7 +67,7 @@ constexpr uint64_t kSMask = kAllLockMask ^ kXMask;
 
 auto
 OptimisticLock::GetVersion() noexcept  //
-    -> OptGuard
+    -> VerGuard
 {
   uint64_t cur;
   while (true) {
@@ -75,7 +75,7 @@ OptimisticLock::GetVersion() noexcept  //
     if ((cur & kXLock) == kNoLocks) break;
     std::this_thread::yield();
   }
-  return OptGuard{this, static_cast<uint32_t>(cur)};
+  return VerGuard{this, static_cast<uint32_t>(cur)};
 }
 
 /*############################################################################*
@@ -261,9 +261,9 @@ OptimisticLock::XGuard::DowngradeToSIX() noexcept  //
  *############################################################################*/
 
 auto
-OptimisticLock::OptGuard::operator=(  //
-    OptGuard &&rhs) noexcept          //
-    -> OptGuard &
+OptimisticLock::VerGuard::operator=(  //
+    VerGuard &&rhs) noexcept          //
+    -> VerGuard &
 {
   if (dest_ && has_lock_) {
     dest_->UnlockS();
@@ -275,7 +275,7 @@ OptimisticLock::OptGuard::operator=(  //
   return *this;
 }
 
-OptimisticLock::OptGuard::~OptGuard()
+OptimisticLock::VerGuard::~VerGuard()
 {
   if (dest_ && has_lock_) {
     dest_->UnlockS();
@@ -283,7 +283,7 @@ OptimisticLock::OptGuard::~OptGuard()
 }
 
 auto
-OptimisticLock::OptGuard::VerifyVersion(  //
+OptimisticLock::VerGuard::VerifyVersion(  //
     const uint32_t mask,
     const size_t max_retry) noexcept  //
     -> bool
@@ -319,7 +319,7 @@ OptimisticLock::OptGuard::VerifyVersion(  //
 }
 
 auto
-OptimisticLock::OptGuard::ImmediateVerify(  //
+OptimisticLock::VerGuard::ImmediateVerify(  //
     const uint32_t mask) noexcept           //
     -> bool
 {
@@ -340,7 +340,7 @@ OptimisticLock::OptGuard::ImmediateVerify(  //
 }
 
 auto
-OptimisticLock::OptGuard::TryLockS(  //
+OptimisticLock::VerGuard::TryLockS(  //
     const uint32_t mask)             //
     -> SGuard
 {
@@ -361,7 +361,7 @@ OptimisticLock::OptGuard::TryLockS(  //
 }
 
 auto
-OptimisticLock::OptGuard::TryLockSIX(  //
+OptimisticLock::VerGuard::TryLockSIX(  //
     const uint32_t mask)               //
     -> SIXGuard
 {
@@ -386,7 +386,7 @@ OptimisticLock::OptGuard::TryLockSIX(  //
 }
 
 auto
-OptimisticLock::OptGuard::TryLockX(  //
+OptimisticLock::VerGuard::TryLockX(  //
     const uint32_t mask)             //
     -> XGuard
 {

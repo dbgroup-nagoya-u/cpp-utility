@@ -288,11 +288,11 @@ class OptimisticLockFixture : public ::testing::Test
   TryTryLock(  //
       const LockType lock_type,
       const LockType conflict_type,
-      OptimisticLock::OptGuard opt_guard,
+      OptimisticLock::VerGuard opt_guard,
       const bool expect_success)
   {
     auto try_lock = [](LockType lock_type, LockType conflict_type,
-                       OptimisticLock::OptGuard opt_guard, std::promise<void> p) {
+                       OptimisticLock::VerGuard opt_guard, std::promise<void> p) {
       switch (lock_type) {
         case kSLock: {
           const auto &guard = opt_guard.TryLockS();

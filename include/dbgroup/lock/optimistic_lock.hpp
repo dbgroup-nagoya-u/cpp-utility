@@ -331,30 +331,30 @@ class OptimisticLock
    * @brief A class for representing a guard instance for optimistic locking.
    *
    */
-  class OptGuard
+  class VerGuard
   {
    public:
     /*########################################################################*
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr OptGuard() noexcept = default;
+    constexpr VerGuard() noexcept = default;
 
     /**
      * @param dest The address of a target lock.
      * @param ver The current version.
      */
-    constexpr OptGuard(  //
+    constexpr VerGuard(  //
         OptimisticLock *dest,
         const uint32_t ver) noexcept
         : dest_{dest}, ver_{ver}
     {
     }
 
-    OptGuard(const OptGuard &) = delete;
+    VerGuard(const VerGuard &) = delete;
 
-    constexpr OptGuard(  //
-        OptGuard &&obj) noexcept
+    constexpr VerGuard(  //
+        VerGuard &&obj) noexcept
         : dest_{std::exchange(obj.dest_, nullptr)},
           ver_{obj.ver_},
           retry_num_{obj.retry_num_},
@@ -362,17 +362,17 @@ class OptimisticLock
     {
     }
 
-    auto operator=(const OptGuard &) -> OptGuard & = delete;
+    auto operator=(const VerGuard &) -> VerGuard & = delete;
 
     auto operator=(               //
-        OptGuard &&rhs) noexcept  //
-        -> OptGuard &;
+        VerGuard &&rhs) noexcept  //
+        -> VerGuard &;
 
     /*########################################################################*
      * Public destructors
      *########################################################################*/
 
-    ~OptGuard();
+    ~VerGuard();
 
     /*########################################################################*
      * Public getters
@@ -506,7 +506,7 @@ class OptimisticLock
    * with spinlock and back-off.
    */
   [[nodiscard]] auto GetVersion() noexcept  //
-      -> OptGuard;
+      -> VerGuard;
 
   /*##########################################################################*
    * Pessimistic lock APIs

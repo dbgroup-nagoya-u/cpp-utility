@@ -145,37 +145,37 @@ class OptiQL
    * @brief A class for representing a guard instance for optimistic locking.
    *
    */
-  class OptGuard
+  class VerGuard
   {
    public:
     /*########################################################################*
      * Public constructors and assignment operators
      *########################################################################*/
 
-    constexpr OptGuard() noexcept = default;
+    constexpr VerGuard() noexcept = default;
 
     /**
      * @param dest The address of a target lock.
      * @param ver The current version.
      */
-    constexpr OptGuard(  //
+    constexpr VerGuard(  //
         const OptiQL *dest,
         const uint32_t ver) noexcept
         : dest_{dest}, ver_{ver}
     {
     }
 
-    constexpr OptGuard(const OptGuard &) noexcept = default;
-    constexpr OptGuard(OptGuard &&) noexcept = default;
+    constexpr VerGuard(const VerGuard &) noexcept = default;
+    constexpr VerGuard(VerGuard &&) noexcept = default;
 
-    constexpr auto operator=(const OptGuard &) noexcept -> OptGuard & = default;
-    constexpr auto operator=(OptGuard &&) noexcept -> OptGuard & = default;
+    constexpr auto operator=(const VerGuard &) noexcept -> VerGuard & = default;
+    constexpr auto operator=(VerGuard &&) noexcept -> VerGuard & = default;
 
     /*########################################################################*
      * Public destructors
      *########################################################################*/
 
-    ~OptGuard() = default;
+    ~VerGuard() = default;
 
     /*########################################################################*
      * Public getters
@@ -253,7 +253,7 @@ class OptiQL
    * with spinlock and back-off.
    */
   [[nodiscard]] auto GetVersion() const noexcept  //
-      -> OptGuard;
+      -> VerGuard;
 
   /**
    * @brief Get an exclusive lock.

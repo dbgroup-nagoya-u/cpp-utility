@@ -52,7 +52,7 @@ class OptiQLFixture : public ::testing::Test
    * Types
    *##########################################################################*/
 
-  using Guard = std::variant<int, OptiQL::XGuard, OptiQL::OptGuard>;
+  using Guard = std::variant<int, OptiQL::XGuard, OptiQL::VerGuard>;
 
   /*##########################################################################*
    * Setup/Teardown

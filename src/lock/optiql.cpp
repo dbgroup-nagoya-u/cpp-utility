@@ -256,7 +256,7 @@ thread_local TLS _tls{};
 
 auto
 OptiQL::GetVersion() const noexcept  //
-    -> OptGuard
+    -> VerGuard
 {
   uint64_t cur{};
   while (true) {
@@ -265,7 +265,7 @@ OptiQL::GetVersion() const noexcept  //
     std::this_thread::yield();
   }
 
-  return OptGuard{this, static_cast<uint32_t>(cur & kVersionMask)};
+  return VerGuard{this, static_cast<uint32_t>(cur & kVersionMask)};
 }
 
 auto
@@ -359,7 +359,7 @@ OptiQL::XGuard::~XGuard()
  *############################################################################*/
 
 auto
-OptiQL::OptGuard::VerifyVersion() noexcept  //
+OptiQL::VerGuard::VerifyVersion() noexcept  //
     -> bool
 {
   uint64_t cur{};

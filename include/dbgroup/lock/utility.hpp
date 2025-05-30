@@ -117,11 +117,11 @@ template <class T>
 concept OptimisticallyLockable = requires(T &x) {
   // public types
   requires VersionedXGuard<typename T::XGuard>;
-  requires OptimisticReadGuard<typename T::OptGuard, typename T::XGuard>;
+  requires OptimisticReadGuard<typename T::VerGuard, typename T::XGuard>;
 
   // public APIs
   { x.LockX() } -> std::convertible_to<typename T::XGuard>;
-  { x.GetVersion() } -> std::convertible_to<typename T::OptGuard>;
+  { x.GetVersion() } -> std::convertible_to<typename T::VerGuard>;
 };
 
 /**
