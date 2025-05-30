@@ -237,4 +237,21 @@ PessimisticLock::XGuard::DowngradeToSIX() noexcept  //
   return SIXGuard{std::exchange(dest_, nullptr), new_ver_};
 }
 
+/*############################################################################*
+ * Version guards
+ *############################################################################*/
+
+auto
+PessimisticLock::VerGuard::ImmediateVerify(  //
+    const uint32_t mask) noexcept            //
+    -> bool
+{
+  while (true) {
+    const auto cur = dest_->lock_.load(kRelaxed);
+    if ((cur ^ ver_) & mask) return false;
+    if ((cur & kXLock) == kNoLocks) return true;
+    std::this_thread::yield();
+  }
+}
+
 }  // namespace dbgroup::lock

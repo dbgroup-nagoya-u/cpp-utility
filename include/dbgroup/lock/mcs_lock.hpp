@@ -40,6 +40,7 @@ class MCSLock
 
   // forward declarations
   class XGuard;
+  class VerGuard;
 
   /**
    * @brief A class for representing a guard instance for shared locks.
@@ -48,6 +49,9 @@ class MCSLock
   class SGuard
   {
    public:
+    // friend declarations
+    friend VerGuard;
+
     /*########################################################################*
      * Public constructors and assignment operators
      *########################################################################*/
@@ -132,6 +136,9 @@ class MCSLock
   class SIXGuard
   {
    public:
+    // friend declarations
+    friend VerGuard;
+
     /*########################################################################*
      * Public constructors and assignment operators
      *########################################################################*/
@@ -226,6 +233,9 @@ class MCSLock
   class XGuard
   {
    public:
+    // friend declarations
+    friend VerGuard;
+
     /*########################################################################*
      * Public constructors and assignment operators
      *########################################################################*/
@@ -336,6 +346,118 @@ class MCSLock
 
     /// @brief A version when failing verification.
     uint32_t new_ver_{};
+  };
+
+  /**
+   * @brief A class for representing a guard instance for version verification.
+   *
+   */
+  class VerGuard
+  {
+   public:
+    /*########################################################################*
+     * Public constructors and assignment operators
+     *########################################################################*/
+
+    constexpr VerGuard() noexcept = default;
+
+    /**
+     * @param dest The address of a target lock.
+     * @param ver The current version.
+     */
+    constexpr VerGuard(  //
+        MCSLock *dest,
+        const uint32_t ver) noexcept
+        : dest_{dest}, ver_{ver}
+    {
+    }
+
+    /**
+     * @param grd A guard instance that holds the current version.
+     */
+    constexpr explicit VerGuard(  //
+        const SGuard &grd) noexcept
+        : dest_{grd.dest_}, ver_{grd.ver_}
+    {
+    }
+
+    /**
+     * @param grd A guard instance that holds the current version.
+     */
+    constexpr explicit VerGuard(  //
+        const SIXGuard &grd) noexcept
+        : dest_{grd.dest_}, ver_{grd.ver_}
+    {
+    }
+
+    /**
+     * @param grd A guard instance that holds the current version.
+     */
+    constexpr explicit VerGuard(  //
+        const XGuard &grd) noexcept
+        : dest_{grd.dest_}, ver_{grd.new_ver_}
+    {
+    }
+
+    constexpr VerGuard(const VerGuard &) = default;
+    constexpr VerGuard(VerGuard &&) noexcept = default;
+
+    constexpr auto operator=(const VerGuard &) noexcept -> VerGuard & = default;
+    constexpr auto operator=(VerGuard &&) noexcept -> VerGuard & = default;
+
+    /*########################################################################*
+     * Public destructors
+     *########################################################################*/
+
+    ~VerGuard() = default;
+
+    /*########################################################################*
+     * Public getters
+     *########################################################################*/
+
+    /**
+     * @retval true if this instance has a valid version.
+     * @retval false otherwise.
+     */
+    constexpr explicit
+    operator bool() const noexcept
+    {
+      return dest_;
+    }
+
+    /**
+     * @return The version when this guard was created.
+     */
+    [[nodiscard]] constexpr auto
+    GetVersion() const noexcept  //
+        -> uint32_t
+    {
+      return ver_;
+    }
+
+    /*########################################################################*
+     * Public APIs
+     *########################################################################*/
+
+    /**
+     * @param mask A bitmask for representing bits to be verified.
+     * @retval true if a target version does not change from an expected one.
+     * @retval false otherwise.
+     */
+    [[nodiscard]] auto ImmediateVerify(    //
+        uint32_t mask = kNoMask) noexcept  //
+        -> bool;
+
+   private:
+    /*########################################################################*
+     * Internal member variables
+     *########################################################################*/
+
+    /// @brief The address of a target lock.
+    MCSLock *dest_{};
+
+    /// @brief A version when creating this guard.
+    uint32_t ver_{};
   };
 
   /*##########################################################################*

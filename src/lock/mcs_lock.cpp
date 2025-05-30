@@ -541,4 +541,46 @@ MCSLock::XGuard::~XGuard()
   }
 }
 
+/*############################################################################*
+ * Version guards
+ *############################################################################*/
+
+auto
+MCSLock::VerGuard::ImmediateVerify(  //
+    const uint32_t mask) noexcept    //
+    -> bool
+{
+  auto cur = dest_->lock_.load(kRelaxed);
+  while (true) {
+    if ((cur & kXLock) == kNoLocks) return ((cur ^ ver_) & mask) == 0;
+    if (dest_->lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) break;
+    CPP_UTILITY_SPINLOCK_HINT
+  }
+
+  // there is the predecessor
+  const auto this_qid = cur & kQIDMask;
+  const auto qid = this_qid >> kQIDShift;
+  auto *qnode = TLS::GetQNode(qid);
+  while ((cur & kQIDMask) == this_qid && (cur & kXLock)) {
+    std::this_thread::yield();
+    cur = dest_->lock_.load(kAcquire);
+  }
+  if ((cur & kQIDMask) != this_qid) {  // there is the successor
+    QNode *next;
+    while (true) {  // wait for the successor to fill its pointer
+      next = qnode->next.load(kAcquire);
+      if (next) break;
+      CPP_UTILITY_SPINLOCK_HINT
+    }
+    while (true) {
+      cur = next->state.load(kRelaxed);
+      if ((cur & kXLock) == kNoLocks) break;
+      std::this_thread::yield();
+    }
+  }
+
+  dest_->UnlockS(qid);
+  return ((cur ^ ver_) & mask) == 0;
+}
+
 }  // namespace dbgroup::lock
