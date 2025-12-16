@@ -31,6 +31,9 @@
 #include <byteswap.h>
 #endif
 
+// local sources
+#include "dbgroup/lock/utility.hpp"
+
 namespace dbgroup::index
 {
 /*############################################################################*
@@ -69,6 +72,12 @@ constexpr bool kClosed = true;
 
 /// @brief A flag for indicating closed intervals
 constexpr bool kOpen = false;
+
+/// @brief A bit mask for extracting insert/delete versions.
+constexpr uint32_t kInsDelMask = 0xFFFF'8000U;
+
+/// @brief A bit mask for extracting SMO versions.
+constexpr uint32_t kSMOMask = 0xFF00'0000U;
 
 /*############################################################################*
  * Global utilities
@@ -249,6 +258,26 @@ ParsePayload(                     //
     const auto &[key, payload] = entry;
     return {payload, sizeof(Payload)};
   }
+}
+
+/**
+ * @brief Increment a version value using a given bitmask.
+ *
+ * @tparam kMask A bitmask for extracting a target version.
+ * @tparam XGuard A class for representing an exclusive-lock guard.
+ * @param x_grd An exclusive-lock guard.
+ */
+template <uint32_t kMask, class XGuard>
+constexpr void
+VerIncrement(  //
+    XGuard &x_grd) noexcept
+{
+  constexpr uint32_t kUnit = ~kMask + 1U;
+  static_assert(           //
+      kMask + kUnit == 0,  //
+      "A bit mask must be a contiguous sequence of leftmost bits.");
+
+  x_grd.SetVersion((x_grd.GetVersion() & kMask) + kUnit);
 }
 
 /**

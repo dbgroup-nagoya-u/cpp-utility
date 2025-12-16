@@ -26,14 +26,12 @@
 #include <type_traits>
 #include <vector>
 
-//
-#include <iostream>
-
 // external libraries
 #include "gtest/gtest.h"
 
 // library sources
 #include "dbgroup/constants.hpp"
+#include "dbgroup/lock/optimistic_lock.hpp"
 
 // local sources
 #include "common.hpp"
@@ -146,19 +144,38 @@ TYPED_TEST_SUITE(BinaryConverterFixture, Targets);
  * Unit test definitions
  *############################################################################*/
 
-TYPED_TEST(BinaryConverterFixture, ConvertedDataAreComparableUsingMemCmp)
+TYPED_TEST(  //
+    BinaryConverterFixture,
+    ConvertedDataAreComparableUsingMemCmp)
 {
   TestFixture::VerifyMemCmp();
 }
 
-TYPED_TEST(BinaryConverterFixture, ConvertedDataAreComparableAsUInt64)
+TYPED_TEST(  //
+    BinaryConverterFixture,
+    ConvertedDataAreComparableAsUInt64)
 {
   TestFixture::VerifyCmpAsUInt64();
 }
 
-TYPED_TEST(BinaryConverterFixture, RestoredValuesAreEquivalentWithSrcValues)
+TYPED_TEST(  //
+    BinaryConverterFixture,
+    RestoredValuesAreEquivalentWithSrcValues)
 {
   TestFixture::VerifyRestore();
+}
+
+TEST(  //
+    VerIncrementTest,
+    IncrementVersionBasedOnGivenMask)
+{
+  lock::OptimisticLock lock{};
+  {
+    auto &&grd = lock.LockX();
+    VerIncrement<kInsDelMask>(grd);
+  }
+  auto &&grd = lock.GetVersion();
+  EXPECT_EQ(grd.GetVersion() + kInsDelMask, 0);
 }
 
 }  // namespace dbgroup::index::test
