@@ -74,10 +74,10 @@ constexpr bool kClosed = true;
 constexpr bool kOpen = false;
 
 /// @brief A bit mask for extracting insert/delete versions.
-constexpr uint32_t kInsDelMask = 0xFFFF'8000U;
+constexpr uint32_t kInsDelMask = 0xFFFF'F000U;
 
 /// @brief A bit mask for extracting SMO versions.
-constexpr uint32_t kSMOMask = 0xFF00'0000U;
+constexpr uint32_t kSMOMask = 0xFFC0'0000U;
 
 /*############################################################################*
  * Global utilities
