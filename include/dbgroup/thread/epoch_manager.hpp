@@ -44,12 +44,6 @@ class EpochManager
    *##########################################################################*/
 
   /**
-   * @brief Construct a new instance.
-   *
-   */
-  constexpr EpochManager() noexcept = default;
-
-  /**
    * @brief Construct a new object and start epoch management.
    *
    * @param epoch_interval The period duration for each epoch.
