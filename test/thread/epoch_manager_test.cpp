@@ -43,6 +43,7 @@ constexpr size_t kLoopNum = 100;
  * Fixture definitions
  *############################################################################*/
 
+template <class Serial>
 class EpochManagerFixture : public ::testing::Test
 {
  protected:
@@ -53,7 +54,7 @@ class EpochManagerFixture : public ::testing::Test
   void
   SetUp() override
   {
-    epoch_manager_ = std::make_unique<EpochManager>(kEpochInterval);
+    epoch_manager_ = std::make_unique<EpochManager<Serial>>(kEpochInterval);
   }
 
   void
@@ -61,80 +62,111 @@ class EpochManagerFixture : public ::testing::Test
   {
   }
 
+  void
+  GlobalEpochWithoutGuardProgressOverTime()
+  {
+    auto prev = epoch_manager_->GetCurrentEpoch();
+    for (size_t i = 0; i < kLoopNum; ++i) {
+      Serial cur;
+      while (true) {
+        cur = epoch_manager_->GetCurrentEpoch();
+        if (cur != prev) break;
+        std::this_thread::sleep_for(kSleepTime);
+      }
+      EXPECT_GT(cur, prev);
+      prev = cur;
+    }
+  }
+
+  void
+  GlobalEpochWithGuardProgressOverTime()
+  {
+    [[maybe_unused]] const auto &grd = epoch_manager_->CreateEpochGuard();
+    auto prev = epoch_manager_->GetCurrentEpoch();
+    for (size_t i = 0; i < kLoopNum; ++i) {
+      Serial cur;
+      while (true) {
+        cur = epoch_manager_->GetCurrentEpoch();
+        if (cur != prev) break;
+        std::this_thread::sleep_for(kSleepTime);
+      }
+      EXPECT_GT(cur, prev);
+      prev = cur;
+    }
+  }
+
+  void
+  MinEpochWithoutGuardProgressOverTime()
+  {
+    auto prev = epoch_manager_->GetMinEpoch();
+    for (size_t i = 0; i < kLoopNum; ++i) {
+      Serial cur;
+      while (true) {
+        cur = epoch_manager_->GetMinEpoch();
+        if (cur != prev) break;
+        std::this_thread::sleep_for(kSleepTime);
+      }
+      EXPECT_GT(cur, prev);
+      prev = cur;
+    }
+  }
+
+  void
+  MinEpochWithGuardRemainUnchangedOverTime()
+  {
+    [[maybe_unused]] const auto &grd = epoch_manager_->CreateEpochGuard();
+    auto prev = epoch_manager_->GetMinEpoch();
+    for (size_t i = 0; i < kLoopNum; ++i) {
+      const auto cur = epoch_manager_->GetMinEpoch();
+      EXPECT_EQ(cur, prev);
+      std::this_thread::sleep_for(kSleepTime);
+    }
+  }
+
   /*##########################################################################*
    * Internal member variables
    *##########################################################################*/
 
-  std::unique_ptr<EpochManager> epoch_manager_{};
+  std::unique_ptr<EpochManager<Serial>> epoch_manager_{};
 };
+
+/*############################################################################*
+ * Preparation for typed testing
+ *############################################################################*/
+
+using Types = ::testing::Types<Serial8_t, Serial16_t, Serial32_t, Serial64_t>;
+TYPED_TEST_SUITE(EpochManagerFixture, Types);
 
 /*############################################################################*
  * Unit test definitions
  *############################################################################*/
 
-TEST_F(                   //
+TYPED_TEST(               //
     EpochManagerFixture,  //
     GlobalEpochWithoutGuardProgressOverTime)
 {
-  auto prev = epoch_manager_->GetCurrentEpoch();
-  for (size_t i = 0; i < kLoopNum; ++i) {
-    Serial32_t cur;
-    while (true) {
-      cur = epoch_manager_->GetCurrentEpoch();
-      if (cur != prev) break;
-      std::this_thread::sleep_for(kSleepTime);
-    }
-    EXPECT_GT(cur, prev);
-    prev = cur;
-  }
+  TestFixture::GlobalEpochWithoutGuardProgressOverTime();
 }
 
-TEST_F(                   //
+TYPED_TEST(               //
     EpochManagerFixture,  //
     GlobalEpochWithGuardProgressOverTime)
 {
-  [[maybe_unused]] const auto &grd = epoch_manager_->CreateEpochGuard();
-  auto prev = epoch_manager_->GetCurrentEpoch();
-  for (size_t i = 0; i < kLoopNum; ++i) {
-    Serial32_t cur;
-    while (true) {
-      cur = epoch_manager_->GetCurrentEpoch();
-      if (cur != prev) break;
-      std::this_thread::sleep_for(kSleepTime);
-    }
-    EXPECT_GT(cur, prev);
-    prev = cur;
-  }
+  TestFixture::GlobalEpochWithGuardProgressOverTime();
 }
 
-TEST_F(                   //
+TYPED_TEST(               //
     EpochManagerFixture,  //
     MinEpochWithoutGuardProgressOverTime)
 {
-  auto prev = epoch_manager_->GetMinEpoch();
-  for (size_t i = 0; i < kLoopNum; ++i) {
-    Serial32_t cur;
-    while (true) {
-      cur = epoch_manager_->GetMinEpoch();
-      if (cur != prev) break;
-      std::this_thread::sleep_for(kSleepTime);
-    }
-    EXPECT_GT(cur, prev);
-    prev = cur;
-  }
+  TestFixture::MinEpochWithoutGuardProgressOverTime();
 }
 
-TEST_F(                   //
+TYPED_TEST(               //
     EpochManagerFixture,  //
     MinEpochWithGuardRemainUnchangedOverTime)
 {
-  [[maybe_unused]] const auto &grd = epoch_manager_->CreateEpochGuard();
-  auto prev = epoch_manager_->GetMinEpoch();
-  for (size_t i = 0; i < kLoopNum; ++i) {
-    const auto cur = epoch_manager_->GetMinEpoch();
-    EXPECT_EQ(cur, prev);
-    std::this_thread::sleep_for(kSleepTime);
-  }
+  TestFixture::MinEpochWithGuardRemainUnchangedOverTime();
 }
 
 }  // namespace dbgroup::thread::test

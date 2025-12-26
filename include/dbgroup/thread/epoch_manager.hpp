@@ -35,7 +35,9 @@ namespace dbgroup::thread
 /**
  * @brief A class to manage epochs for epoch-based garbage collection.
  *
+ * @tparam Serial A serial type for representing epoch values.
  */
+template <class Serial = Serial64_t>
 class EpochManager
 {
  public:
@@ -62,7 +64,7 @@ class EpochManager
    */
   EpochManager(  //
       size_t epoch_interval,
-      const std::function<Serial32_t(void)> &get_new_epoch,
+      const std::function<Serial(void)> &get_new_epoch,
       size_t thread_num = kMaxThreadNum);
 
   EpochManager(const EpochManager &) = delete;
@@ -90,14 +92,14 @@ class EpochManager
    */
   [[nodiscard]]
   auto GetCurrentEpoch() const noexcept  //
-      -> Serial32_t;
+      -> Serial;
 
   /**
    * @return The current minimum (i.e., protected) epoch.
    */
   [[nodiscard]]
   auto GetMinEpoch() const noexcept  //
-      -> Serial32_t;
+      -> Serial;
 
   /**
    * @brief Create a guard instance based on the scoped locking pattern.
@@ -122,7 +124,7 @@ class EpochManager
     std::atomic_bool active{};
 
     /// @brief The last epoch when a thread has entered.
-    Serial32_t entered{};
+    Serial entered{};
   };
 
   /*##########################################################################*
@@ -134,17 +136,17 @@ class EpochManager
    *
    */
   void AdvanceEpochWorker(  //
-      const std::function<Serial32_t(void)> &get_new_epoch);
+      const std::function<Serial(void)> &get_new_epoch);
 
   /*##########################################################################*
    * Internal member variables
    *##########################################################################*/
 
   /// @brief A global epoch counter.
-  std::atomic<Serial32_t> global_epoch_{Serial32_t{1}};
+  std::atomic<Serial> global_epoch_{Serial{1}};
 
   /// @brief The local minimum epoch.
-  std::atomic<Serial32_t> min_epoch_{Serial32_t{0}};
+  std::atomic<Serial> min_epoch_{Serial{0}};
 
   /// @brief The maximum number of worker threads.
   size_t thread_num_{kMaxThreadNum};

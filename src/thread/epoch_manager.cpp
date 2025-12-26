@@ -38,7 +38,8 @@ namespace dbgroup::thread
  * Public constructors and destructors
  *############################################################################*/
 
-EpochManager::EpochManager(  //
+template <class Serial>
+EpochManager<Serial>::EpochManager(  //
     const size_t epoch_interval,
     const size_t thread_num)
     : thread_num_{thread_num},
@@ -46,15 +47,16 @@ EpochManager::EpochManager(  //
       tls_fields_{std::make_unique<TLSEpoch[]>(thread_num)},
       running_{true},
       manager_{&EpochManager::AdvanceEpochWorker, this,
-               [this]() -> Serial32_t { return ++GetCurrentEpoch(); }}
+               [this]() -> Serial { return ++GetCurrentEpoch(); }}
 {
   if (thread_num_ <= kMaxThreadNum) return;
   throw std::range_error{"The number of worker threads exceeded the upperbound."};
 }
 
-EpochManager::EpochManager(  //
+template <class Serial>
+EpochManager<Serial>::EpochManager(  //
     const size_t epoch_interval,
-    const std::function<Serial32_t(void)> &get_new_epoch,
+    const std::function<Serial(void)> &get_new_epoch,
     const size_t thread_num)
     : global_epoch_{get_new_epoch()},
       min_epoch_{--GetCurrentEpoch()},
@@ -68,7 +70,8 @@ EpochManager::EpochManager(  //
   throw std::range_error{"The number of worker threads exceeded the upperbound."};
 }
 
-EpochManager::~EpochManager()
+template <class Serial>
+EpochManager<Serial>::~EpochManager()
 {
   if (running_.load(kRelaxed)) {
     running_.store(false, kRelaxed);
@@ -84,22 +87,25 @@ EpochManager::~EpochManager()
  * Public APIs
  *############################################################################*/
 
+template <class Serial>
 auto
-EpochManager::GetCurrentEpoch() const noexcept  //
-    -> Serial32_t
+EpochManager<Serial>::GetCurrentEpoch() const noexcept  //
+    -> Serial
 {
   return global_epoch_.load(kRelaxed);
 }
 
+template <class Serial>
 auto
-EpochManager::GetMinEpoch() const noexcept  //
-    -> Serial32_t
+EpochManager<Serial>::GetMinEpoch() const noexcept  //
+    -> Serial
 {
   return min_epoch_.load(kRelaxed);
 }
 
+template <class Serial>
 auto
-EpochManager::CreateEpochGuard()  //
+EpochManager<Serial>::CreateEpochGuard()  //
     -> EpochGuard
 {
   auto &tls = tls_fields_[dbgroup::thread::IDManager::GetThreadID()];
@@ -111,9 +117,10 @@ EpochManager::CreateEpochGuard()  //
  * Internal APIs
  *############################################################################*/
 
+template <class Serial>
 void
-EpochManager::AdvanceEpochWorker(  //
-    const std::function<Serial32_t(void)> &get_new_epoch)
+EpochManager<Serial>::AdvanceEpochWorker(  //
+    const std::function<Serial(void)> &get_new_epoch)
 {
   auto wake_time = std::chrono::system_clock::now();
   while (running_.load(kRelaxed)) {
@@ -131,5 +138,14 @@ EpochManager::AdvanceEpochWorker(  //
     std::this_thread::sleep_until(wake_time);
   }
 }
+
+/*############################################################################*
+ * Explicit instantiation definitions
+ *############################################################################*/
+
+template class EpochManager<Serial8_t>;
+template class EpochManager<Serial16_t>;
+template class EpochManager<Serial32_t>;
+template class EpochManager<Serial64_t>;
 
 }  // namespace dbgroup::thread
