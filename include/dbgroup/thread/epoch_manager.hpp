@@ -18,18 +18,17 @@
 #define CPP_UTILITY_DBGROUP_THREAD_EPOCH_MANAGER_HPP_
 
 // C++ standard libraries
-#include <array>
 #include <atomic>
 #include <chrono>
 #include <cstddef>
+#include <functional>
 #include <memory>
-#include <utility>
-#include <vector>
+#include <thread>
 
 // local sources
 #include "dbgroup/constants.hpp"
 #include "dbgroup/thread/epoch_guard.hpp"
-#include "dbgroup/thread/id_manager.hpp"
+#include "dbgroup/types.hpp"
 
 namespace dbgroup::thread
 {
@@ -39,35 +38,32 @@ namespace dbgroup::thread
  */
 class EpochManager
 {
-  /*##########################################################################*
-   * Type aliases
-   *##########################################################################*/
-
-  using Epoch = component::Epoch;
-
  public:
-  /*##########################################################################*
-   * Public constants
-   *##########################################################################*/
-
-  /// @brief The capacity of nodes for protected epochs.
-  static constexpr size_t kCapacity = 256;
-
-  /// @brief The initial value of epochs.
-  static constexpr size_t kInitialEpoch = kCapacity;
-
-  /// @brief The minimum value of epochs.
-  static constexpr size_t kMinEpoch = 0;
-
   /*##########################################################################*
    * Public constructors and assignment operators
    *##########################################################################*/
 
   /**
-   * @brief Construct a new instance.
+   * @brief Construct a new object and start epoch management.
    *
+   * @param epoch_interval The period duration for each epoch.
+   * @param thread_num The maximum number of worker threads.
    */
-  EpochManager();
+  explicit EpochManager(  //
+      size_t epoch_interval,
+      size_t thread_num = kMaxThreadNum);
+
+  /**
+   * @brief Construct a new object and start epoch management.
+   *
+   * @param epoch_interval The interval between epoch updates.
+   * @param get_new_epoch Callback function for updating the global epoch value.
+   * @param thread_num The maximum number of worker threads.
+   */
+  EpochManager(  //
+      size_t epoch_interval,
+      const std::function<Serial32_t(void)> &get_new_epoch,
+      size_t thread_num = kMaxThreadNum);
 
   EpochManager(const EpochManager &) = delete;
   EpochManager(EpochManager &&) = delete;
@@ -90,44 +86,27 @@ class EpochManager
    *##########################################################################*/
 
   /**
-   * @return A current global epoch value.
+   * @return The current epoch.
    */
-  [[nodiscard]] auto GetCurrentEpoch() const noexcept  //
-      -> size_t;
+  [[nodiscard]]
+  auto GetCurrentEpoch() const noexcept  //
+      -> Serial32_t;
 
   /**
-   * @return The minimum protected epoch value.
+   * @return The current minimum (i.e., protected) epoch.
    */
-  [[nodiscard]] auto GetMinEpoch() const noexcept  //
-      -> size_t;
-
-  /**
-   * @brief Get protected epoch values as shared_ptr.
-   *
-   * Protected epoch values are sorted by descending order and include the
-   * current epoch value. Note that the returned vector cannot be modified
-   * because it is referred from multiple threads concurrently.
-   *
-   * @retval 1st: The corresponding epoch guard for this thread.
-   * @retval 2nd: Protected epoch values.
-   */
-  [[nodiscard]] auto GetProtectedEpochs()  //
-      -> std::pair<EpochGuard, const std::vector<size_t> &>;
+  [[nodiscard]]
+  auto GetMinEpoch() const noexcept  //
+      -> Serial32_t;
 
   /**
    * @brief Create a guard instance based on the scoped locking pattern.
    *
    * @return A created epoch guard.
    */
-  [[nodiscard]] auto CreateEpochGuard()  //
+  [[nodiscard]]
+  auto CreateEpochGuard()  //
       -> EpochGuard;
-
-  /**
-   * @brief Increment a current epoch value.
-   *
-   * This function also updates protected epoch values.
-   */
-  void ForwardGlobalEpoch();
 
  private:
   /*##########################################################################*
@@ -139,155 +118,48 @@ class EpochManager
    *
    */
   struct alignas(kCacheLineSize) TLSEpoch {
-    /// @brief An epoch object for each thread.
-    Epoch epoch{};
+    /// @brief A flag for indicating wether a thread has entered an epoch.
+    std::atomic_bool active{};
 
-    /// @brief A flag for indicating the corresponding thread has exited.
-    std::weak_ptr<size_t> heartbeat{};
+    /// @brief The last epoch when a thread has entered.
+    Serial32_t entered{};
   };
-
-  /**
-   * @brief A class for composing a linked list of epochs in each thread.
-   *
-   */
-  class alignas(kCacheLineSize) ProtectedNode
-  {
-   public:
-    /*########################################################################*
-     * Public constructors and assignment operators
-     *########################################################################*/
-
-    /**
-     * @brief Construct a new instance.
-     *
-     * @param epoch Upper bits of epoch values to be retained in this node.
-     * @param next A pointer to the next node.
-     */
-    ProtectedNode(  //
-        size_t epoch,
-        ProtectedNode *next) noexcept;
-
-    ProtectedNode(const ProtectedNode &) = delete;
-    ProtectedNode(ProtectedNode &&) = delete;
-
-    auto operator=(const ProtectedNode &) -> ProtectedNode & = delete;
-    auto operator=(ProtectedNode &&) -> ProtectedNode & = delete;
-
-    /*########################################################################*
-     * Public destructors
-     *########################################################################*/
-
-    /**
-     * @brief Destroy the instance.
-     *
-     */
-    ~ProtectedNode() = default;
-
-    /*########################################################################*
-     * Public utility functions
-     *########################################################################*/
-
-    /**
-     * @brief Get protected epoch values based on a given epoch.
-     *
-     * @param epoch A target epoch value.
-     * @param node The head pointer of a linked list.
-     * @return Protected epochs.
-     */
-    [[nodiscard]] static constexpr auto
-    GetProtectedEpochs(  //
-        const size_t epoch,
-        ProtectedNode *node)  //
-        -> std::vector<size_t> &
-    {
-      // go to the target node
-      const auto upper_epoch = epoch & kUpperMask;
-      while (node->upper_epoch_ > upper_epoch) {
-        node = node->next;
-      }
-
-      return node->epoch_lists_.at(epoch & kLowerMask);
-    }
-
-    /**
-     * @return The upper bits of the current epoch.
-     */
-    [[nodiscard]] constexpr auto
-    GetUpperBits() const noexcept  //
-        -> size_t
-    {
-      return upper_epoch_;
-    }
-
-    /*########################################################################*
-     * Public member variables
-     *########################################################################*/
-
-    /// @brief A pointer to the next node.
-    ProtectedNode *next{nullptr};  // NOLINT
-
-   private:
-    /*########################################################################*
-     * Internal member variables
-     *########################################################################*/
-
-    /// @brief The upper bits of epoch values to be retained in this node.
-    size_t upper_epoch_{};
-
-    /// @brief The list of protected epochs.
-    std::array<std::vector<size_t>, kCapacity> epoch_lists_ = {};
-  };
-
-  /*##########################################################################*
-   * Internal constants
-   *##########################################################################*/
-
-  /// @brief A bitmask for extracting lower bits from epochs.
-  static constexpr size_t kLowerMask = kCapacity - 1UL;
-
-  /// @brief A bitmask for extracting upper bits from epochs.
-  static constexpr size_t kUpperMask = ~kLowerMask;
 
   /*##########################################################################*
    * Internal utility functions
    *##########################################################################*/
 
   /**
-   * @brief Collect epoch value for epoch-based protection.
+   * @brief Advance a global epoch while running.
    *
-   * This function also removes dead epochs from the internal list while
-   * computing.
-   *
-   * @param cur_epoch The current global epoch value.
-   * @param protected_epochs Protected epoch values.
    */
-  void CollectProtectedEpochs(  //
-      size_t cur_epoch,
-      std::vector<size_t> &protected_epochs);
-
-  /**
-   * @brief Remove unprotected epoch nodes from a linked-list.
-   *
-   * @param protected_epochs Protected epoch values.
-   */
-  void RemoveOutDatedLists(  //
-      std::vector<size_t> &protected_epochs);
+  void AdvanceEpochWorker(  //
+      const std::function<Serial32_t(void)> &get_new_epoch);
 
   /*##########################################################################*
    * Internal member variables
    *##########################################################################*/
 
   /// @brief A global epoch counter.
-  std::atomic_size_t global_epoch_{kInitialEpoch};
+  std::atomic<Serial32_t> global_epoch_{Serial32_t{1}};
 
-  /// @brief The minimum protected epoch value.
-  std::atomic_size_t min_epoch_{kInitialEpoch};
+  /// @brief The local minimum epoch.
+  std::atomic<Serial32_t> min_epoch_{Serial32_t{0}};
 
-  /// @brief The head pointer of a linked list of epochs.
-  ProtectedNode *protected_lists_{new ProtectedNode{kInitialEpoch, nullptr}};
+  /// @brief The maximum number of worker threads.
+  size_t thread_num_{kMaxThreadNum};
+
+  /// @brief The interval between epoch updates.
+  std::chrono::milliseconds epoch_interval_{};
 
   /// @brief The array of epochs to use as thread local storages.
-  TLSEpoch tls_fields_[kMaxThreadNum]{};
+  std::unique_ptr<TLSEpoch[]> tls_fields_{};
+
+  /// @brief A flag for detaching a epoch manager thread.
+  std::atomic_bool running_{};
+
+  /// @brief A thread for managing epoch values.
+  std::thread manager_{};
 };
 
 }  // namespace dbgroup::thread

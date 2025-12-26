@@ -18,10 +18,8 @@
 #define CPP_UTILITY_DBGROUP_THREAD_EPOCH_GUARD_HPP_
 
 // C++ standard libraries
+#include <atomic>
 #include <utility>
-
-// local sources
-#include "dbgroup/thread/component/epoch.hpp"
 
 namespace dbgroup::thread
 {
@@ -31,12 +29,6 @@ namespace dbgroup::thread
  */
 class EpochGuard
 {
-  /*##########################################################################*
-   * Type aliases
-   *##########################################################################*/
-
-  using Epoch = component::Epoch;
-
  public:
   /*##########################################################################*
    * Public constructors and assignment operators
@@ -47,27 +39,17 @@ class EpochGuard
   /**
    * @brief Construct a new instance and protect a current epoch.
    *
-   * @param epoch A reference to a target epoch.
+   * @param active An actual address for managing a guard status.
    */
   explicit EpochGuard(  //
-      Epoch *epoch) noexcept;
+      std::atomic_bool *active) noexcept;
 
-  /**
-   * @brief Construct a new instance.
-   *
-   * @param obj An rvalue reference.
-   */
   constexpr EpochGuard(  //
       EpochGuard &&obj) noexcept
-      : epoch_{std::exchange(obj.epoch_, nullptr)}
+      : active_{std::exchange(obj.active_, nullptr)}
   {
   }
 
-  /**
-   * @brief Construct a new instance.
-   *
-   * @param rhs An rvalue reference.
-   */
   auto operator=(                 //
       EpochGuard &&rhs) noexcept  //
       -> EpochGuard &;
@@ -86,23 +68,13 @@ class EpochGuard
    */
   ~EpochGuard();
 
-  /*##########################################################################*
-   * Public getters
-   *##########################################################################*/
-
-  /**
-   * @return The epoch value protected by this object.
-   */
-  [[nodiscard]] auto GetProtectedEpoch() const noexcept  //
-      -> size_t;
-
  private:
   /*##########################################################################*
    * Internal member variables
    *##########################################################################*/
 
   /// @brief A reference to a target epoch.
-  Epoch *epoch_{};
+  std::atomic_bool *active_{};
 };
 
 }  // namespace dbgroup::thread

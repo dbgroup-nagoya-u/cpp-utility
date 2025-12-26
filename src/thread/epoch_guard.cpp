@@ -18,15 +18,19 @@
 #include "dbgroup/thread/epoch_guard.hpp"
 
 // C++ standard libraries
+#include <atomic>
 #include <utility>
+
+// local sources
+#include "dbgroup/constants.hpp"
 
 namespace dbgroup::thread
 {
 EpochGuard::EpochGuard(  //
-    Epoch *epoch) noexcept
-    : epoch_{epoch}
+    std::atomic_bool *active) noexcept
+    : active_{active}
 {
-  epoch_->EnterEpoch();
+  active_->store(true, kRelease);
 }
 
 auto
@@ -34,25 +38,18 @@ EpochGuard::operator=(          //
     EpochGuard &&rhs) noexcept  //
     -> EpochGuard &
 {
-  if (epoch_) {
-    epoch_->LeaveEpoch();
+  if (active_) {
+    active_->store(false, kRelaxed);
   }
-  epoch_ = std::exchange(rhs.epoch_, nullptr);
+  active_ = std::exchange(rhs.active_, nullptr);
   return *this;
 }
 
 EpochGuard::~EpochGuard()
 {
-  if (epoch_) {
-    epoch_->LeaveEpoch();
+  if (active_) {
+    active_->store(false, kRelaxed);
   }
-}
-
-auto
-EpochGuard::GetProtectedEpoch() const noexcept  //
-    -> size_t
-{
-  return epoch_->GetProtectedEpoch();
 }
 
 }  // namespace dbgroup::thread
