@@ -41,8 +41,14 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
 
   set(
     DBGROUP_MAX_THREAD_NUM
-    "" CACHE STRING
+    "1024" CACHE STRING
     "The maximum number of worker threads."
+  )
+
+  set(
+    DBGROUP_LOGICAL_CORE_NUM
+    "" CACHE STRING
+    "The number of logical cores."
   )
 
   set(
@@ -68,29 +74,23 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
   CHECK_INCLUDE_FILE_CXX("byteswap.h" CPP_UTILITY_HAS_BYTESWAP)
 
   # set the default number of threads if needed
-  if ("${DBGROUP_MAX_THREAD_NUM}" STREQUAL "")
-    message("[${PROJECT_NAME}] DBGROUP_MAX_THREAD_NUM is not set, so check the number of CPU cores.")
+  if ("${DBGROUP_LOGICAL_CORE_NUM}" STREQUAL "")
+    message("[${PROJECT_NAME}] DBGROUP_LOGICAL_CORE_NUM is not set, so check the number of CPU cores.")
 
     # check the number of logical cores
     include(ProcessorCount)
-    ProcessorCount(CPP_UTILITY_MAX_CORES)
-    if(NOT CPP_UTILITY_MAX_CORES EQUAL 0)
-      message("[${PROJECT_NAME}] The detected number of cores: ${CPP_UTILITY_MAX_CORES}")
-      set(
-        DBGROUP_MAX_THREAD_NUM
-        "(2 * ${CPP_UTILITY_MAX_CORES})" CACHE STRING
-        "The number of worker threads." FORCE
-      )
+    ProcessorCount(DBGROUP_LOGICAL_CORE_NUM)
+    if(NOT DBGROUP_LOGICAL_CORE_NUM EQUAL 0)
+      message("[${PROJECT_NAME}] The detected number of cores: ${DBGROUP_LOGICAL_CORE_NUM}")
     else()
-      message(WARNING "[${PROJECT_NAME}] The number of cores could not be detected.")
+      message(WARNING "[${PROJECT_NAME}] The number of cores could not be detected, so use 64 as default.")
       set(
-        DBGROUP_MAX_THREAD_NUM
-        "256" CACHE STRING
-        "The number of worker threads." FORCE
+        DBGROUP_LOGICAL_CORE_NUM
+        "64" CACHE STRING
+        "The number of logical cores." FORCE
       )
     endif()
   endif()
-  message("[${PROJECT_NAME}] Use ${DBGROUP_MAX_THREAD_NUM} as the maximum number of worker threads.")
 
   #----------------------------------------------------------------------------#
   # Build targets
@@ -125,6 +125,7 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
     DBGROUP_CACHE_LINE_SIZE=${DBGROUP_CACHE_LINE_SIZE}
     DBGROUP_VIRTUAL_PAGE_SIZE=${DBGROUP_VIRTUAL_PAGE_SIZE}
     DBGROUP_MAX_THREAD_NUM=${DBGROUP_MAX_THREAD_NUM}
+    DBGROUP_LOGICAL_CORE_NUM=${DBGROUP_LOGICAL_CORE_NUM}
     $<$<BOOL:${CPP_UTILITY_HAS_SPINLOCK_HINT}>:CPP_UTILITY_HAS_SPINLOCK_HINT>
     $<$<BOOL:${CPP_UTILITY_HAS_BYTESWAP}>:CPP_UTILITY_HAS_BYTESWAP>
     CPP_UTILITY_SPINLOCK_RETRY_NUM=${CPP_UTILITY_SPINLOCK_RETRY_NUM}
