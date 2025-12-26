@@ -83,7 +83,8 @@ class ZipfDistribution
    * @param id A target ID in [0, `bin_num`).
    * @return A CDF value of the given ID.
    */
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   GetCDF(                      //
       const IntType id) const  //
       -> double
@@ -100,7 +101,8 @@ class ZipfDistribution
    * @return A random value according to Zipf's law.
    */
   template <class RandEngine>
-  [[nodiscard]] auto
+  [[nodiscard]]
+  auto
   operator()(               //
       RandEngine &g) const  //
       -> IntType
@@ -224,7 +226,8 @@ class ApproxZipfDistribution
    * @param id A target ID in [0, `bin_num`).
    * @return A CDF value of the given ID.
    */
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   GetCDF(                      //
       const IntType id) const  //
       -> double
@@ -242,7 +245,8 @@ class ApproxZipfDistribution
    * @return A random value according to Zipf's law.
    */
   template <class RandEngine>
-  [[nodiscard]] auto
+  [[nodiscard]]
+  auto
   operator()(               //
       RandEngine &g) const  //
       -> IntType
@@ -261,7 +265,8 @@ class ApproxZipfDistribution
    * @return A random value according to Zipf's law.
    */
   template <class RandEngine>
-  [[nodiscard]] auto
+  [[nodiscard]]
+  auto
   GetIDUsingBinarySearch(   //
       RandEngine &g) const  //
       -> IntType
@@ -317,7 +322,8 @@ class ApproxZipfDistribution
    * @param n The number of partial elements in the p-series.
    * @return An approximate partial sum of the p-series.
    */
-  [[nodiscard]] auto
+  [[nodiscard]]
+  auto
   GetHarmonicNum(             //
       const IntType n) const  //
       -> double

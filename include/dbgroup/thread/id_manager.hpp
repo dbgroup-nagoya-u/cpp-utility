@@ -26,7 +26,6 @@
 
 namespace dbgroup::thread
 {
-
 /**
  * @brief A singleton class for managing IDs for each thread.
  *
@@ -54,13 +53,15 @@ class IDManager
   /**
    * @return The unique thread ID in [0, DBGROUP_MAX_THREAD_NUM).
    */
-  [[nodiscard]] static auto GetThreadID()  //
+  [[nodiscard]]
+  static auto GetThreadID()  //
       -> size_t;
 
   /**
    * @return A weak pointer object to check heart beats of the current thread.
    */
-  [[nodiscard]] static auto GetHeartBeat()  //
+  [[nodiscard]]
+  static auto GetHeartBeat()  //
       -> std::weak_ptr<size_t>;
 
  private:
@@ -108,19 +109,22 @@ class IDManager
      * @retval true if this object has a unique thread ID.
      * @retval false otherwise.
      */
-    [[nodiscard]] auto HasID() const noexcept  //
+    [[nodiscard]]
+    auto HasID() const noexcept  //
         -> bool;
 
     /**
      * @return The assigned ID for this object.
      */
-    [[nodiscard]] auto GetID() const  //
+    [[nodiscard]]
+    auto GetID() const  //
         -> size_t;
 
     /**
      * @return A weak pointer object to check heart beats of this object.
      */
-    [[nodiscard]] auto GetHeartBeat() const noexcept  //
+    [[nodiscard]]
+    auto GetHeartBeat() const noexcept  //
         -> std::weak_ptr<size_t>;
 
     /*########################################################################*
@@ -156,7 +160,8 @@ class IDManager
    *
    * @return The reference to a heart beater.
    */
-  [[nodiscard]] static auto GetHeartBeater()  //
+  [[nodiscard]]
+  static auto GetHeartBeater()  //
       -> const HeartBeater &;
 };
 
