@@ -18,17 +18,19 @@
 #include "dbgroup/thread/epoch_manager.hpp"
 
 // C++ standard libraries
-#include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cstddef>
+#include <exception>
 #include <functional>
-#include <limits>
-#include <utility>
-#include <vector>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
 
 // local sources
 #include "dbgroup/constants.hpp"
 #include "dbgroup/thread/id_manager.hpp"
+#include "dbgroup/types.hpp"
 
 namespace dbgroup::thread
 {
@@ -36,25 +38,45 @@ namespace dbgroup::thread
  * Public constructors and destructors
  *############################################################################*/
 
-/**
- * @brief Construct a new instance.
- *
- */
-EpochManager::EpochManager()
+EpochManager::EpochManager(  //
+    const size_t epoch_interval,
+    const size_t thread_num)
+    : thread_num_{thread_num},
+      epoch_interval_{epoch_interval},
+      tls_fields_{std::make_unique<TLSEpoch[]>(thread_num)},
+      running_{true},
+      manager_{&EpochManager::AdvanceEpochWorker, this,
+               [this]() -> Serial32_t { return ++GetCurrentEpoch(); }}
 {
-  auto &protected_epochs = ProtectedNode::GetProtectedEpochs(kInitialEpoch, protected_lists_);
-  protected_epochs.emplace_back(kInitialEpoch);
+  if (thread_num_ <= kMaxThreadNum) return;
+  throw std::range_error{"The number of worker threads exceeded the upperbound."};
+}
+
+EpochManager::EpochManager(  //
+    const size_t epoch_interval,
+    const std::function<Serial32_t(void)> &get_new_epoch,
+    const size_t thread_num)
+    : global_epoch_{get_new_epoch()},
+      min_epoch_{--GetCurrentEpoch()},
+      thread_num_{thread_num},
+      epoch_interval_{epoch_interval},
+      tls_fields_{std::make_unique<TLSEpoch[]>(thread_num)},
+      running_{true},
+      manager_{&EpochManager::AdvanceEpochWorker, this, get_new_epoch}
+{
+  if (thread_num_ <= kMaxThreadNum) return;
+  throw std::range_error{"The number of worker threads exceeded the upperbound."};
 }
 
 EpochManager::~EpochManager()
 {
-  // remove the retained protected epochs
-  [[maybe_unused]] const auto dummy = global_epoch_.load(kAcquire);
-  auto *pro_next = protected_lists_;
-  while (pro_next != nullptr) {
-    auto *current = pro_next;
-    pro_next = current->next;
-    delete current;
+  if (running_.load(kRelaxed)) {
+    running_.store(false, kRelaxed);
+    try {
+      manager_.join();
+    } catch (const std::exception &e) {
+      std::cerr << "The epoch manager could not be joined: " << e.what() << "\n";
+    }
   }
 }
 
@@ -64,61 +86,25 @@ EpochManager::~EpochManager()
 
 auto
 EpochManager::GetCurrentEpoch() const noexcept  //
-    -> size_t
+    -> Serial32_t
 {
   return global_epoch_.load(kRelaxed);
 }
 
 auto
 EpochManager::GetMinEpoch() const noexcept  //
-    -> size_t
+    -> Serial32_t
 {
   return min_epoch_.load(kRelaxed);
-}
-
-auto
-EpochManager::GetProtectedEpochs()  //
-    -> std::pair<EpochGuard, const std::vector<size_t> &>
-{
-  auto &&guard = CreateEpochGuard();
-  const auto e = guard.GetProtectedEpoch();
-  const auto &protected_epochs = ProtectedNode::GetProtectedEpochs(e, protected_lists_);
-
-  return {std::move(guard), protected_epochs};
 }
 
 auto
 EpochManager::CreateEpochGuard()  //
     -> EpochGuard
 {
-  auto &tls = tls_fields_[IDManager::GetThreadID()];
-  if (tls.heartbeat.expired()) {
-    tls.epoch.SetGlobalEpoch(&global_epoch_);
-    tls.heartbeat = IDManager::GetHeartBeat();
-  }
-
-  return EpochGuard{&(tls.epoch)};
-}
-
-void
-EpochManager::ForwardGlobalEpoch()
-{
-  const auto cur_epoch = global_epoch_.load(kRelaxed);
-  const auto next_epoch = cur_epoch + 1;
-
-  // create a new node if needed
-  if ((next_epoch & kLowerMask) == 0UL) {
-    protected_lists_ = new ProtectedNode{next_epoch, protected_lists_};
-  }
-
-  // update protected epoch values
-  auto &protected_epochs = ProtectedNode::GetProtectedEpochs(next_epoch, protected_lists_);
-  CollectProtectedEpochs(cur_epoch, protected_epochs);
-  RemoveOutDatedLists(protected_epochs);
-
-  // store the max/min epoch values for efficiency
-  global_epoch_.store(next_epoch, kRelease);
-  min_epoch_.store(protected_epochs.back(), kRelaxed);
+  auto &tls = tls_fields_[dbgroup::thread::IDManager::GetThreadID()];
+  tls.entered = --GetCurrentEpoch();  // add a safety buffer
+  return EpochGuard{&(tls.active)};
 }
 
 /*############################################################################*
@@ -126,77 +112,24 @@ EpochManager::ForwardGlobalEpoch()
  *############################################################################*/
 
 void
-EpochManager::CollectProtectedEpochs(  //
-    const size_t cur_epoch,
-    std::vector<size_t> &protected_epochs)
+EpochManager::AdvanceEpochWorker(  //
+    const std::function<Serial32_t(void)> &get_new_epoch)
 {
-  protected_epochs.reserve(kMaxThreadNum);
-  protected_epochs.emplace_back(cur_epoch + 1);  // reserve the next epoch
-  protected_epochs.emplace_back(cur_epoch);
-
-  for (size_t i = 0; i < kMaxThreadNum; ++i) {
-    auto &tls = tls_fields_[i];
-    if (tls.heartbeat.expired()) continue;
-
-    const auto protected_epoch = tls.epoch.GetProtectedEpoch();
-    if (protected_epoch < std::numeric_limits<size_t>::max()) {
-      protected_epochs.emplace_back(protected_epoch);
+  auto wake_time = std::chrono::system_clock::now();
+  while (running_.load(kRelaxed)) {
+    wake_time += epoch_interval_;
+    auto min = --GetCurrentEpoch();  // add a safety buffer
+    for (size_t thd_id = 0; thd_id < thread_num_; ++thd_id) {
+      auto &tls = tls_fields_[thd_id];
+      if (!tls.active.load(kAcquire)) continue;
+      min = std::min(min, tls.entered);
     }
+    global_epoch_.store(get_new_epoch(), kRelaxed);
+    if (GetMinEpoch() != min) {
+      min_epoch_.store(min, kRelaxed);
+    }
+    std::this_thread::sleep_until(wake_time);
   }
-
-  // remove duplicate values
-  std::sort(protected_epochs.begin(), protected_epochs.end(), std::greater<size_t>{});
-  auto &&end_iter = std::unique(protected_epochs.begin(), protected_epochs.end());
-  protected_epochs.erase(end_iter, protected_epochs.end());
-}
-
-void
-EpochManager::RemoveOutDatedLists(  //
-    std::vector<size_t> &protected_epochs)
-{
-  const auto &it_end = protected_epochs.cend();
-  auto &&it = protected_epochs.cbegin();
-  auto protected_epoch = *it & kUpperMask;
-
-  // remove out-dated lists
-  auto *prev = protected_lists_;
-  auto *current = protected_lists_;
-  while (current->next != nullptr) {
-    const auto upper_bits = current->GetUpperBits();
-    if (protected_epoch == upper_bits) {
-      // this node is still referred, so skip
-      prev = current;
-      current = current->next;
-
-      // search the next protected epoch
-      do {
-        if (++it == it_end) {
-          protected_epoch = kMinEpoch;
-          break;
-        }
-        protected_epoch = *it & kUpperMask;
-      } while (protected_epoch == upper_bits);
-      continue;
-    }
-
-    if (prev != current) {
-      // remove the out-dated list
-      prev->next = current->next;
-      delete current;
-      current = prev->next;
-    }
-  }
-}
-
-/*############################################################################*
- * Internal class: ProtectedNode
- *############################################################################*/
-
-EpochManager::ProtectedNode::ProtectedNode(  //
-    const size_t epoch,
-    ProtectedNode *next) noexcept
-    : next{next}, upper_epoch_(epoch)
-{
 }
 
 }  // namespace dbgroup::thread

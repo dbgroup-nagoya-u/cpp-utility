@@ -31,6 +31,18 @@
 
 namespace dbgroup::thread::test
 {
+/*############################################################################*
+ * Global constants
+ *############################################################################*/
+
+constexpr size_t kEpochInterval = 1;
+constexpr std::chrono::milliseconds kSleepTime{kEpochInterval};
+constexpr size_t kLoopNum = 100;
+
+/*############################################################################*
+ * Fixture definitions
+ *############################################################################*/
+
 class EpochManagerFixture : public ::testing::Test
 {
  protected:
@@ -41,7 +53,7 @@ class EpochManagerFixture : public ::testing::Test
   void
   SetUp() override
   {
-    epoch_manager_ = std::make_unique<EpochManager>();
+    epoch_manager_ = std::make_unique<EpochManager>(kEpochInterval);
   }
 
   void
@@ -54,155 +66,74 @@ class EpochManagerFixture : public ::testing::Test
    *##########################################################################*/
 
   std::unique_ptr<EpochManager> epoch_manager_{};
-
-  std::mutex mtx_{};
 };
 
 /*############################################################################*
  * Unit test definitions
  *############################################################################*/
 
-TEST_F(EpochManagerFixture, ConstructorInitializeGlobalEpoch)
+TEST_F(                   //
+    EpochManagerFixture,  //
+    GlobalEpochWithoutGuardProgressOverTime)
 {
-  EXPECT_EQ(EpochManager::kInitialEpoch, epoch_manager_->GetCurrentEpoch());
-}
-
-TEST_F(EpochManagerFixture, ForwardGlobalEpochAfterConstructGetIncrementedEpoch)
-{
-  epoch_manager_->ForwardGlobalEpoch();
-
-  EXPECT_EQ(EpochManager::kInitialEpoch + 1, epoch_manager_->GetCurrentEpoch());
-}
-
-TEST_F(EpochManagerFixture, GetProtectedEpochWithoutEpochsGetCurrentEpoch)
-{
-  EXPECT_EQ(EpochManager::kInitialEpoch, epoch_manager_->GetMinEpoch());
-
-  const auto &[ep_guard, protected_epochs] = epoch_manager_->GetProtectedEpochs();
-  EXPECT_EQ(protected_epochs.size(), 1);
-  EXPECT_EQ(protected_epochs.front(), EpochManager::kInitialEpoch);
-}
-
-TEST_F(EpochManagerFixture, GetProtectedEpochWithEnteredEpochGetEnteredEpoch)
-{
-  constexpr size_t kLoopNum = 1000;
-  constexpr size_t kRepeatNum = 10;
-
-  // forward global epoch
-  std::thread forwarder{[&]() {
-    for (size_t i = 0; i < kLoopNum; ++i) {
-      std::this_thread::sleep_for(std::chrono::microseconds{1});
-      epoch_manager_->ForwardGlobalEpoch();
+  auto prev = epoch_manager_->GetCurrentEpoch();
+  for (size_t i = 0; i < kLoopNum; ++i) {
+    Serial32_t cur;
+    while (true) {
+      cur = epoch_manager_->GetCurrentEpoch();
+      if (cur != prev) break;
+      std::this_thread::sleep_for(kSleepTime);
     }
-  }};
-
-  // create entered epochs
-  std::vector<std::thread> threads;
-  {
-    const std::unique_lock guard{mtx_};
-    for (size_t i = 0; i < kRepeatNum; ++i) {
-      threads.emplace_back([&]() {
-        [[maybe_unused]] const auto &guard = epoch_manager_->CreateEpochGuard();
-        const std::unique_lock lock{mtx_};
-      });
-    }
-
-    forwarder.join();
-
-    const auto &[ep_guard, protected_epochs] = epoch_manager_->GetProtectedEpochs();
-    for (size_t i = 0; i < protected_epochs.size() - 1; ++i) {
-      EXPECT_GT(protected_epochs.at(i), protected_epochs.at(i + 1));
-    }
-    EXPECT_EQ(protected_epochs.front(), epoch_manager_->GetCurrentEpoch());
-    EXPECT_EQ(protected_epochs.back(), epoch_manager_->GetMinEpoch());
-  }
-  for (auto &&t : threads) {
-    t.join();
+    EXPECT_GT(cur, prev);
+    prev = cur;
   }
 }
 
-TEST_F(EpochManagerFixture, GetProtectedEpochWithLeavedEpochGetCurrentEpoch)
+TEST_F(                   //
+    EpochManagerFixture,  //
+    GlobalEpochWithGuardProgressOverTime)
 {
-  constexpr size_t kLoopNum = 1000;
-  constexpr size_t kRepeatNum = 10;
-
-  // forward global epoch
-  std::thread forwarder{[&]() {
-    for (size_t i = 0; i < kLoopNum; ++i) {
-      std::this_thread::sleep_for(std::chrono::microseconds{1});
-      epoch_manager_->ForwardGlobalEpoch();
+  [[maybe_unused]] const auto &grd = epoch_manager_->CreateEpochGuard();
+  auto prev = epoch_manager_->GetCurrentEpoch();
+  for (size_t i = 0; i < kLoopNum; ++i) {
+    Serial32_t cur;
+    while (true) {
+      cur = epoch_manager_->GetCurrentEpoch();
+      if (cur != prev) break;
+      std::this_thread::sleep_for(kSleepTime);
     }
-  }};
-
-  // create entered epochs
-  std::vector<std::thread> threads;
-  {
-    const std::unique_lock guard{mtx_};
-    for (size_t i = 0; i < kRepeatNum; ++i) {
-      threads.emplace_back([&]() {
-        {
-          [[maybe_unused]] const auto &guard = epoch_manager_->CreateEpochGuard();
-        }
-        const std::unique_lock lock{mtx_};
-      });
-    }
-
-    forwarder.join();
-
-    const auto &[ep_guard, protected_epochs] = epoch_manager_->GetProtectedEpochs();
-    EXPECT_EQ(protected_epochs.size(), 2);
-    EXPECT_EQ(protected_epochs.front(), epoch_manager_->GetCurrentEpoch());
-  }
-  for (auto &&t : threads) {
-    t.join();
+    EXPECT_GT(cur, prev);
+    prev = cur;
   }
 }
 
-TEST_F(EpochManagerFixture, EpochGuardProtectProtectedEpochLists)
+TEST_F(                   //
+    EpochManagerFixture,  //
+    MinEpochWithoutGuardProgressOverTime)
 {
-  constexpr size_t kLoopNum = 1000UL * 100UL;
-  constexpr size_t kRepeatNum = 10;
-
-  // a flag for controling worker threads
-  std::atomic_bool is_running{true};
-
-  // forward global epoch
-  std::thread forwarder{[&]() {
-    for (size_t i = 0; i < kLoopNum; ++i) {
-      std::this_thread::sleep_for(std::chrono::microseconds{1});
-      epoch_manager_->ForwardGlobalEpoch();
+  auto prev = epoch_manager_->GetMinEpoch();
+  for (size_t i = 0; i < kLoopNum; ++i) {
+    Serial32_t cur;
+    while (true) {
+      cur = epoch_manager_->GetMinEpoch();
+      if (cur != prev) break;
+      std::this_thread::sleep_for(kSleepTime);
     }
-  }};
-
-  // create entered epochs
-  std::vector<std::thread> threads;
-  {
-    const std::unique_lock guard{mtx_};
-    for (size_t i = 0; i < kRepeatNum; ++i) {
-      threads.emplace_back([&]() {
-        while (is_running) {
-          const auto &[ep_guard, protected_epochs] = epoch_manager_->GetProtectedEpochs();
-          for (size_t i = 0; i < protected_epochs.size() - 1; ++i) {
-            EXPECT_GT(protected_epochs.at(i), protected_epochs.at(i + 1));
-          }
-        }
-
-        const std::unique_lock lock{mtx_};
-      });
-    }
-
-    forwarder.join();
-    is_running = false;
-
-    const auto &[ep_guard, protected_epochs] = epoch_manager_->GetProtectedEpochs();
-    for (size_t i = 0; i < protected_epochs.size() - 1; ++i) {
-      EXPECT_GT(protected_epochs.at(i), protected_epochs.at(i + 1));
-    }
-    EXPECT_EQ(protected_epochs.front(), epoch_manager_->GetCurrentEpoch());
-    EXPECT_EQ(protected_epochs.back(), epoch_manager_->GetMinEpoch());
+    EXPECT_GT(cur, prev);
+    prev = cur;
   }
-  for (auto &&t : threads) {
-    t.join();
+}
+
+TEST_F(                   //
+    EpochManagerFixture,  //
+    MinEpochWithGuardRemainUnchangedOverTime)
+{
+  [[maybe_unused]] const auto &grd = epoch_manager_->CreateEpochGuard();
+  auto prev = epoch_manager_->GetMinEpoch();
+  for (size_t i = 0; i < kLoopNum; ++i) {
+    const auto cur = epoch_manager_->GetMinEpoch();
+    EXPECT_EQ(cur, prev);
+    std::this_thread::sleep_for(kSleepTime);
   }
 }
 
