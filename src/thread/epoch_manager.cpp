@@ -145,7 +145,6 @@ EpochManager<Serial>::AdvanceEpochWorker(  //
  * Explicit instantiation definitions
  *############################################################################*/
 
-template class EpochManager<Serial8_t>;
 template class EpochManager<Serial16_t>;
 template class EpochManager<Serial32_t>;
 template class EpochManager<Serial64_t>;
