@@ -20,6 +20,7 @@
 // C++ standard libraries
 #include <atomic>
 #include <cstddef>
+#include <iostream>
 #include <memory>
 #include <thread>
 #include <vector>
@@ -36,13 +37,33 @@ namespace
  *############################################################################*/
 
 /// @brief A bool array for managing reservation states of thread IDs.
-std::atomic_bool _id_vec[kMaxThreadNum] = {};  // NOLINT
+alignas(kVMPageSize) std::atomic_bool _id_vec[kMaxThreadCapacity] = {};  // NOLINT
+
+/// @brief The maximum number of worker threads.
+std::atomic_size_t _max_thread_num{2 * kLogicalCoreNum};  // NOLINT
 
 }  // namespace
 
 /*############################################################################*
  * Public APIs
  *############################################################################*/
+
+auto
+IDManager::GetMaxThreadNum() noexcept  //
+    -> size_t
+{
+  return _max_thread_num.load(kRelaxed);
+}
+
+void
+IDManager::SetMaxThreadNum(  //
+    const size_t thread_num)
+{
+  if (thread_num > kMaxThreadCapacity) {
+    throw std::out_of_range{"IDManager: The number of worker threads exceeded the upperbound."};
+  }
+  _max_thread_num.store(thread_num, kRelaxed);
+}
 
 auto
 IDManager::GetThreadID()  //
@@ -68,9 +89,18 @@ IDManager::GetHeartBeater()  //
 {
   thread_local HeartBeater hb{};
   if (!hb.HasID()) [[unlikely]] {
-    auto id = std::hash<std::thread::id>{}(std::this_thread::get_id()) % kMaxThreadNum;
+    const auto n = GetMaxThreadNum();
+    const auto retry_limit = 2 * n;
+    auto id = std::hash<std::thread::id>{}(std::this_thread::get_id()) % n;
+    auto loop_num = 0U;
     do {
-      if (++id >= kMaxThreadNum) [[unlikely]] {
+      if (++loop_num > retry_limit) {
+        std::cerr << "[WARN] IDManager failed to assign a thread ID. To resolve "
+                     "this issue, increase the thread pool capacity by calling "
+                     "`IDManager::SetThreadID()` during process initialization.\n";
+        throw std::range_error{"IDManager: Too many threads was assigned."};
+      }
+      if (++id >= n) [[unlikely]] {
         id = 0;
       }
     } while (_id_vec[id].load(kRelaxed) || _id_vec[id].exchange(true, kAcquire));

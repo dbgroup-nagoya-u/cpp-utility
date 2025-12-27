@@ -58,8 +58,8 @@ constexpr size_t kVMPageSize = static_cast<size_t>(DBGROUP_VIRTUAL_PAGE_SIZE);
 /// @brief The number of logical cores.
 constexpr size_t kLogicalCoreNum = static_cast<size_t>(DBGROUP_LOGICAL_CORE_NUM);
 
-/// @brief The maximum number of threads used in a process.
-constexpr size_t kMaxThreadNum = static_cast<size_t>(DBGROUP_MAX_THREAD_NUM);
+/// @brief The capacity of threads used in a process.
+constexpr size_t kMaxThreadCapacity{kVMPageSize};
 
 }  // namespace dbgroup
 

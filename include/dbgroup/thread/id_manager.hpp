@@ -51,7 +51,22 @@ class IDManager
    *##########################################################################*/
 
   /**
-   * @return The unique thread ID in [0, DBGROUP_MAX_THREAD_NUM).
+   * @return The maximum number of worker threads.
+   */
+  [[nodiscard]]
+  static auto GetMaxThreadNum() noexcept  //
+      -> size_t;
+
+  /**
+   * @brief Set the maximum number of worker threads.
+   *
+   * @param thread_num The expected number of threads.
+   */
+  static void SetMaxThreadNum(  //
+      size_t thread_num);
+
+  /**
+   * @return The unique thread ID in [0, `IDManager::GetMaxThreadNum()`).
    */
   [[nodiscard]]
   static auto GetThreadID()  //

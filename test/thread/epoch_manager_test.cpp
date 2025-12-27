@@ -134,7 +134,7 @@ class EpochManagerFixture : public ::testing::Test
  * Preparation for typed testing
  *############################################################################*/
 
-using Types = ::testing::Types<Serial8_t, Serial16_t, Serial32_t, Serial64_t>;
+using Types = ::testing::Types<Serial16_t, Serial32_t, Serial64_t>;
 TYPED_TEST_SUITE(EpochManagerFixture, Types);
 
 /*############################################################################*

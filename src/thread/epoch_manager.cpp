@@ -35,39 +35,41 @@
 namespace dbgroup::thread
 {
 /*############################################################################*
+ * Local type aliases
+ *############################################################################*/
+
+using IDManager = dbgroup::thread::IDManager;
+
+/*############################################################################*
  * Public constructors and destructors
  *############################################################################*/
 
 template <class Serial>
 EpochManager<Serial>::EpochManager(  //
-    const size_t epoch_interval,
-    const size_t thread_num)
-    : thread_num_{thread_num},
+    const size_t epoch_interval)
+    : global_epoch_{Serial{1}},
+      min_epoch_{Serial{0}},
+      thread_num_{IDManager::GetMaxThreadNum()},
       epoch_interval_{epoch_interval},
-      tls_fields_{std::make_unique<TLSEpoch[]>(thread_num)},
+      tls_fields_{std::make_unique<TLSEpoch[]>(thread_num_)},
       running_{true},
       manager_{&EpochManager::AdvanceEpochWorker, this,
                [this]() -> Serial { return ++GetCurrentEpoch(); }}
 {
-  if (thread_num_ <= kMaxThreadNum) return;
-  throw std::range_error{"The number of worker threads exceeded the upperbound."};
 }
 
 template <class Serial>
 EpochManager<Serial>::EpochManager(  //
     const size_t epoch_interval,
-    const std::function<Serial(void)> &get_new_epoch,
-    const size_t thread_num)
+    const std::function<Serial(void)> &get_new_epoch)
     : global_epoch_{get_new_epoch()},
       min_epoch_{--GetCurrentEpoch()},
-      thread_num_{thread_num},
+      thread_num_{IDManager::GetMaxThreadNum()},
       epoch_interval_{epoch_interval},
-      tls_fields_{std::make_unique<TLSEpoch[]>(thread_num)},
+      tls_fields_{std::make_unique<TLSEpoch[]>(thread_num_)},
       running_{true},
       manager_{&EpochManager::AdvanceEpochWorker, this, get_new_epoch}
 {
-  if (thread_num_ <= kMaxThreadNum) return;
-  throw std::range_error{"The number of worker threads exceeded the upperbound."};
 }
 
 template <class Serial>
@@ -143,7 +145,6 @@ EpochManager<Serial>::AdvanceEpochWorker(  //
  * Explicit instantiation definitions
  *############################################################################*/
 
-template class EpochManager<Serial8_t>;
 template class EpochManager<Serial16_t>;
 template class EpochManager<Serial32_t>;
 template class EpochManager<Serial64_t>;
