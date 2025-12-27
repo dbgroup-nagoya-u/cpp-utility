@@ -54,7 +54,7 @@ class IDManagerFixture : public ::testing::Test
   void
   SetUp() override
   {
-    IDManager::SetMaxThreadNum(kMaxThreadCapacity);
+    IDManager::SetMaxThreadNum(kLogicalCoreNum);
   }
 
   void
@@ -71,10 +71,10 @@ class IDManagerFixture : public ::testing::Test
   {
     std::mutex mtx{};
     std::atomic_size_t cnt{0};
-    std::array<bool, kMaxThreadCapacity> reserved{};
+    std::array<bool, kLogicalCoreNum> reserved{};
     reserved.fill(false);
     std::vector<std::thread> threads{};
-    threads.reserve(kMaxThreadCapacity);
+    threads.reserve(kLogicalCoreNum);
 
     auto f = [&] {
       const auto id = IDManager::GetThreadID();
@@ -85,10 +85,10 @@ class IDManagerFixture : public ::testing::Test
 
     {
       std::lock_guard guard{mtx};
-      for (size_t i = 0; i < kMaxThreadCapacity; ++i) {
+      for (size_t i = 0; i < kLogicalCoreNum; ++i) {
         threads.emplace_back(f);
       }
-      while (cnt.load(std::memory_order_acquire) < kMaxThreadCapacity) {
+      while (cnt.load(std::memory_order_acquire) < kLogicalCoreNum) {
         std::this_thread::sleep_for(std::chrono::microseconds{1});
       }
     }
@@ -121,9 +121,9 @@ TEST_F(IDManagerFixture, ThreadHeartBeatsShowProperBoolValues)
 {
   std::mutex mtx{};
   std::atomic_size_t cnt{0};
-  std::array<std::weak_ptr<size_t>, kMaxThreadCapacity> hbs{};
+  std::array<std::weak_ptr<size_t>, kLogicalCoreNum> hbs{};
   std::vector<std::thread> threads{};
-  threads.reserve(kMaxThreadCapacity);
+  threads.reserve(kLogicalCoreNum);
 
   auto f = [&] {
     const auto id = IDManager::GetThreadID();
@@ -134,10 +134,10 @@ TEST_F(IDManagerFixture, ThreadHeartBeatsShowProperBoolValues)
 
   {
     std::lock_guard guard{mtx};
-    for (size_t i = 0; i < kMaxThreadCapacity; ++i) {
+    for (size_t i = 0; i < kLogicalCoreNum; ++i) {
       threads.emplace_back(f);
     }
-    while (cnt.load(std::memory_order_acquire) < kMaxThreadCapacity) {
+    while (cnt.load(std::memory_order_acquire) < kLogicalCoreNum) {
       std::this_thread::sleep_for(std::chrono::microseconds{1});
     }
     for (auto &&flag : hbs) {
