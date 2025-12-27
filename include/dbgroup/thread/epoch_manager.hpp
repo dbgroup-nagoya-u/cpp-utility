@@ -49,23 +49,19 @@ class EpochManager
    * @brief Construct a new object and start epoch management.
    *
    * @param epoch_interval The period duration for each epoch.
-   * @param thread_num The maximum number of worker threads.
    */
   explicit EpochManager(  //
-      size_t epoch_interval,
-      size_t thread_num = kMaxThreadNum);
+      size_t epoch_interval);
 
   /**
    * @brief Construct a new object and start epoch management.
    *
    * @param epoch_interval The interval between epoch updates.
    * @param get_new_epoch Callback function for updating the global epoch value.
-   * @param thread_num The maximum number of worker threads.
    */
   EpochManager(  //
       size_t epoch_interval,
-      const std::function<Serial(void)> &get_new_epoch,
-      size_t thread_num = kMaxThreadNum);
+      const std::function<Serial(void)> &get_new_epoch);
 
   EpochManager(const EpochManager &) = delete;
   EpochManager(EpochManager &&) = delete;
@@ -143,13 +139,13 @@ class EpochManager
    *##########################################################################*/
 
   /// @brief A global epoch counter.
-  std::atomic<Serial> global_epoch_{Serial{1}};
+  std::atomic<Serial> global_epoch_{};
 
   /// @brief The local minimum epoch.
-  std::atomic<Serial> min_epoch_{Serial{0}};
+  std::atomic<Serial> min_epoch_{};
 
   /// @brief The maximum number of worker threads.
-  size_t thread_num_{kMaxThreadNum};
+  size_t thread_num_{};
 
   /// @brief The interval between epoch updates.
   std::chrono::milliseconds epoch_interval_{};
