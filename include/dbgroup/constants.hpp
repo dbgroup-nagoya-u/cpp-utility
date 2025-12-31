@@ -20,6 +20,7 @@
 // C++ standard libraries
 #include <atomic>
 #include <cstddef>
+#include <new>
 
 namespace dbgroup
 {
@@ -100,7 +101,7 @@ constexpr size_t kWordSize = static_cast<size_t>(DBGROUP_WORD_SIZE);
 /// @brief The expected cache-line size.
 constexpr size_t kCacheLineSize = static_cast<size_t>(DBGROUP_CACHE_LINE_SIZE);
 
-/// @brief The expected cache-line size.
+/// @brief The expected virtual page size.
 constexpr size_t kVMPageSize = static_cast<size_t>(DBGROUP_VIRTUAL_PAGE_SIZE);
 
 /// @brief The number of logical cores.
@@ -108,6 +109,22 @@ constexpr size_t kLogicalCoreNum = static_cast<size_t>(DBGROUP_LOGICAL_CORE_NUM)
 
 /// @brief The capacity of threads used in a process.
 constexpr size_t kMaxThreadCapacity{kVMPageSize};
+
+/*############################################################################*
+ * Global utilities for constants
+ *############################################################################*/
+
+/**
+ * @param size A target page size.
+ * @return The alignment size that fits in virtual pages.
+ */
+constexpr auto
+GetAlignValOnVirtualPages(       //
+    const size_t size) noexcept  //
+    -> std::align_val_t
+{
+  return static_cast<std::align_val_t>(size < kVMPageSize ? size : kVMPageSize);
+}
 
 }  // namespace dbgroup
 
