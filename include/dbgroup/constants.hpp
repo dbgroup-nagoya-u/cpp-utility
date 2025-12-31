@@ -28,6 +28,42 @@ namespace dbgroup
  * Global constants
  *############################################################################*/
 
+/// @brief K (10^3)
+constexpr size_t kK = 1E3;
+
+/// @brief M (10^6)
+constexpr size_t kM = 1E6;
+
+/// @brief G (10^9)
+constexpr size_t kG = 1E9;
+
+/// @brief T (10^12)
+constexpr size_t kT = 1E12;
+
+/// @brief P (10^15)
+constexpr size_t kP = 1E15;
+
+/// @brief E (10^18)
+constexpr size_t kE = 1E18;
+
+/// @brief Ki (2^10)
+constexpr size_t kKi = 1UL << 10UL;
+
+/// @brief Mi (2^20)
+constexpr size_t kMi = 1UL << 20UL;
+
+/// @brief Gi (2^30)
+constexpr size_t kGi = 1UL << 30UL;
+
+/// @brief Ti (2^40)
+constexpr size_t kTi = 1UL << 40UL;
+
+/// @brief Pi (2^50)
+constexpr size_t kPi = 1UL << 50UL;
+
+/// @brief Ei (2^60)
+constexpr size_t kEi = 1UL << 60UL;
+
 /// @brief 2
 constexpr size_t k2 = 1UL << 1UL;
 
@@ -56,25 +92,34 @@ constexpr size_t k256 = 1UL << 8UL;
 constexpr size_t k512 = 1UL << 9UL;
 
 /// @brief 1,024
-constexpr size_t k1Ki = 1UL << 10UL;
+constexpr size_t k1Ki = kKi;
 
 /// @brief 2,048
-constexpr size_t k2Ki = 1UL << 11UL;
+constexpr size_t k2Ki = 2 * kKi;
 
 /// @brief 4,096
-constexpr size_t k4Ki = 1UL << 12UL;
+constexpr size_t k4Ki = 4 * kKi;
 
 /// @brief 8,192
-constexpr size_t k8Ki = 1UL << 13UL;
+constexpr size_t k8Ki = 8 * kKi;
 
 /// @brief 16,384
-constexpr size_t k16Ki = 1UL << 14UL;
+constexpr size_t k16Ki = 16 * kKi;
 
 /// @brief 32,768
-constexpr size_t k32Ki = 1UL << 15UL;
+constexpr size_t k32Ki = 32 * kKi;
 
 /// @brief 65,536
-constexpr size_t k64Ki = 1UL << 16UL;
+constexpr size_t k64Ki = 64 * kKi;
+
+/// @brief 131,072
+constexpr size_t k128Ki = 128 * kKi;
+
+/// @brief 262,144
+constexpr size_t k256Ki = 256 * kKi;
+
+/// @brief 524,288
+constexpr size_t k512Ki = 512 * kKi;
 
 /// @brief An alias of the sequential-consistency memory order.
 constexpr std::memory_order kSeqCst = std::memory_order_seq_cst;
