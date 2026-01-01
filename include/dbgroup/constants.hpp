@@ -171,6 +171,33 @@ GetAlignValOnVirtualPages(       //
   return static_cast<std::align_val_t>(size < kVMPageSize ? size : kVMPageSize);
 }
 
+/**
+ * @param addr A target address or size.
+ * @return The aligned address on virtual pages.
+ * @note The addresss may be rounded down for alignment.
+ */
+constexpr auto
+FloorOnVirtualPages(               //
+    const uint64_t addr) noexcept  //
+    -> uint64_t
+{
+  return addr & ~(kVMPageSize - 1UL);
+}
+
+/**
+ * @param addr A target address or size.
+ * @return The aligned address on virtual pages.
+ * @note The addresss may be rounded up for alignment.
+ */
+constexpr auto
+CeilOnVirtualPages(                //
+    const uint64_t addr) noexcept  //
+    -> uint64_t
+{
+  constexpr auto kFillBits = kVMPageSize - 1UL;
+  return (addr + kFillBits) & ~kFillBits;
+}
+
 }  // namespace dbgroup
 
 #endif  // CPP_UTILITY_DBGROUP_CONSTANTS_HPP_
