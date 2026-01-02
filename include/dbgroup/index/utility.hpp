@@ -132,22 +132,6 @@ IsEqual(  //
 }
 
 /**
- * @brief Shift a memory address by a byte offset.
- *
- * @param addr An original address.
- * @param offset An offset in bytes.
- * @return A shifted address.
- */
-constexpr auto
-ShiftAddr(  //
-    const void *addr,
-    const int64_t offset) noexcept  //
-    -> void *
-{
-  return std::bit_cast<std::byte *>(addr) + offset;
-}
-
-/**
  * @tparam T A target class.
  * @param obj A target instance.
  * @return The address of a given instance for `std::memcpy` or `std::memcmp`.

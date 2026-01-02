@@ -19,7 +19,10 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <bit>
+#include <concepts>
 #include <cstddef>
+#include <cstdint>
 #include <new>
 
 namespace dbgroup
@@ -196,6 +199,38 @@ CeilOnVirtualPages(                //
 {
   constexpr auto kFillBits = kVMPageSize - 1UL;
   return (addr + kFillBits) & ~kFillBits;
+}
+
+/**
+ * @brief Shift a memory address by a byte offset.
+ *
+ * @tparam T An integral type.
+ * @param addr An original address.
+ * @param offset An offset in bytes.
+ * @return A shifted address.
+ */
+template <std::integral T>
+constexpr auto
+ShiftAddr(  //
+    const void *addr,
+    const T offset) noexcept  //
+    -> void *
+{
+  return std::bit_cast<std::byte *>(addr) + offset;
+}
+
+/**
+ * @param base A base address.
+ * @param rel A destination address.
+ * @return The offset between `base` and `rel` (`rel` - `base`).
+ */
+constexpr auto
+GetOffsetBetween(  //
+    const void *base,
+    const void *rel) noexcept  //
+    -> int64_t
+{
+  return std::bit_cast<std::int64_t>(rel) - std::bit_cast<std::int64_t>(base);
 }
 
 }  // namespace dbgroup
