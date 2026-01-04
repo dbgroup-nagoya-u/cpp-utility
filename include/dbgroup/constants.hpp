@@ -220,16 +220,26 @@ ShiftAddr(  //
 }
 
 /**
+ * @tparam T1 Unsigned integers or pointers.
+ * @tparam T2 Unsigned integers or pointers.
  * @param base A base address.
  * @param rel A destination address.
  * @return The offset between `base` and `rel` (`rel` - `base`).
  */
+template <class T1, class T2>
 constexpr auto
 GetOffsetBetween(  //
-    const void *base,
-    const void *rel) noexcept  //
+    const T1 base,
+    const T2 rel) noexcept  //
     -> int64_t
 {
+  static_assert(                                              //
+      std::is_same_v<T1, uint64_t> || std::is_pointer_v<T1>,  //
+      "The first argument must be address values or pointers.");
+  static_assert(                                              //
+      std::is_same_v<T2, uint64_t> || std::is_pointer_v<T2>,  //
+      "The second argument must be address values or pointers.");
+
   return std::bit_cast<std::int64_t>(rel) - std::bit_cast<std::int64_t>(base);
 }
 
