@@ -62,7 +62,7 @@ add_executable(
     [<source> ...]
 )
 target_link_libraries(<target_bin_name> PRIVATE
-    dbgroup::cpp-utility
+    dbgroup::cpp_utility
 )
 ```
 
