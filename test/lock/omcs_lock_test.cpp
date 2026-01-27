@@ -38,6 +38,7 @@ namespace dbgroup::lock::test
 
 constexpr bool kExpectSucceed = true;
 constexpr bool kExpectFail = false;
+constexpr size_t kThreadNumForLockS = 1E2;
 constexpr size_t kWriteNumPerThread = 1E5;
 constexpr std::chrono::milliseconds kWaitTimeMill{100};
 
@@ -52,7 +53,8 @@ class OMCSLockFixture : public ::testing::Test
    * Types
    *##########################################################################*/
 
-  using Guard = std::variant<int, OMCS::XGuard, OMCS::SIXGuard, OMCS::SGuard, OptiQL::OptGuard>;
+  using Guard =
+      std::variant<int, OMCSLock::XGuard, OMCSLock::SIXGuard, OMCSLock::SGuard, OMCSLock::OptGuard>;
 
   /*##########################################################################*
    * Setup/Teardown
@@ -222,7 +224,7 @@ class OMCSLockFixture : public ::testing::Test
     // try to get an exclusive lock by another thread
     std::promise<void> p{};
     auto &&f = p.get_future();
-    t_ = std::thread{&OptiQLFixture::LockWorker, this, lock_type, std::move(p)};
+    t_ = std::thread{&OMCSLockFixture::LockWorker, this, lock_type, std::move(p)};
 
     // after short sleep, give up on acquiring the lock
     const auto rc = f.wait_for(kWaitTimeMill);
@@ -237,7 +239,7 @@ class OMCSLockFixture : public ::testing::Test
 
   void
   TryUpgrade(  //
-      MCSLock::SIXGuard six_guard,
+      OMCSLock::SIXGuard six_guard,
       const bool expect_success)
   {
     auto upgrade_worker = [](OMCSLock::SIXGuard six_guard, std::promise<void> p) -> void {
@@ -265,7 +267,7 @@ class OMCSLockFixture : public ::testing::Test
    * Internal member variables
    *##########################################################################*/
 
-  OptiQL lock_{};
+  OMCSLock lock_{};
 
   size_t counter_{0};
 

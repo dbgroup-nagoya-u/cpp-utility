@@ -35,6 +35,12 @@ class OMCSLock
 {
  public:
   /*##########################################################################*
+   * Public types
+   *##########################################################################*/
+
+  // forward declarations
+  class XGuard;
+  /*##########################################################################*
    * Public constants
    *##########################################################################*/
 
@@ -116,7 +122,13 @@ class OMCSLock
     OMCSLock *dest_{};
 
     /// @brief The corresponding queue node for unlocking.
-    OMCSLock *qnode_{};
+    uint64_t qid_{};
+
+    /// @brief A version when creating this guard.
+    uint32_t old_ver_{};
+
+    /// @brief A version when failing verification.
+    uint32_t new_ver_{};
   };
 
   /**
@@ -200,7 +212,13 @@ class OMCSLock
     OMCSLock *dest_{};
 
     /// @brief The corresponding queue node for unlocking.
-    OMCSLock *qnode_{};
+    uint64_t qid_{};
+
+    /// @brief A version when creating this guard.
+    uint32_t old_ver_{};
+
+    /// @brief A version when failing verification.
+    uint32_t new_ver_{};
   };
 
   /**
@@ -291,6 +309,22 @@ class OMCSLock
       new_ver_ = ver;
     }
 
+    /**
+     * @brief Downgrade this lock to an SIX lock.
+     *
+     * @return The lock guard for an SIX lock.
+     * @note After calling the function, this lock guard abandons the lock's
+     * ownership.
+     * @note This function does not do anything actually due to a queue lock
+     * structure.
+     */
+    [[nodiscard]] auto
+    DowngradeToSIX()  //
+        -> SIXGuard
+    {
+      return SIXGuard{std::exchange(dest_, nullptr), qid_, old_ver_};
+    }
+
    private:
     /*########################################################################*
      * Internal member variables
@@ -308,22 +342,6 @@ class OMCSLock
     /// @brief A version when failing verification.
     uint32_t new_ver_{};
   };
-
-  /**
-   * @brief Downgrade this lock to an SIX lock.
-   *
-   * @return The lock guard for an SIX lock.
-   * @note After calling the function, this lock guard abandons the lock's
-   * ownership.
-   * @note This function does not do anything actually due to a queue lock
-   * structure.
-   */
-  [[nodiscard]] auto
-  DowngradeToSIX()  //
-      -> SIXGuard
-  {
-    return SIXGuard{std::exchange(dest_, nullptr), qnode_};
-  }
 
   /**
    * @brief A class for representing a guard instance for optimistic locking.
@@ -344,8 +362,10 @@ class OMCSLock
      */
     constexpr OptGuard(  //
         const OMCSLock *dest,
-        const uint32_t ver) noexcept
-        : dest_{dest}, ver_{ver}
+        const uint32_t ver,
+        uint16_t retry_num_,
+        bool has_lock_) noexcept
+        : dest_{dest}, ver_{ver}, retry_num_{retry_num_}, has_lock_{std::exchange(has_lock_, false)}
     {
     }
 
@@ -394,6 +414,7 @@ class OMCSLock
      * @retval false otherwise.
      */
     [[nodiscard]] auto VerifyVersion(
+        uint32_t mask = kNoMask,
         size_t max_retry = std::numeric_limits<size_t>::max()) noexcept  //
         -> bool;
 
@@ -407,6 +428,12 @@ class OMCSLock
 
     /// @brief A version when creating this guard.
     uint32_t ver_{};
+
+    /// @brief The number of retries for version verification.
+    uint16_t retry_num_{};
+
+    /// @brief A flag indicating whether this instance is holding a lock.
+    bool has_lock_{};
   };
 
   /*##########################################################################*

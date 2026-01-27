@@ -53,6 +53,9 @@ struct QNode {
  * Local constants
  *############################################################################*/
 
+/// @brief The `uintptr_t` of nullptr.
+constexpr uint64_t kNull = 0;
+
 /// @brief A lock state representing no locks.
 constexpr uint64_t kNoLocks = 0b000;
 
@@ -74,9 +77,6 @@ constexpr uint64_t kVersionMask = ~(~0UL << 32UL);
 /// @brief A bit mask for extracting a node pointer.
 constexpr uint64_t kQIDMask = (kSLock - 1UL) ^ kVersionMask;
 
-/// @brief A bit mask for extracting a sharedlock state.
-constexpr uint64_t kSMask = kLockMask ^ kXAndOPReadMask;
-
 /// @brief A bit shift for QNode.
 constexpr uint64_t kQIDShift = 32UL;
 
@@ -84,7 +84,7 @@ constexpr uint64_t kQIDShift = 32UL;
 constexpr uint64_t kLockMask = ~(kVersionMask | kQIDMask);
 
 /// @brief A bit mask for extracting a sharedlock state.
-constexpr uint64_t kSMask = kLockMask ^ kXLock;
+constexpr uint64_t kSMask = kLockMask ^ kXAndOPReadMask;
 
 /// @brief The number of bits in one word.
 constexpr uint64_t kBitNum = 64UL;
@@ -186,7 +186,7 @@ auto
 OMCSLock::LockS()  //
     -> SGuard
 {
-  const auto qid = GetQID();
+  auto qid = GetQID();
   auto *qnode = &(_qnodes[qid]);
   const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kSLock;
 
@@ -201,10 +201,11 @@ OMCSLock::LockS()  //
     CPP_UTILITY_SPINLOCK_HINT
   }
 
-  Retain(qid);
+  RetainQID(qid);
   qid = cur & kQIDMask;
-  auto *qnode = &(_qnodes[qid]);
+  qnode = &(_qnodes[qid]);
   if (cur & kXLock) {  // wait for the predecessor to release the lock
+    auto *next_ptr = qnode->next.load(kAcquire);
     while (((cur & kQIDMask) >> kQIDShift) == qid && (cur & kXLock)) {
       std::this_thread::yield();
       cur = lock_.load(kAcquire);
@@ -301,7 +302,7 @@ OMCSLock::UnlockS(  //
       if (unlock & kLockMask) {
         if (lock_.compare_exchange_weak(cur, unlock, kRelaxed, kRelaxed)) return;
       } else if (lock_.compare_exchange_weak(cur, kNull, kRelaxed, kRelaxed)) {
-        _tls.reset(qnode);
+        RetainQID(qid);
         return;
       }
       CPP_UTILITY_SPINLOCK_HINT
@@ -411,8 +412,8 @@ OMCSLock::XGuard::~XGuard()
  *############################################################################*/
 
 auto
-OptimisticLock::OptGuard::operator=(  //
-    OptGuard &&rhs) noexcept          //
+OMCSLock::OptGuard::operator=(  //
+    OptGuard &&rhs) noexcept    //
     -> OptGuard &
 {
   if (dest_ && has_lock_) {
@@ -425,7 +426,7 @@ OptimisticLock::OptGuard::operator=(  //
   return *this;
 }
 
-OptimisticLock::OptGuard::~OptGuard()
+OMCSLock::OptGuard::~OptGuard()
 {
   if (dest_ && has_lock_) {
     dest_->UnlockS();
