@@ -7,7 +7,7 @@ endif()
 
 # project information
 project(cpp_utility
-  VERSION "0.14.4"
+  VERSION "0.15.0"
   DESCRIPTION "An open-source C++ utility library for research use."
   LANGUAGES "CXX"
 )
@@ -98,6 +98,7 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
 
   # build as a header-only library
   add_library(${PROJECT_NAME} STATIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/benchmark/stop_watch.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lock/pessimistic_lock.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lock/optimistic_lock.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/lock/mcs_lock.cpp"
