@@ -31,6 +31,7 @@
 
 // local sources
 #include "dbgroup/constants.hpp"
+#include "dbgroup/lock/component/queue_node_holder.hpp"
 #include "dbgroup/lock/utility.hpp"
 
 namespace dbgroup::lock
@@ -41,6 +42,10 @@ namespace
  * Local types
  *############################################################################*/
 
+/**
+ * @brief A class for representing nodes in queue locks.
+ *
+ */
 struct QNode {
   /// @brief The next queue node if exist.
   std::atomic<QNode *> next;
@@ -48,6 +53,9 @@ struct QNode {
   /// @brief A flag for indicating this node's owner holds a lock.
   std::atomic_bool hold_lock;
 };
+
+/// @brief A class for managing thread local queue nodes.
+using QNodeHolder = component::QueueNodeHolder<QNode, OMCSLock::kQNodeNum>;
 
 /*############################################################################*
  * Local constants
@@ -86,82 +94,15 @@ constexpr uint64_t kLockMask = ~(kVersionMask | kQIDMask);
 /// @brief A bit mask for extracting a sharedlock state.
 constexpr uint64_t kSMask = kLockMask ^ kXAndOPReadMask;
 
-/// @brief The number of bits in one word.
-constexpr uint64_t kBitNum = 64UL;
-
-/// @brief The maximum number of thread local queue nodes.
-constexpr uint32_t kMaxTLSNum = 8;
-
-/// @brief The size of a buffer for managing queue node IDs.
-constexpr uint64_t kIDBufSize = OMCSLock::kQNodeNum / kBitNum;
-
 /*############################################################################*
  * Static variables
  *############################################################################*/
-
-// The definition of a static member.
-QNode _qnodes[OMCSLock::kQNodeNum] = {};  // NOLINT
-
-/// @brief The container of queue node IDs.
-alignas(kVMPageSize) std::atomic_uint64_t _id_buf[kIDBufSize] = {};  // NOLINT
+// NOLINTBEGIN
 
 /// @brief A thread local queue node container.
-thread_local std::vector<uint32_t> _tls{};  // NOLINT
+thread_local QNodeHolder tls_holder{};
 
-/*############################################################################*
- * Local utilities
- *############################################################################*/
-
-/**
- * @return A unique QID.
- */
-auto
-GetQID()  //
-    -> uint32_t
-{
-  if (!_tls.empty()) {
-    const auto qid = _tls.back();
-    _tls.pop_back();
-    return qid;
-  }
-
-  constexpr uint32_t kIDBufMask = kIDBufSize - 1U;
-  constexpr uint64_t kFilledIDs = ~0UL;
-  thread_local const auto base = std::hash<std::thread::id>{}(std::this_thread::get_id());
-  for (uint32_t pos = base; true; ++pos) {
-    pos &= kIDBufMask;
-    auto cur = _id_buf[pos].load(kRelaxed);
-    while (cur < kFilledIDs) {
-      const uint32_t cto = std::countr_one(cur);
-      const auto flag = 1UL << cto;
-      cur = _id_buf[pos].fetch_or(flag, kRelaxed);
-      if ((cur & flag) == 0UL) return pos * kBitNum + cto;
-      CPP_UTILITY_SPINLOCK_HINT
-    }
-  }
-}
-
-/**
- * @brief Retain a QID for reusing in the future.
- *
- * @param qid A QID to be reused.
- */
-void
-RetainQID(  //
-    const uint32_t qid)
-{
-  auto *qnode = &(_qnodes[qid]);
-  qnode->next.store(nullptr, kRelaxed);
-  qnode->hold_lock.store(false, kRelaxed);
-
-  if (_tls.size() < kMaxTLSNum) {
-    _tls.emplace_back(qid);
-  } else {
-    constexpr uint32_t kFlagMask = kBitNum - 1U;
-    _id_buf[qid / kBitNum].fetch_xor(qid & kFlagMask, kRelaxed);
-  }
-}
-
+// NOLINTEND
 }  // namespace
 
 /*############################################################################*
@@ -186,8 +127,8 @@ auto
 OMCSLock::LockS()  //
     -> SGuard
 {
-  auto qid = GetQID();
-  auto *qnode = &(_qnodes[qid]);
+  auto qid = tls_holder.GetQID();
+  auto *qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kSLock;
 
   auto cur = lock_.load(kRelaxed);
@@ -201,9 +142,9 @@ OMCSLock::LockS()  //
     CPP_UTILITY_SPINLOCK_HINT
   }
 
-  RetainQID(qid);
+  tls_holder.ReleaseQID(qid);
   qid = cur & kQIDMask;
-  qnode = &(_qnodes[qid]);
+  qnode = QNodeHolder::GetQNode(qid);
   if (cur & kXLock) {  // wait for the predecessor to release the lock
     auto *next_ptr = qnode->next.load(kAcquire);
     while (((cur & kQIDMask) >> kQIDShift) == qid && (cur & kXLock)) {
@@ -216,7 +157,7 @@ OMCSLock::LockS()  //
         if (next_ptr) break;
         CPP_UTILITY_SPINLOCK_HINT
       }
-      auto *pred_qnode = &(_qnodes[(cur & kQIDMask) >> kQIDShift]);
+      auto *pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
       pred_qnode->next.store(qnode, kRelaxed);
       while (!qnode->hold_lock.load(kRelaxed)) {
         std::this_thread::yield();
@@ -231,8 +172,8 @@ auto
 OMCSLock::LockSIX()  //
     -> SIXGuard
 {
-  const auto qid = GetQID();
-  auto *qnode = &(_qnodes[qid]);
+  const auto qid = tls_holder.GetQID();
+  auto *qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
   auto cur = lock_.load(kRelaxed);
@@ -243,7 +184,7 @@ OMCSLock::LockSIX()  //
 
   if ((cur & kLockMask) != kNoLocks) {
     // wait until predecessor gives up the lock
-    auto *pred_qnode = &(_qnodes[(cur & kQIDMask) >> kQIDShift]);
+    auto *pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
     pred_qnode->next.store(qnode, kRelaxed);
     while (!qnode->hold_lock.load(kRelaxed)) {
       std::this_thread::yield();
@@ -259,8 +200,8 @@ auto
 OMCSLock::LockX()  //
     -> XGuard
 {
-  const auto qid = GetQID();
-  auto *qnode = &(_qnodes[qid]);
+  const auto qid = tls_holder.GetQID();
+  auto *qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
   auto cur = lock_.load(kRelaxed);
@@ -271,7 +212,7 @@ OMCSLock::LockX()  //
 
   if ((cur & kLockMask) != kNoLocks) {
     // wait until predecessor gives up the lock
-    auto *pred_qnode = &(_qnodes[(cur & kQIDMask) >> kQIDShift]);
+    auto *pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
     pred_qnode->next.store(qnode, kRelaxed);
     while (!qnode->hold_lock.load(kRelaxed)) {
       std::this_thread::yield();
@@ -292,7 +233,7 @@ OMCSLock::UnlockS(  //
     const uint64_t qid,
     const uint64_t ver)
 {
-  auto *qnode = &(_qnodes[qid]);
+  auto *qnode = QNodeHolder::GetQNode(qid);
 
   auto *next_ptr = qnode->next.load(kAcquire);
   if (next_ptr == nullptr) {  // this is the tail node
@@ -302,7 +243,7 @@ OMCSLock::UnlockS(  //
       if (unlock & kLockMask) {
         if (lock_.compare_exchange_weak(cur, unlock, kRelaxed, kRelaxed)) return;
       } else if (lock_.compare_exchange_weak(cur, kNull, kRelaxed, kRelaxed)) {
-        RetainQID(qid);
+        tls_holder.ReleaseQID(qid);
         return;
       }
       CPP_UTILITY_SPINLOCK_HINT
@@ -315,7 +256,7 @@ OMCSLock::UnlockS(  //
     }
   }
   next_ptr->hold_lock.store(true, kRelaxed);
-  RetainQID(qid);
+  tls_holder.ReleaseQID(qid);
 }
 
 void
@@ -323,7 +264,7 @@ OMCSLock::UnlockSIX(  //
     const uint64_t qid,
     const uint64_t ver)
 {
-  auto *qnode = &(_qnodes[qid]);
+  auto *qnode = QNodeHolder::GetQNode(qid);
 
   auto *next_ptr = qnode->next.load(kAcquire);
   if (next_ptr == nullptr) {  // this is the tail node
@@ -332,7 +273,7 @@ OMCSLock::UnlockSIX(  //
       if (cur & kSMask) {
         if (lock_.compare_exchange_weak(cur, cur ^ kXLock, kRelease, kRelaxed)) return;
       } else if (lock_.compare_exchange_weak(cur, ver, kRelease, kRelaxed)) {
-        RetainQID(qid);
+        tls_holder.ReleaseQID(qid);
         return;
       }
       CPP_UTILITY_SPINLOCK_HINT
@@ -347,7 +288,7 @@ OMCSLock::UnlockSIX(  //
     CPP_UTILITY_SPINLOCK_HINT
   }
   next_ptr->hold_lock.store(true, kRelaxed);
-  RetainQID(qid);
+  tls_holder.ReleaseQID(qid);
 }
 
 void
@@ -355,7 +296,7 @@ OMCSLock::UnlockX(  //
     const uint64_t qid,
     const uint64_t ver)
 {
-  auto *qnode = &(_qnodes[qid]);
+  auto *qnode = QNodeHolder::GetQNode(qid);
 
   auto *next_ptr = qnode->next.load(kAcquire);
   if (next_ptr == nullptr) {  // this is the tail node
@@ -364,7 +305,7 @@ OMCSLock::UnlockX(  //
       if (cur & kSMask) {
         if (lock_.compare_exchange_weak(cur, cur ^ kXLock, kRelease, kRelaxed)) return;
       } else if (lock_.compare_exchange_weak(cur, ver, kRelease, kRelaxed)) {
-        RetainQID(qid);
+        tls_holder.ReleaseQID(qid);
         return;
       }
     }
@@ -378,7 +319,7 @@ OMCSLock::UnlockX(  //
     CPP_UTILITY_SPINLOCK_HINT
   }
   next_ptr->hold_lock.store(true, kRelaxed);
-  RetainQID(qid);
+  tls_holder.ReleaseQID(qid);
 }
 
 /*############################################################################*
