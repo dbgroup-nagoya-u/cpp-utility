@@ -362,10 +362,18 @@ class OMCSLock
      */
     constexpr OptGuard(  //
         const OMCSLock *dest,
-        const uint32_t ver,
-        uint16_t retry_num_,
-        bool has_lock_) noexcept
-        : dest_{dest}, ver_{ver}, retry_num_{retry_num_}, has_lock_{std::exchange(has_lock_, false)}
+        const uint32_t ver) noexcept
+        : dest_{dest}, ver_{ver}
+    {
+    }
+
+    constexpr OptGuard(  //
+        OptGuard &&obj) noexcept
+        : dest_{std::exchange(obj.dest_, nullptr)},
+          qid_{obj.qid_},
+          ver_{obj.ver_},
+          retry_num_{obj.retry_num_},
+          has_lock_{std::exchange(obj.has_lock_, false)}
     {
     }
 
@@ -425,6 +433,9 @@ class OMCSLock
 
     /// @brief The address of a target lock.
     const OMCSLock *dest_{};
+
+    /// @brief The corresponding queue node for unlocking.
+    uint64_t qid_{};
 
     /// @brief A version when creating this guard.
     uint32_t ver_{};

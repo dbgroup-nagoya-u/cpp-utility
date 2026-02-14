@@ -358,9 +358,10 @@ OMCSLock::OptGuard::operator=(  //
     -> OptGuard &
 {
   if (dest_ && has_lock_) {
-    dest_->UnlockS();
+    dest_->UnlockS(qid_, ver_);
   }
   dest_ = std::exchange(rhs.dest_, nullptr);
+  qid_ = rhs.qid_;
   ver_ = rhs.ver_;
   retry_num_ = rhs.retry_num_;
   has_lock_ = std::exchange(rhs.has_lock_, false);
@@ -370,16 +371,16 @@ OMCSLock::OptGuard::operator=(  //
 OMCSLock::OptGuard::~OptGuard()
 {
   if (dest_ && has_lock_) {
-    dest_->UnlockS();
+    dest_->UnlockS(qid_, ver_);
   }
 }
 
 auto
-OMCSLock::OptGuard::VerifyVersion(const size_t max_retry) noexcept  //
+OMCSLock::OptGuard::VerifyVersion(const uint32_t mask, const size_t max_retry) noexcept  //
     -> bool
 {
   if (has_lock_) {
-    dest_->UnlockS();
+    dest_->UnlockS(qid_, ver_);
     has_lock_ = false;
     return true;
   }
