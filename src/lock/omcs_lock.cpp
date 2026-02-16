@@ -110,7 +110,7 @@ thread_local QNodeHolder tls_holder{};
  *############################################################################*/
 
 auto
-OMCSLock::GetVersion() const noexcept  //
+OMCSLock::GetVersion() noexcept  //
     -> OptGuard
 {
   uint64_t cur{};
@@ -230,8 +230,7 @@ OMCSLock::LockX()  //
 
 void
 OMCSLock::UnlockS(  //
-    const uint64_t qid,
-    const uint64_t ver)
+    const uint64_t qid)
 {
   auto *qnode = QNodeHolder::GetQNode(qid);
 
@@ -358,7 +357,7 @@ OMCSLock::OptGuard::operator=(  //
     -> OptGuard &
 {
   if (dest_ && has_lock_) {
-    dest_->UnlockS(qid_, ver_);
+    dest_->UnlockS(qid_);
   }
   dest_ = std::exchange(rhs.dest_, nullptr);
   qid_ = rhs.qid_;
@@ -371,7 +370,7 @@ OMCSLock::OptGuard::operator=(  //
 OMCSLock::OptGuard::~OptGuard()
 {
   if (dest_ && has_lock_) {
-    dest_->UnlockS(qid_, ver_);
+    dest_->UnlockS(qid_);
   }
 }
 
@@ -380,7 +379,7 @@ OMCSLock::OptGuard::VerifyVersion(const uint32_t mask, const size_t max_retry) n
     -> bool
 {
   if (has_lock_) {
-    dest_->UnlockS(qid_, ver_);
+    dest_->UnlockS(qid_);
     has_lock_ = false;
     return true;
   }
@@ -406,6 +405,68 @@ OMCSLock::OptGuard::VerifyVersion(const uint32_t mask, const size_t max_retry) n
     CPP_UTILITY_SPINLOCK_HINT
   }
   return false;
+}
+
+/*############################################################################*
+ * Shared-with-intent-exclusive lock guards
+ *############################################################################*/
+
+auto
+OMCSLock::SIXGuard::operator=(  //
+    SIXGuard &&rhs) noexcept    //
+    -> SIXGuard &
+{
+  if (dest_) {
+    dest_->UnlockSIX(qid_, new_ver_);
+  }
+  dest_ = std::exchange(rhs.dest_, nullptr);
+  qid_ = rhs.qid_;
+  return *this;
+}
+
+OMCSLock::SIXGuard::~SIXGuard()
+{
+  if (dest_) {
+    dest_->UnlockSIX(qid_, new_ver_);
+  }
+}
+
+auto
+OMCSLock::SIXGuard::UpgradeToX()  //
+    -> XGuard
+{
+  if (dest_ == nullptr) return XGuard{};
+
+  auto cur = dest_->lock_.load(kRelaxed);
+  while (true) {  // wait for shared lock holders to release their locks
+    cur = dest_->lock_.load(kRelaxed);
+    if ((cur & kSMask) == kNoLocks) break;
+    std::this_thread::yield();
+  }
+  return XGuard{std::exchange(dest_, nullptr), qid_, new_ver_};
+}
+/*############################################################################*
+ * Shared lock guards
+ *############################################################################*/
+
+auto
+OMCSLock::SGuard::operator=(  //
+    SGuard &&rhs) noexcept    //
+    -> SGuard &
+{
+  if (dest_) {
+    dest_->UnlockS(qid_);
+  }
+  dest_ = std::exchange(rhs.dest_, nullptr);
+  qid_ = rhs.qid_;
+  return *this;
+}
+
+OMCSLock::SGuard::~SGuard()
+{
+  if (dest_) {
+    dest_->UnlockS(qid_);
+  }
 }
 
 }  // namespace dbgroup::lock

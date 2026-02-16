@@ -361,7 +361,7 @@ class OMCSLock
      * @param ver The current version.
      */
     constexpr OptGuard(  //
-        const OMCSLock *dest,
+        OMCSLock *dest,
         const uint32_t ver) noexcept
         : dest_{dest}, ver_{ver}
     {
@@ -378,16 +378,17 @@ class OMCSLock
     }
 
     constexpr OptGuard(const OptGuard &) noexcept = default;
-    constexpr OptGuard(OptGuard &&) noexcept = default;
+    auto operator=(               //
+        OptGuard &&rhs) noexcept  //
+        -> OptGuard &;
 
     constexpr auto operator=(const OptGuard &) noexcept -> OptGuard & = default;
-    constexpr auto operator=(OptGuard &&) noexcept -> OptGuard & = default;
 
     /*########################################################################*
      * Public destructors
      *########################################################################*/
 
-    ~OptGuard() = default;
+    ~OptGuard();
 
     /*########################################################################*
      * Public getters
@@ -432,7 +433,7 @@ class OMCSLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    const OMCSLock *dest_{};
+    OMCSLock *dest_{};
 
     /// @brief The corresponding queue node for unlocking.
     uint64_t qid_{};
@@ -475,7 +476,7 @@ class OMCSLock
    * @note This function does not give up reading a version value and continues
    * with spinlock and back-off.
    */
-  [[nodiscard]] auto GetVersion() const noexcept  //
+  [[nodiscard]] auto GetVersion() noexcept  //
       -> OptGuard;
 
   /**
@@ -521,8 +522,7 @@ class OMCSLock
    * corrupt an internal lock state.
    */
   void UnlockS(  //
-      uint64_t qid,
-      uint64_t ver);
+      uint64_t qid);
 
   /**
    * @brief Release a shared-with-intent-exclusive lock.
