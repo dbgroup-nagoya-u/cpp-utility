@@ -427,6 +427,50 @@ class OMCSLock
         size_t max_retry = std::numeric_limits<size_t>::max()) noexcept  //
         -> bool;
 
+    /**
+     * @param mask A bitmask for representing bits to be verified.
+     * @retval true if a target version does not change from an expected one.
+     * @retval false otherwise.
+     */
+    [[nodiscard]] auto ImmediateVerify(    //
+        uint32_t mask = kNoMask) noexcept  //
+        -> bool;
+
+    /**
+     * @brief Get a shared lock if a given version is the same as the current one.
+     *
+     * @param mask A bitmask for representing bits to be verified.
+     * @retval A guard instance if the lock is acquired.
+     * @retval An empty guard instance otherwise.
+     * @note This function does not give up acquiring a lock and continues with
+     * spinlock and back-off.
+     */
+    [[nodiscard]] auto TryLockS(  //
+        uint32_t mask = kNoMask)  //
+        -> SGuard;
+
+    /**
+     * @brief Get an SIX lock if a given version is the same as the current one.
+     *
+     * @param mask A bitmask for representing bits to be verified.
+     * @retval A guard instance if the lock is acquired.
+     * @retval An empty guard instance otherwise.
+     */
+    [[nodiscard]] auto TryLockSIX(  //
+        uint32_t mask = kNoMask)    //
+        -> SIXGuard;
+
+    /**
+     * @brief Get an X lock if a given version is the same as the current one.
+     *
+     * @param mask A bitmask for representing bits to be verified.
+     * @retval A guard instance if the lock is acquired.
+     * @retval An empty guard instance otherwise.
+     */
+    [[nodiscard]] auto TryLockX(  //
+        uint32_t mask = kNoMask)  //
+        -> XGuard;
+
    private:
     /*########################################################################*
      * Internal member variables
