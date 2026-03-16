@@ -52,6 +52,9 @@ struct QNode {
 
   /// @brief A flag for indicating this node's owner holds a lock.
   std::atomic_bool hold_lock;
+
+  /// @brief A flag for indicating this node's owner holds a lock.
+  std::atomic<uint64_t> lock_state;
 };
 
 /// @brief A class for managing thread local queue nodes.
@@ -132,6 +135,7 @@ OMCSLock::LockS()  //
 {
   auto qid = tls_holder.GetQID();
   auto *qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
+  qnode->lock_state.store(kNull, kRelaxed);
   const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kSLock;
 
   auto cur = lock_.load(kRelaxed);
@@ -146,29 +150,28 @@ OMCSLock::LockS()  //
   }
 
   tls_holder.ReleaseQID(qid);
-  qid = cur & kQIDMask;
+  qid = (cur & kQIDMask) >> kQIDShift;
   qnode = QNodeHolder::GetQNode(qid);
   if (cur & kXLock) {  // wait for the predecessor to release the lock
-    auto *next_ptr = qnode->next.load(kAcquire);
     while (((cur & kQIDMask) >> kQIDShift) == qid && (cur & kXLock)) {
       std::this_thread::yield();
       cur = lock_.load(kAcquire);
     }
+    auto *next_ptr = qnode->next.load(kAcquire);
     if (((cur & kQIDMask) >> kQIDShift) != qid) {
       while (true) {  // wait until successor fills in its next field
         next_ptr = qnode->next.load(kRelaxed);
         if (next_ptr) break;
         CPP_UTILITY_SPINLOCK_HINT
       }
-      auto *pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
-      pred_qnode->next.store(qnode, kRelaxed);
-      while (!qnode->hold_lock.load(kRelaxed)) {
+
+      while (next_ptr->lock_state.load(kRelaxed) & kXLock) {
         std::this_thread::yield();
       }
     }
   }
 end:
-  return SGuard{this, qid, static_cast<uint32_t>(cur & kVersionMask)};
+  return SGuard{this, qid};
 }
 
 auto
@@ -181,6 +184,7 @@ OMCSLock::LockSIX()  //
 
   auto cur = lock_.load(kRelaxed);
   while (true) {
+    qnode->lock_state.store(cur & kLockMask, kRelaxed);
     if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
@@ -189,8 +193,9 @@ OMCSLock::LockSIX()  //
     // wait until predecessor gives up the lock
     auto *pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
     pred_qnode->next.store(qnode, kRelaxed);
-    while (!qnode->hold_lock.load(kRelaxed)) {
+    while (qnode->lock_state.load(kAcquire) & kXLock) {
       std::this_thread::yield();
+      cur = lock_.load(kRelaxed);
     }
     // disable opportunistic read
     cur = lock_.fetch_xor(kOPReadFlag, kAcquire);
@@ -237,14 +242,14 @@ OMCSLock::UnlockS(  //
 {
   auto *qnode = QNodeHolder::GetQNode(qid);
 
-  auto *next_ptr = qnode->next.load(kAcquire);
-  if (next_ptr == nullptr) {  // this is the tail node
+  auto *next_node = qnode->next.load(kAcquire);
+  if (next_node == nullptr) {  // this is the tail node
     auto cur = lock_.load(kRelaxed);
-    while ((cur & kQIDMask) == qid) {
+    while (((cur & kQIDMask) >> kQIDShift) == qid) {
       const auto unlock = cur - kSLock;
       if (unlock & kLockMask) {
         if (lock_.compare_exchange_weak(cur, unlock, kRelaxed, kRelaxed)) return;
-      } else if (lock_.compare_exchange_weak(cur, kNull, kRelaxed, kRelaxed)) {
+      } else if (lock_.compare_exchange_weak(cur, cur & kVersionMask, kRelaxed, kRelaxed)) {
         tls_holder.ReleaseQID(qid);
         return;
       }
@@ -252,13 +257,15 @@ OMCSLock::UnlockS(  //
     }
 
     while (true) {  // wait until successor fills in its next field
-      next_ptr = qnode->next.load(kRelaxed);
-      if (next_ptr) break;
+      next_node = qnode->next.load(kRelaxed);
+      if (next_node) break;
       CPP_UTILITY_SPINLOCK_HINT
     }
   }
-  next_ptr->hold_lock.store(true, kRelaxed);
-  tls_holder.ReleaseQID(qid);
+  next_node->hold_lock.store(true, kRelaxed);
+  if ((next_node->lock_state.fetch_sub(kSLock, kRelease) & kLockMask) == kSLock) {
+    tls_holder.ReleaseQID(qid);
+  }
 }
 
 void
@@ -290,7 +297,9 @@ OMCSLock::UnlockSIX(  //
     CPP_UTILITY_SPINLOCK_HINT
   }
   next_ptr->hold_lock.store(true, kRelaxed);
-  tls_holder.ReleaseQID(qid);
+  if ((next_ptr->lock_state.fetch_xor(kXLock, kRelease) & kLockMask) == kXLock) {
+    tls_holder.ReleaseQID(qid);
+  }
 }
 
 void
@@ -321,7 +330,9 @@ OMCSLock::UnlockX(  //
     CPP_UTILITY_SPINLOCK_HINT
   }
   next_ptr->hold_lock.store(true, kRelaxed);
-  tls_holder.ReleaseQID(qid);
+  if ((next_ptr->lock_state.fetch_xor(kXLock, kRelease) & kLockMask) == kXLock) {
+    tls_holder.ReleaseQID(qid);
+  }
 }
 
 /*############################################################################*
@@ -436,7 +447,7 @@ OMCSLock::OptGuard::TryLockS(  //
     const uint32_t mask)       //
     -> SGuard
 {
-  if (has_lock_) return SGuard{std::exchange(dest_, nullptr), qid_, ver_};
+  if (has_lock_) return SGuard{std::exchange(dest_, nullptr), qid_};
 
   const auto expected = ver_;
   SpinWithBackoff(
@@ -449,7 +460,7 @@ OMCSLock::OptGuard::TryLockS(  //
       },
       &(dest_->lock_), &ver_, ver_, mask);
 
-  return ((ver_ ^ expected) & mask) ? SGuard{} : SGuard{std::exchange(dest_, nullptr), qid_, ver_};
+  return ((ver_ ^ expected) & mask) ? SGuard{} : SGuard{std::exchange(dest_, nullptr), qid_};
 }
 
 auto
@@ -534,10 +545,11 @@ OMCSLock::SIXGuard::UpgradeToX()  //
 {
   if (dest_ == nullptr) return XGuard{};
 
-  auto cur = dest_->lock_.load(kRelaxed);
+  auto *qnode = QNodeHolder::GetQNode(qid_);
+  uint64_t next_state;
   while (true) {  // wait for shared lock holders to release their locks
-    cur = dest_->lock_.load(kRelaxed);
-    if ((cur & kSMask) == kNoLocks) break;
+    next_state = qnode->lock_state.load(kRelaxed);
+    if ((next_state & kSMask) == kNoLocks) break;
     std::this_thread::yield();
   }
   return XGuard{std::exchange(dest_, nullptr), qid_, new_ver_};

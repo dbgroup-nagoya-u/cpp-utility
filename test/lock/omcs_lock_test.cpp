@@ -358,9 +358,9 @@ TEST_F(  //
 
 TEST_F(  //
     OMCSLockFixture,
-    LockSWithSIXLockSucceed)
+    LockSWithSIXLockNeedWait)
 {
-  VerifyLock(kSLock, kSIXLock, kExpectSucceed);
+  VerifyLock(kSLock, kSIXLock, kExpectFail);
 }
 
 TEST_F(  //
@@ -386,9 +386,9 @@ TEST_F(  //
 
 TEST_F(  //
     OMCSLockFixture,
-    TryLockSWithSIXLockSucceed)
+    TryLockSWithSIXLockNeedWait)
 {
-  VerifyTryLock(kSLock, kSIXLock, kExpectSucceed);
+  VerifyTryLock(kSLock, kSIXLock, kExpectFail);
 }
 
 TEST_F(  //
@@ -524,9 +524,9 @@ TEST_F(  //
 
 TEST_F(  //
     OMCSLockFixture,
-    LockSAfterDowngradeToSIXSucceed)
+    LockSAfterDowngradeToSIXNeedWait)
 {
-  VerifyDowngradeToSIX(kSLock, kExpectSucceed);
+  VerifyDowngradeToSIX(kSLock, kExpectFail);
 }
 
 TEST_F(  //

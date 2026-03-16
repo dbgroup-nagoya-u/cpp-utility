@@ -70,9 +70,8 @@ class OMCSLock
      */
     constexpr SGuard(  //
         OMCSLock *dest,
-        const uint64_t qid,
-        const uint32_t ver) noexcept
-        : dest_{dest}, qid_{qid}, old_ver_{ver}, new_ver_{ver + 1U}
+        const uint64_t qid) noexcept
+        : dest_{dest}, qid_{qid}
     {
     }
 
@@ -80,10 +79,7 @@ class OMCSLock
 
     constexpr SGuard(  //
         SGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)},
-          qid_{obj.qid_},
-          old_ver_{obj.old_ver_},
-          new_ver_{obj.new_ver_}
+        : dest_{std::exchange(obj.dest_, nullptr)}, qid_{obj.qid_}
     {
     }
 
