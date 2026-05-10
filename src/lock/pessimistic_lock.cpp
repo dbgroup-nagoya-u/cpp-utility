@@ -19,6 +19,7 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <cassert>
 #include <cstdint>
 #include <utility>
 
@@ -183,13 +184,12 @@ PessimisticLock::SIXGuard::UpgradeToX()  //
 {
   if (dest_ == nullptr) return XGuard{};
 
-  SpinWithBackoff(
-      [](std::atomic_uint64_t *lock) -> bool {
-        auto cur = lock->load(kRelaxed);
-        return cur == kSIXLock && lock->compare_exchange_weak(cur, kXLock, kRelaxed, kRelaxed);
-      },
-      &(dest_->lock_));
-
+  auto cur = dest_->lock_.fetch_xor(kXMask, kRelaxed);
+  assert((cur & kXMask) == kSIXLock);
+  while (cur & kSMask) {
+    CPP_UTILITY_SPINLOCK_HINT
+    cur = dest_->lock_.load(kRelaxed);
+  }
   return XGuard{std::exchange(dest_, nullptr)};
 }
 
