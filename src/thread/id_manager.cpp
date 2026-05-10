@@ -23,7 +23,6 @@
 #include <iostream>
 #include <memory>
 #include <thread>
-#include <vector>
 
 // local sources
 #include "dbgroup/constants.hpp"

@@ -18,13 +18,10 @@
 #include "dbgroup/thread/epoch_manager.hpp"
 
 // C++ standard libraries
-#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <memory>
-#include <mutex>
 #include <thread>
-#include <vector>
 
 // external libraries
 #include "gtest/gtest.h"

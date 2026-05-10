@@ -19,7 +19,6 @@
 
 // C++ standard libraries
 #include <atomic>
-#include <memory>
 #include <utility>
 
 // local sources

@@ -31,9 +31,6 @@
 #include <byteswap.h>
 #endif
 
-// local sources
-#include "dbgroup/lock/utility.hpp"
-
 namespace dbgroup::index
 {
 /*############################################################################*

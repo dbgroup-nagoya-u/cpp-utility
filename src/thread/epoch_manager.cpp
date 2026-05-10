@@ -25,7 +25,6 @@
 #include <functional>
 #include <iostream>
 #include <memory>
-#include <stdexcept>
 
 // local sources
 #include "dbgroup/constants.hpp"

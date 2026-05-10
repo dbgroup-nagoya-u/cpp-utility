@@ -18,11 +18,9 @@
 #define CPP_UTILITY_DBGROUP_LOCK_UTILITY_HPP_
 
 // C++ standard libraries
-#include <atomic>
 #include <chrono>
 #include <concepts>
 #include <cstddef>
-#include <functional>
 #include <thread>
 
 // define spinlock hints if exist

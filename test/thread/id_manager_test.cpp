@@ -18,8 +18,6 @@
 #include "dbgroup/thread/id_manager.hpp"
 
 // C++ standard libraries
-#include <algorithm>
-#include <array>
 #include <chrono>
 #include <mutex>
 #include <thread>
@@ -28,7 +26,7 @@
 #include "gtest/gtest.h"
 
 // local sources
-#include "common.hpp"
+#include "dbgroup/constants.hpp"
 
 namespace dbgroup::thread::test
 {
