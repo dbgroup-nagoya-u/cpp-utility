@@ -21,9 +21,6 @@
 #include <cstddef>
 #include <memory>
 
-// local sources
-#include "dbgroup/constants.hpp"
-
 namespace dbgroup::thread
 {
 /**

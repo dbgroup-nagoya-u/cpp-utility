@@ -18,11 +18,9 @@
 #define CPP_UTILITY_DBGROUP_LOCK_UTILITY_HPP_
 
 // C++ standard libraries
-#include <atomic>
 #include <chrono>
 #include <concepts>
 #include <cstddef>
-#include <functional>
 #include <thread>
 
 // define spinlock hints if exist
@@ -158,6 +156,30 @@ SpinWithBackoff(  //
       CPP_UTILITY_SPINLOCK_HINT
     }
     std::this_thread::sleep_for(kBackOffTime);
+  }
+}
+
+/**
+ * @brief Execute a given procedure with spinning and yield.
+ *
+ * @param proc A target procedure.
+ * @param args Arguments for executing a given procedure.
+ * @tparam Func A function pointer.
+ * @tparam Args A parameter pack for calling a given function.
+ */
+template <class Func, class... Args>
+void
+SpinWithYield(  //
+    Func proc,
+    Args... args)
+{
+  while (true) {
+    for (size_t i = 0; true; ++i) {
+      if (proc(args...)) return;
+      if (i >= kRetryNum) break;
+      CPP_UTILITY_SPINLOCK_HINT
+    }
+    std::this_thread::yield();
   }
 }
 

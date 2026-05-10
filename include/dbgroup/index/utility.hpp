@@ -31,9 +31,6 @@
 #include <byteswap.h>
 #endif
 
-// local sources
-#include "dbgroup/lock/utility.hpp"
-
 namespace dbgroup::index
 {
 /*############################################################################*
@@ -129,22 +126,6 @@ IsEqual(  //
     -> bool
 {
   return !Comp{}(lhs, rhs) && !Comp{}(rhs, lhs);
-}
-
-/**
- * @brief Shift a memory address by a byte offset.
- *
- * @param addr An original address.
- * @param offset An offset in bytes.
- * @return A shifted address.
- */
-constexpr auto
-ShiftAddr(  //
-    const void *addr,
-    const int64_t offset) noexcept  //
-    -> void *
-{
-  return std::bit_cast<std::byte *>(addr) + offset;
 }
 
 /**

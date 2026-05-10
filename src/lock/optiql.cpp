@@ -26,9 +26,6 @@
 #include <utility>
 #include <vector>
 
-// temp
-#include <stdexcept>
-
 // local sources
 #include "dbgroup/constants.hpp"
 #include "dbgroup/lock/utility.hpp"

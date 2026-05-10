@@ -18,18 +18,11 @@
 #include "dbgroup/types.hpp"
 
 // C++ standard libraries
-#include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <thread>
-#include <type_traits>
-#include <vector>
 
 // external libraries
 #include "gtest/gtest.h"
-
-// local sources
-#include "common.hpp"
 
 namespace dbgroup::test
 {

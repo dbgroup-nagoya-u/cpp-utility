@@ -21,7 +21,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <limits>
 #include <random>
 #include <type_traits>
 #include <vector>
@@ -30,7 +29,6 @@
 #include "gtest/gtest.h"
 
 // library sources
-#include "dbgroup/constants.hpp"
 #include "dbgroup/lock/optimistic_lock.hpp"
 
 // local sources

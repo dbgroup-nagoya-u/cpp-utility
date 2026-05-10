@@ -37,7 +37,7 @@ readability-*,
 -readability-inconsistent-declaration-parameter-name,
 performance-*,'
 WarningsAsErrors: ''
-HeaderFilterRegex: '(include|src|test)/.*\.hpp$'
+HeaderFilterRegex: '.*include/.*'
 AnalyzeTemporaryDtors: false
 FormatStyle:     none
 CheckOptions:

@@ -19,8 +19,6 @@
 // C++ standard libraries
 #include <algorithm>
 #include <cmath>
-#include <thread>
-#include <type_traits>
 #include <vector>
 
 // external libraries

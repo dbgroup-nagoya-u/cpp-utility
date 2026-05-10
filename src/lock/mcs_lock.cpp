@@ -19,7 +19,6 @@
 
 // C++ standard libraries
 #include <atomic>
-#include <bitset>
 #include <cstdint>
 #include <thread>
 #include <utility>

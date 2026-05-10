@@ -18,8 +18,8 @@
 #define CPP_UTILITY_DBGROUP_TYPES_HPP_
 
 // C++ standard libraries
-#include <atomic>
-#include <cstddef>
+#include <cstdint>
+#include <type_traits>
 
 namespace dbgroup
 {

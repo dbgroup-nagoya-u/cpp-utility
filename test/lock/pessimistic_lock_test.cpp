@@ -24,10 +24,12 @@
 #include <vector>
 
 // external libraries
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 // local sources
 #include "common.hpp"
+#include "dbgroup/constants.hpp"
+#include "dbgroup/thread/id_manager.hpp"
 
 namespace dbgroup::lock::test
 {
@@ -62,6 +64,8 @@ class PessimisticLockFixture : public ::testing::Test
   void
   SetUp() override
   {
+    static_assert(kThreadNum < kMaxThreadCapacity);
+    dbgroup::thread::IDManager::SetMaxThreadNum(kMaxThreadCapacity);
   }
 
   void
