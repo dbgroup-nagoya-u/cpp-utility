@@ -49,6 +49,9 @@ constexpr uint64_t kXLock = 1UL << 63UL;
 /// @brief A bit mask for extracting an SIX/X-lock state.
 constexpr uint64_t kXMask = kSIXLock | kXLock;
 
+/// @brief A bit mask for extracting an S-lock state.
+constexpr uint64_t kSMask = ~kXMask;
+
 }  // namespace
 
 /*############################################################################*
@@ -59,11 +62,13 @@ auto
 PessimisticLock::LockS()  //
     -> SGuard
 {
-  if (lock_.fetch_add(kSLock, kAcquire) & kXLock) {
-    do {
-      std::this_thread::yield();
-    } while (lock_.load(kAcquire) & kXLock);
-  }
+  SpinWithYield(
+      [](std::atomic_uint64_t *lock) -> bool {
+        auto cur = lock->load(kRelaxed);
+        return (cur & kXLock) == kNoLocks
+               && lock->compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed);
+      },
+      &lock_);
   return SGuard{this};
 }
 
@@ -88,13 +93,19 @@ auto
 PessimisticLock::LockX()  //
     -> XGuard
 {
+  uint64_t cur{};
   SpinWithBackoff(
-      [](std::atomic_uint64_t *lock) -> bool {
-        auto cur = lock->load(kRelaxed);
-        return cur == kNoLocks  //
-               && lock->compare_exchange_weak(cur, kXLock, kAcquire, kRelaxed);
+      [](std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
+        *cur = lock->load(kRelaxed);
+        return (*cur & kXMask) == kNoLocks
+               && lock->compare_exchange_weak(*cur, *cur | kXLock, kAcquire, kRelaxed);
       },
-      &lock_);
+      &lock_, &cur);
+
+  while (cur & kSMask) {
+    CPP_UTILITY_SPINLOCK_HINT
+    cur = lock_.load(kRelaxed);
+  }
   return XGuard{this};
 }
 
