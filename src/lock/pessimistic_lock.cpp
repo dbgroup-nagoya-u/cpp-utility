@@ -117,19 +117,22 @@ PessimisticLock::LockX()  //
 void
 PessimisticLock::UnlockS() noexcept
 {
-  lock_.fetch_sub(kSLock, kRelaxed);
+  [[maybe_unused]] const auto ret = lock_.fetch_sub(kSLock, kRelaxed);
+  assert(ret & kSMask);
 }
 
 void
 PessimisticLock::UnlockSIX() noexcept
 {
-  lock_.fetch_xor(kSIXLock, kRelaxed);
+  [[maybe_unused]] const auto ret = lock_.fetch_xor(kSIXLock, kRelaxed);
+  assert((ret & kXMask) == kSIXLock);
 }
 
 void
 PessimisticLock::UnlockX() noexcept
 {
-  lock_.fetch_xor(kXLock, kRelease);
+  [[maybe_unused]] const auto ret = lock_.fetch_xor(kXLock, kRelease);
+  assert((ret & kXMask) == kXLock);
 }
 
 /*############################################################################*
@@ -222,7 +225,8 @@ PessimisticLock::XGuard::DowngradeToSIX() noexcept  //
 {
   if (dest_ == nullptr) return SIXGuard{};
 
-  dest_->lock_.fetch_xor(kXMask, kRelease);
+  [[maybe_unused]] const auto ret = dest_->lock_.fetch_xor(kXMask, kRelease);
+  assert((ret & kXMask) == kXLock);
   return SIXGuard{std::exchange(dest_, nullptr)};
 }
 

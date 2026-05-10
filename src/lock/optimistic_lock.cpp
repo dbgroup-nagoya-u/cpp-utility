@@ -138,20 +138,22 @@ OptimisticLock::LockX()  //
 void
 OptimisticLock::UnlockS() noexcept
 {
-  lock_.fetch_sub(kSLock, kRelaxed);
+  [[maybe_unused]] const auto ret = lock_.fetch_sub(kSLock, kRelaxed);
+  assert(ret & kSMask);
 }
 
 void
 OptimisticLock::UnlockSIX() noexcept
 {
-  lock_.fetch_xor(kSIXLock, kRelaxed);
+  [[maybe_unused]] const auto ret = lock_.fetch_xor(kSIXLock, kRelaxed);
+  assert((ret & kXMask) == kSIXLock);
 }
 
 void
 OptimisticLock::UnlockX(  //
     const uint64_t ver) noexcept
 {
-  assert((lock_.load(kRelaxed) & (kSIXLock | kSMask)) == kNoLocks);
+  assert((lock_.load(kRelaxed) & kAllLockMask) == kXLock);
   lock_.store(ver, kRelease);
 }
 
