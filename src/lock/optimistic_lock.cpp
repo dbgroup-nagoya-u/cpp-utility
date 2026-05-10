@@ -20,7 +20,6 @@
 // C++ standard libraries
 #include <atomic>
 #include <cstdint>
-#include <thread>
 #include <utility>
 
 // local sources
@@ -103,12 +102,9 @@ OptimisticLock::LockSIX()  //
 {
   SpinWithBackoff(
       [](std::atomic_uint64_t *lock) -> bool {
-        while (true) {
-          auto cur = lock->load(kRelaxed);
-          if (cur & kXMask) return false;
-          if (lock->compare_exchange_weak(cur, cur | kSIXLock, kAcquire, kRelaxed)) return true;
-          CPP_UTILITY_SPINLOCK_HINT
-        }
+        auto cur = lock->load(kRelaxed);
+        return (cur & kXMask) == kNoLocks
+               && lock->compare_exchange_weak(cur, cur | kSIXLock, kAcquire, kRelaxed);
       },
       &lock_);
   return SIXGuard{this};
@@ -303,15 +299,14 @@ OptimisticLock::OptGuard::VerifyVersion(  //
   // verify using the optimistic read procedure
   uint64_t cur;
   const auto expected = ver_;
-  while (true) {
-    std::atomic_thread_fence(kRelease);
-    cur = dest_->lock_.load(kAcquire);
-    if ((cur & kXLock) == kNoLocks) {
-      ver_ = static_cast<uint32_t>(cur);
-      break;
-    }
-    std::this_thread::yield();
-  }
+  SpinWithYield(
+      [](std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
+        std::atomic_thread_fence(kRelease);
+        *cur = lock->load(kAcquire);
+        return (*cur & kXLock) == kNoLocks;
+      },
+      &dest_->lock_, &cur);
+  ver_ = static_cast<uint32_t>(cur);
   if (((ver_ ^ expected) & mask) == 0) return true;
   if (++retry_num_ < max_retry) return false;  // continue with OCC
 
@@ -336,13 +331,11 @@ OptimisticLock::OptGuard::ImmediateVerify(  //
   }
 
   // verify using the optimistic read procedure
-  while (true) {
-    std::atomic_thread_fence(kRelease);
-    const auto cur = dest_->lock_.load(kRelaxed);
-    if ((cur ^ ver_) & mask) return false;
-    if ((cur & kXLock) == kNoLocks) return true;
-    std::this_thread::yield();
-  }
+  std::atomic_thread_fence(kRelease);
+  const auto expected = ver_;
+  const auto cur = dest_->lock_.load(kAcquire);
+  ver_ = static_cast<uint32_t>(cur);
+  return ((ver_ ^ expected) & mask) == 0 && (cur & kXLock) == kNoLocks;
 }
 
 auto
@@ -386,7 +379,6 @@ OptimisticLock::OptGuard::TryLockSIX(  //
   SpinWithBackoff(
       [](std::atomic_uint64_t *lock, uint32_t *ver, uint32_t expected, uint32_t mask) -> bool {
         auto cur = lock->load(kAcquire);
-        if (cur & kXLock) return false;
         *ver = static_cast<uint32_t>(cur);
         return ((*ver ^ expected) & mask)
                || ((cur & kXMask) == kNoLocks
