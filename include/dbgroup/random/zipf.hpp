@@ -63,11 +63,11 @@ class ZipfDistribution
       IntType max,
       double alpha);
 
-  ZipfDistribution(const ZipfDistribution &) = default;
-  ZipfDistribution(ZipfDistribution &&) noexcept = default;
+  ZipfDistribution(const ZipfDistribution&) = default;
+  ZipfDistribution(ZipfDistribution&&) noexcept = default;
 
-  auto operator=(const ZipfDistribution &obj) -> ZipfDistribution & = default;
-  auto operator=(ZipfDistribution &&) noexcept -> ZipfDistribution & = default;
+  auto operator=(const ZipfDistribution& obj) -> ZipfDistribution& = default;
+  auto operator=(ZipfDistribution&&) noexcept -> ZipfDistribution& = default;
 
   /*##########################################################################*
    * Public destructors
@@ -104,7 +104,7 @@ class ZipfDistribution
   [[nodiscard]]
   auto
   operator()(               //
-      RandEngine &g) const  //
+      RandEngine& g) const  //
       -> IntType
   {
     static std::uniform_real_distribution<double> uniform{0.0, 1.0};  // NOLINT
@@ -204,13 +204,13 @@ class ApproxZipfDistribution
       IntType max,
       double alpha);
 
-  constexpr ApproxZipfDistribution(const ApproxZipfDistribution &) = default;
-  constexpr ApproxZipfDistribution(ApproxZipfDistribution &&) noexcept = default;
+  constexpr ApproxZipfDistribution(const ApproxZipfDistribution&) = default;
+  constexpr ApproxZipfDistribution(ApproxZipfDistribution&&) noexcept = default;
 
-  constexpr auto operator=(const ApproxZipfDistribution &obj)  //
-      -> ApproxZipfDistribution & = default;
-  constexpr auto operator=(ApproxZipfDistribution &&) noexcept  //
-      -> ApproxZipfDistribution & = default;
+  constexpr auto operator=(const ApproxZipfDistribution& obj)  //
+      -> ApproxZipfDistribution& = default;
+  constexpr auto operator=(ApproxZipfDistribution&&) noexcept  //
+      -> ApproxZipfDistribution& = default;
 
   /*##########################################################################*
    * Public destructors
@@ -248,7 +248,7 @@ class ApproxZipfDistribution
   [[nodiscard]]
   auto
   operator()(               //
-      RandEngine &g) const  //
+      RandEngine& g) const  //
       -> IntType
   {
     // NOLINTBEGIN
@@ -268,7 +268,7 @@ class ApproxZipfDistribution
   [[nodiscard]]
   auto
   GetIDUsingBinarySearch(   //
-      RandEngine &g) const  //
+      RandEngine& g) const  //
       -> IntType
   {
     const auto p = _uniform(g);

@@ -90,11 +90,11 @@ class IDManagerFixture : public ::testing::Test
         std::this_thread::sleep_for(std::chrono::microseconds{1});
       }
     }
-    for (auto &&t : threads) {
+    for (auto&& t : threads) {
       t.join();
     }
 
-    for (auto &&flag : reserved) {
+    for (auto&& flag : reserved) {
       EXPECT_TRUE(flag);
     }
   }
@@ -138,15 +138,15 @@ TEST_F(IDManagerFixture, ThreadHeartBeatsShowProperBoolValues)
     while (cnt.load(std::memory_order_acquire) < kLogicalCoreNum) {
       std::this_thread::sleep_for(std::chrono::microseconds{1});
     }
-    for (auto &&flag : hbs) {
+    for (auto&& flag : hbs) {
       EXPECT_FALSE(flag.expired());
     }
   }
-  for (auto &&t : threads) {
+  for (auto&& t : threads) {
     t.join();
   }
 
-  for (auto &&flag : hbs) {
+  for (auto&& flag : hbs) {
     EXPECT_TRUE(flag.expired());
   }
 }

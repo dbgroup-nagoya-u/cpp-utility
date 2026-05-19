@@ -64,7 +64,7 @@ PessimisticLock::LockS()  //
     -> SGuard
 {
   SpinWithYield(
-      [](std::atomic_uint64_t *lock) -> bool {
+      [](std::atomic_uint64_t* lock) -> bool {
         auto cur = lock->load(kRelaxed);
         return (cur & kXLock) == kNoLocks
                && lock->compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed);
@@ -78,7 +78,7 @@ PessimisticLock::LockSIX()  //
     -> SIXGuard
 {
   SpinWithBackoff(
-      [](std::atomic_uint64_t *lock) -> bool {
+      [](std::atomic_uint64_t* lock) -> bool {
         while (true) {
           auto cur = lock->load(kRelaxed);
           if (cur & kXMask) return false;
@@ -96,7 +96,7 @@ PessimisticLock::LockX()  //
 {
   uint64_t cur{};
   SpinWithBackoff(
-      [](std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
+      [](std::atomic_uint64_t* lock, uint64_t* cur) -> bool {
         *cur = lock->load(kRelaxed);
         return (*cur & kXMask) == kNoLocks
                && lock->compare_exchange_weak(*cur, *cur | kXLock, kAcquire, kRelaxed);
@@ -141,8 +141,8 @@ PessimisticLock::UnlockX() noexcept
 
 auto
 PessimisticLock::SGuard::operator=(  //
-    SGuard &&rhs) noexcept           //
-    -> SGuard &
+    SGuard&& rhs) noexcept           //
+    -> SGuard&
 {
   if (dest_) {
     dest_->UnlockS();
@@ -164,8 +164,8 @@ PessimisticLock::SGuard::~SGuard()
 
 auto
 PessimisticLock::SIXGuard::operator=(  //
-    SIXGuard &&rhs) noexcept           //
-    -> SIXGuard &
+    SIXGuard&& rhs) noexcept           //
+    -> SIXGuard&
 {
   if (dest_) {
     dest_->UnlockSIX();
@@ -202,8 +202,8 @@ PessimisticLock::SIXGuard::UpgradeToX()  //
 
 auto
 PessimisticLock::XGuard::operator=(  //
-    XGuard &&rhs) noexcept           //
-    -> XGuard &
+    XGuard&& rhs) noexcept           //
+    -> XGuard&
 {
   if (dest_) {
     dest_->UnlockX();

@@ -37,11 +37,11 @@ class IDManager
   IDManager() = delete;
   ~IDManager() = delete;
 
-  IDManager(const IDManager &) = delete;
-  IDManager(IDManager &&) = delete;
+  IDManager(const IDManager&) = delete;
+  IDManager(IDManager&&) = delete;
 
-  auto operator=(const IDManager &) -> IDManager & = delete;
-  auto operator=(IDManager &&) -> IDManager & = delete;
+  auto operator=(const IDManager&) -> IDManager& = delete;
+  auto operator=(IDManager&&) -> IDManager& = delete;
 
   /*##########################################################################*
    * Public static utilities
@@ -96,11 +96,11 @@ class IDManager
 
     constexpr HeartBeater() = default;
 
-    HeartBeater(const HeartBeater &) = delete;
-    HeartBeater(HeartBeater &&) noexcept = delete;
+    HeartBeater(const HeartBeater&) = delete;
+    HeartBeater(HeartBeater&&) noexcept = delete;
 
-    auto operator=(const HeartBeater &obj) -> HeartBeater & = delete;
-    auto operator=(HeartBeater &&) noexcept -> HeartBeater & = delete;
+    auto operator=(const HeartBeater& obj) -> HeartBeater& = delete;
+    auto operator=(HeartBeater&&) noexcept -> HeartBeater& = delete;
 
     /*########################################################################*
      * Public destructor
@@ -174,7 +174,7 @@ class IDManager
    */
   [[nodiscard]]
   static auto GetHeartBeater()  //
-      -> const HeartBeater &;
+      -> const HeartBeater&;
 };
 
 }  // namespace dbgroup::thread

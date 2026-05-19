@@ -71,7 +71,7 @@ OptimisticLock::GetVersion() noexcept  //
 {
   uint64_t cur{};
   SpinWithYield(
-      [](std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
+      [](std::atomic_uint64_t* lock, uint64_t* cur) -> bool {
         *cur = lock->load(kAcquire);
         return (*cur & kXMask) == kNoLocks;
       },
@@ -88,7 +88,7 @@ OptimisticLock::LockS()  //
     -> SGuard
 {
   SpinWithYield(
-      [](std::atomic_uint64_t *lock) -> bool {
+      [](std::atomic_uint64_t* lock) -> bool {
         auto cur = lock->load(kRelaxed);
         return (cur & kXLock) == kNoLocks
                && lock->compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed);
@@ -102,7 +102,7 @@ OptimisticLock::LockSIX()  //
     -> SIXGuard
 {
   SpinWithBackoff(
-      [](std::atomic_uint64_t *lock) -> bool {
+      [](std::atomic_uint64_t* lock) -> bool {
         auto cur = lock->load(kRelaxed);
         return (cur & kXMask) == kNoLocks
                && lock->compare_exchange_weak(cur, cur | kSIXLock, kAcquire, kRelaxed);
@@ -117,7 +117,7 @@ OptimisticLock::LockX()  //
 {
   uint64_t cur{};
   SpinWithBackoff(
-      [](std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
+      [](std::atomic_uint64_t* lock, uint64_t* cur) -> bool {
         *cur = lock->load(kRelaxed);
         return (*cur & kXMask) == kNoLocks
                && lock->compare_exchange_weak(*cur, *cur | kXLock, kAcquire, kRelaxed);
@@ -163,8 +163,8 @@ OptimisticLock::UnlockX(  //
 
 auto
 OptimisticLock::SGuard::operator=(  //
-    SGuard &&rhs) noexcept          //
-    -> SGuard &
+    SGuard&& rhs) noexcept          //
+    -> SGuard&
 {
   if (dest_) {
     dest_->UnlockS();
@@ -186,8 +186,8 @@ OptimisticLock::SGuard::~SGuard()
 
 auto
 OptimisticLock::SIXGuard::operator=(  //
-    SIXGuard &&rhs) noexcept          //
-    -> SIXGuard &
+    SIXGuard&& rhs) noexcept          //
+    -> SIXGuard&
 {
   if (dest_) {
     dest_->UnlockSIX();
@@ -224,8 +224,8 @@ OptimisticLock::SIXGuard::UpgradeToX()  //
 
 auto
 OptimisticLock::XGuard::operator=(  //
-    XGuard &&rhs) noexcept          //
-    -> XGuard &
+    XGuard&& rhs) noexcept          //
+    -> XGuard&
 {
   if (dest_) {
     dest_->UnlockX(new_ver_);
@@ -260,8 +260,8 @@ OptimisticLock::XGuard::DowngradeToSIX() noexcept  //
 
 auto
 OptimisticLock::OptGuard::operator=(  //
-    OptGuard &&rhs) noexcept          //
-    -> OptGuard &
+    OptGuard&& rhs) noexcept          //
+    -> OptGuard&
 {
   if (dest_ && has_lock_) {
     dest_->UnlockS();
@@ -296,7 +296,7 @@ OptimisticLock::OptGuard::VerifyVersion(  //
   uint64_t cur;
   const auto expected = ver_;
   SpinWithYield(
-      [](std::atomic_uint64_t *lock, uint64_t *cur) -> bool {
+      [](std::atomic_uint64_t* lock, uint64_t* cur) -> bool {
         std::atomic_thread_fence(kRelease);
         *cur = lock->load(kAcquire);
         return (*cur & kXLock) == kNoLocks;
@@ -347,7 +347,7 @@ OptimisticLock::OptGuard::TryLockS(  //
 
   const auto expected = ver_;
   SpinWithBackoff(
-      [](std::atomic_uint64_t *lock, uint32_t *ver, uint32_t expected, uint32_t mask) -> bool {
+      [](std::atomic_uint64_t* lock, uint32_t* ver, uint32_t expected, uint32_t mask) -> bool {
         std::atomic_thread_fence(kRelease);
         auto cur = lock->load(kAcquire);
         *ver = static_cast<uint32_t>(cur);
@@ -373,7 +373,7 @@ OptimisticLock::OptGuard::TryLockSIX(  //
 
   const auto expected = ver_;
   SpinWithBackoff(
-      [](std::atomic_uint64_t *lock, uint32_t *ver, uint32_t expected, uint32_t mask) -> bool {
+      [](std::atomic_uint64_t* lock, uint32_t* ver, uint32_t expected, uint32_t mask) -> bool {
         auto cur = lock->load(kAcquire);
         *ver = static_cast<uint32_t>(cur);
         return ((*ver ^ expected) & mask)
@@ -398,7 +398,7 @@ OptimisticLock::OptGuard::TryLockX(  //
   uint64_t cur{};
   const auto expected = ver_;
   SpinWithBackoff(
-      [](std::atomic_uint64_t *lock, uint64_t *cur,  //
+      [](std::atomic_uint64_t* lock, uint64_t* cur,  //
          const uint32_t expected, const uint32_t mask) -> bool {
         std::atomic_thread_fence(kRelease);
         *cur = lock->load(kAcquire);

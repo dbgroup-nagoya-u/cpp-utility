@@ -8,4 +8,4 @@ BreakConstructorInitializers: BeforeComma
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
 PackConstructorInitializers: Never
 DerivePointerAlignment: false
-PointerAlignment: Right
+PointerAlignment: Left

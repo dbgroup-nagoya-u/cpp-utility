@@ -60,7 +60,7 @@ class OptiQL
      * @param ver The current version.
      */
     constexpr XGuard(  //
-        OptiQL *dest,
+        OptiQL* const dest,
         const uint64_t qid,
         const uint32_t ver) noexcept
         : dest_{dest}
@@ -70,10 +70,10 @@ class OptiQL
     {
     }
 
-    XGuard(const XGuard &) = delete;
+    XGuard(const XGuard&) = delete;
 
     constexpr XGuard(  //
-        XGuard &&obj) noexcept
+        XGuard&& obj) noexcept
         : dest_{std::exchange(obj.dest_, nullptr)}
         , qid_{obj.qid_}
         , old_ver_{obj.old_ver_}
@@ -81,11 +81,11 @@ class OptiQL
     {
     }
 
-    auto operator=(const XGuard &) -> XGuard & = delete;
+    auto operator=(const XGuard&) -> XGuard& = delete;
 
     auto operator=(             //
-        XGuard &&rhs) noexcept  //
-        -> XGuard &;
+        XGuard&& rhs) noexcept  //
+        -> XGuard&;
 
     /*########################################################################*
      * Public destructors
@@ -139,7 +139,7 @@ class OptiQL
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    OptiQL *dest_{};
+    OptiQL* dest_{};
 
     /// @brief The corresponding queue node for unlocking.
     uint64_t qid_{};
@@ -169,18 +169,18 @@ class OptiQL
      * @param ver The current version.
      */
     constexpr OptGuard(  //
-        const OptiQL *dest,
+        const OptiQL* const dest,
         const uint32_t ver) noexcept
         : dest_{dest}
         , ver_{ver}
     {
     }
 
-    constexpr OptGuard(const OptGuard &) noexcept = default;
-    constexpr OptGuard(OptGuard &&) noexcept = default;
+    constexpr OptGuard(const OptGuard&) noexcept = default;
+    constexpr OptGuard(OptGuard&&) noexcept = default;
 
-    constexpr auto operator=(const OptGuard &) noexcept -> OptGuard & = default;
-    constexpr auto operator=(OptGuard &&) noexcept -> OptGuard & = default;
+    constexpr auto operator=(const OptGuard&) noexcept -> OptGuard& = default;
+    constexpr auto operator=(OptGuard&&) noexcept -> OptGuard& = default;
 
     /*########################################################################*
      * Public destructors
@@ -229,7 +229,7 @@ class OptiQL
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    const OptiQL *dest_{};
+    const OptiQL* dest_{};
 
     /// @brief A version when creating this guard.
     uint32_t ver_{};
@@ -241,11 +241,11 @@ class OptiQL
 
   constexpr OptiQL() noexcept = default;
 
-  OptiQL(const OptiQL &) = delete;
-  OptiQL(OptiQL &&) = delete;
+  OptiQL(const OptiQL&) = delete;
+  OptiQL(OptiQL&&) = delete;
 
-  auto operator=(const OptiQL &) -> OptiQL & = delete;
-  auto operator=(OptiQL &&) -> OptiQL & = delete;
+  auto operator=(const OptiQL&) -> OptiQL& = delete;
+  auto operator=(OptiQL&&) -> OptiQL& = delete;
 
   /*##########################################################################*
    * Public destructors

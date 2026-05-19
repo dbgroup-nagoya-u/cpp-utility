@@ -42,21 +42,21 @@ class EpochGuard
    * @param active An actual address for managing a guard status.
    */
   explicit EpochGuard(  //
-      std::atomic_bool *active) noexcept;
+      std::atomic_bool* active) noexcept;
 
   constexpr EpochGuard(  //
-      EpochGuard &&obj) noexcept
+      EpochGuard&& obj) noexcept
       : active_{std::exchange(obj.active_, nullptr)}
   {
   }
 
   auto operator=(                 //
-      EpochGuard &&rhs) noexcept  //
-      -> EpochGuard &;
+      EpochGuard&& rhs) noexcept  //
+      -> EpochGuard&;
 
   // delete the copy constructor/assignment
-  EpochGuard(const EpochGuard &) = delete;
-  auto operator=(const EpochGuard &) -> EpochGuard & = delete;
+  EpochGuard(const EpochGuard&) = delete;
+  auto operator=(const EpochGuard&) -> EpochGuard& = delete;
 
   /*##########################################################################*
    * Public destructors
@@ -74,7 +74,7 @@ class EpochGuard
    *##########################################################################*/
 
   /// @brief A reference to a target epoch.
-  std::atomic_bool *active_{};
+  std::atomic_bool* active_{};
 };
 
 }  // namespace dbgroup::thread

@@ -59,24 +59,24 @@ class OptimisticLock
      * @param dest The address of a target lock.
      */
     constexpr explicit SGuard(  //
-        OptimisticLock *dest) noexcept
+        OptimisticLock* const dest) noexcept
         : dest_{dest}
     {
     }
 
-    SGuard(const SGuard &) = delete;
+    SGuard(const SGuard&) = delete;
 
     constexpr SGuard(  //
-        SGuard &&obj) noexcept
+        SGuard&& obj) noexcept
         : dest_{std::exchange(obj.dest_, nullptr)}
     {
     }
 
-    auto operator=(const SGuard &) -> SGuard & = delete;
+    auto operator=(const SGuard&) -> SGuard& = delete;
 
     auto operator=(             //
-        SGuard &&rhs) noexcept  //
-        -> SGuard &;
+        SGuard&& rhs) noexcept  //
+        -> SGuard&;
 
     /*########################################################################*
      * Public destructors
@@ -108,7 +108,7 @@ class OptimisticLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    OptimisticLock *dest_{};
+    OptimisticLock* dest_{};
   };
 
   /**
@@ -128,24 +128,24 @@ class OptimisticLock
      * @param dest The address of a target lock.
      */
     constexpr explicit SIXGuard(  //
-        OptimisticLock *dest) noexcept
+        OptimisticLock* const dest) noexcept
         : dest_{dest}
     {
     }
 
-    SIXGuard(const SIXGuard &) = delete;
+    SIXGuard(const SIXGuard&) = delete;
 
     constexpr SIXGuard(  //
-        SIXGuard &&obj) noexcept
+        SIXGuard&& obj) noexcept
         : dest_{std::exchange(obj.dest_, nullptr)}
     {
     }
 
-    auto operator=(const SIXGuard &) -> SIXGuard & = delete;
+    auto operator=(const SIXGuard&) -> SIXGuard& = delete;
 
     auto operator=(               //
-        SIXGuard &&rhs) noexcept  //
-        -> SIXGuard &;
+        SIXGuard&& rhs) noexcept  //
+        -> SIXGuard&;
 
     /*########################################################################*
      * Public destructors
@@ -187,7 +187,7 @@ class OptimisticLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    OptimisticLock *dest_{};
+    OptimisticLock* dest_{};
   };
 
   /**
@@ -208,7 +208,7 @@ class OptimisticLock
      * @param ver The current version.
      */
     constexpr XGuard(  //
-        OptimisticLock *dest,
+        OptimisticLock* const dest,
         const uint32_t ver) noexcept
         : dest_{dest}
         , old_ver_{ver}
@@ -216,21 +216,21 @@ class OptimisticLock
     {
     }
 
-    XGuard(const XGuard &) = delete;
+    XGuard(const XGuard&) = delete;
 
     constexpr XGuard(  //
-        XGuard &&obj) noexcept
+        XGuard&& obj) noexcept
         : dest_{std::exchange(obj.dest_, nullptr)}
         , old_ver_{obj.old_ver_}
         , new_ver_{obj.new_ver_}
     {
     }
 
-    auto operator=(const XGuard &) -> XGuard & = delete;
+    auto operator=(const XGuard&) -> XGuard& = delete;
 
     auto operator=(             //
-        XGuard &&rhs) noexcept  //
-        -> XGuard &;
+        XGuard&& rhs) noexcept  //
+        -> XGuard&;
 
     /*########################################################################*
      * Public destructors
@@ -294,7 +294,7 @@ class OptimisticLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    OptimisticLock *dest_{};
+    OptimisticLock* dest_{};
 
     /// @brief A version when creating this guard.
     uint32_t old_ver_{};
@@ -321,17 +321,17 @@ class OptimisticLock
      * @param ver The current version.
      */
     constexpr OptGuard(  //
-        OptimisticLock *dest,
+        OptimisticLock* const dest,
         const uint32_t ver) noexcept
         : dest_{dest}
         , ver_{ver}
     {
     }
 
-    OptGuard(const OptGuard &) = delete;
+    OptGuard(const OptGuard&) = delete;
 
     constexpr OptGuard(  //
-        OptGuard &&obj) noexcept
+        OptGuard&& obj) noexcept
         : dest_{std::exchange(obj.dest_, nullptr)}
         , ver_{obj.ver_}
         , retry_num_{obj.retry_num_}
@@ -339,11 +339,11 @@ class OptimisticLock
     {
     }
 
-    auto operator=(const OptGuard &) -> OptGuard & = delete;
+    auto operator=(const OptGuard&) -> OptGuard& = delete;
 
     auto operator=(               //
-        OptGuard &&rhs) noexcept  //
-        -> OptGuard &;
+        OptGuard&& rhs) noexcept  //
+        -> OptGuard&;
 
     /*########################################################################*
      * Public destructors
@@ -442,7 +442,7 @@ class OptimisticLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    OptimisticLock *dest_{};
+    OptimisticLock* dest_{};
 
     /// @brief A version when creating this guard.
     uint32_t ver_{};
@@ -460,11 +460,11 @@ class OptimisticLock
 
   constexpr OptimisticLock() noexcept = default;
 
-  OptimisticLock(const OptimisticLock &) = delete;
-  OptimisticLock(OptimisticLock &&) = delete;
+  OptimisticLock(const OptimisticLock&) = delete;
+  OptimisticLock(OptimisticLock&&) = delete;
 
-  auto operator=(const OptimisticLock &) -> OptimisticLock & = delete;
-  auto operator=(OptimisticLock &&) -> OptimisticLock & = delete;
+  auto operator=(const OptimisticLock&) -> OptimisticLock& = delete;
+  auto operator=(OptimisticLock&&) -> OptimisticLock& = delete;
 
   /*##########################################################################*
    * Public destructors

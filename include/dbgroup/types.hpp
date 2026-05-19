@@ -49,7 +49,7 @@ struct Serial {
   constexpr auto
   operator+=(                 //
       const UInt n) noexcept  //
-      -> Serial &
+      -> Serial&
   {
     v += n;
     return *this;
@@ -58,7 +58,7 @@ struct Serial {
   constexpr auto
   operator+=(                     //
       const Serial rhs) noexcept  //
-      -> Serial &
+      -> Serial&
   {
     v += rhs.v;
     return *this;
@@ -67,7 +67,7 @@ struct Serial {
   constexpr auto
   operator-=(                 //
       const UInt n) noexcept  //
-      -> Serial &
+      -> Serial&
   {
     v -= n;
     return *this;
@@ -76,7 +76,7 @@ struct Serial {
   constexpr auto
   operator-=(                     //
       const Serial rhs) noexcept  //
-      -> Serial &
+      -> Serial&
   {
     v -= rhs.v;
     return *this;
@@ -85,7 +85,7 @@ struct Serial {
   constexpr auto
   operator&=(                 //
       const UInt n) noexcept  //
-      -> Serial &
+      -> Serial&
   {
     v &= n;
     return *this;
@@ -94,7 +94,7 @@ struct Serial {
   constexpr auto
   operator&=(                     //
       const Serial rhs) noexcept  //
-      -> Serial &
+      -> Serial&
   {
     v &= rhs.v;
     return *this;
@@ -103,7 +103,7 @@ struct Serial {
   constexpr auto
   operator|=(                 //
       const UInt n) noexcept  //
-      -> Serial &
+      -> Serial&
   {
     v |= n;
     return *this;
@@ -112,7 +112,7 @@ struct Serial {
   constexpr auto
   operator|=(                     //
       const Serial rhs) noexcept  //
-      -> Serial &
+      -> Serial&
   {
     v |= rhs.v;
     return *this;
@@ -121,7 +121,7 @@ struct Serial {
   constexpr auto
   operator^=(                 //
       const UInt n) noexcept  //
-      -> Serial &
+      -> Serial&
   {
     v ^= n;
     return *this;
@@ -130,7 +130,7 @@ struct Serial {
   constexpr auto
   operator^=(                     //
       const Serial rhs) noexcept  //
-      -> Serial &
+      -> Serial&
   {
     v ^= rhs.v;
     return *this;
@@ -139,7 +139,7 @@ struct Serial {
   constexpr auto
   operator<<=(                //
       const UInt n) noexcept  //
-      -> Serial &
+      -> Serial&
   {
     v <<= n;
     return *this;
@@ -148,7 +148,7 @@ struct Serial {
   constexpr auto
   operator>>=(                //
       const UInt n) noexcept  //
-      -> Serial &
+      -> Serial&
   {
     v >>= n;
     return *this;
@@ -160,7 +160,7 @@ struct Serial {
 
   constexpr auto
   operator++() noexcept  //
-      -> Serial &
+      -> Serial&
   {
     ++v;
     return *this;
@@ -177,7 +177,7 @@ struct Serial {
 
   constexpr auto
   operator--() noexcept  //
-      -> Serial &
+      -> Serial&
   {
     --v;
     return *this;
@@ -230,7 +230,7 @@ struct Serial {
 
   constexpr auto
   operator~() noexcept  //
-      -> Serial &
+      -> Serial&
   {
     v = ~v;
     return *this;
@@ -306,7 +306,7 @@ struct Serial {
 
   [[nodiscard]] constexpr auto
   operator==(                          //
-      const UInt &rhs) const noexcept  //
+      const UInt& rhs) const noexcept  //
       -> bool
   {
     return v == rhs;
@@ -314,7 +314,7 @@ struct Serial {
 
   [[nodiscard]] constexpr auto
   operator==(                            //
-      const Serial &rhs) const noexcept  //
+      const Serial& rhs) const noexcept  //
       -> bool
   {
     return v == rhs.v;
@@ -322,7 +322,7 @@ struct Serial {
 
   [[nodiscard]] constexpr auto
   operator!=(                          //
-      const UInt &rhs) const noexcept  //
+      const UInt& rhs) const noexcept  //
       -> bool
   {
     return v != rhs;
@@ -330,7 +330,7 @@ struct Serial {
 
   [[nodiscard]] constexpr auto
   operator!=(                            //
-      const Serial &rhs) const noexcept  //
+      const Serial& rhs) const noexcept  //
       -> bool
   {
     return v != rhs.v;
@@ -338,7 +338,7 @@ struct Serial {
 
   [[nodiscard]] constexpr auto
   operator<(                           //
-      const UInt &rhs) const noexcept  //
+      const UInt& rhs) const noexcept  //
       -> bool
   {
     return static_cast<Int>(v - rhs) < 0;
@@ -346,7 +346,7 @@ struct Serial {
 
   [[nodiscard]] constexpr auto
   operator<(                             //
-      const Serial &rhs) const noexcept  //
+      const Serial& rhs) const noexcept  //
       -> bool
   {
     return static_cast<Int>(v - rhs.v) < 0;
@@ -354,7 +354,7 @@ struct Serial {
 
   [[nodiscard]] constexpr auto
   operator<=(                          //
-      const UInt &rhs) const noexcept  //
+      const UInt& rhs) const noexcept  //
       -> bool
   {
     return static_cast<Int>(v - rhs) <= 0;
@@ -362,7 +362,7 @@ struct Serial {
 
   [[nodiscard]] constexpr auto
   operator<=(                            //
-      const Serial &rhs) const noexcept  //
+      const Serial& rhs) const noexcept  //
       -> bool
   {
     return static_cast<Int>(v - rhs.v) <= 0;
@@ -370,7 +370,7 @@ struct Serial {
 
   [[nodiscard]] constexpr auto
   operator>(                           //
-      const UInt &rhs) const noexcept  //
+      const UInt& rhs) const noexcept  //
       -> bool
   {
     return static_cast<Int>(v - rhs) > 0;
@@ -378,7 +378,7 @@ struct Serial {
 
   [[nodiscard]] constexpr auto
   operator>(                             //
-      const Serial &rhs) const noexcept  //
+      const Serial& rhs) const noexcept  //
       -> bool
   {
     return static_cast<Int>(v - rhs.v) > 0;
@@ -386,7 +386,7 @@ struct Serial {
 
   [[nodiscard]] constexpr auto
   operator>=(                          //
-      const UInt &rhs) const noexcept  //
+      const UInt& rhs) const noexcept  //
       -> bool
   {
     return static_cast<Int>(v - rhs) >= 0;
@@ -394,7 +394,7 @@ struct Serial {
 
   [[nodiscard]] constexpr auto
   operator>=(                            //
-      const Serial &rhs) const noexcept  //
+      const Serial& rhs) const noexcept  //
       -> bool
   {
     return static_cast<Int>(v - rhs.v) >= 0;

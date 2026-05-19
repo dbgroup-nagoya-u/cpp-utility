@@ -58,27 +58,27 @@ class MCSLock
      * @param qnode The corresponding queue node for unlocking.
      */
     constexpr SGuard(  //
-        MCSLock *dest,
-        MCSLock *qnode) noexcept
+        MCSLock* const dest,
+        MCSLock* const qnode) noexcept
         : dest_{dest}
         , qnode_{qnode}
     {
     }
 
-    SGuard(const SGuard &) = delete;
+    SGuard(const SGuard&) = delete;
 
     constexpr SGuard(  //
-        SGuard &&obj) noexcept
+        SGuard&& obj) noexcept
         : dest_{std::exchange(obj.dest_, nullptr)}
         , qnode_{obj.qnode_}
     {
     }
 
-    auto operator=(const SGuard &) -> SGuard & = delete;
+    auto operator=(const SGuard&) -> SGuard& = delete;
 
     auto operator=(             //
-        SGuard &&rhs) noexcept  //
-        -> SGuard &;
+        SGuard&& rhs) noexcept  //
+        -> SGuard&;
 
     /*########################################################################*
      * Public destructors
@@ -106,10 +106,10 @@ class MCSLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    MCSLock *dest_{};
+    MCSLock* dest_{};
 
     /// @brief The corresponding queue node for unlocking.
-    MCSLock *qnode_{};
+    MCSLock* qnode_{};
   };
 
   /**
@@ -130,27 +130,27 @@ class MCSLock
      * @param qnode The corresponding queue node for unlocking.
      */
     constexpr SIXGuard(  //
-        MCSLock *dest,
-        MCSLock *qnode) noexcept
+        MCSLock* const dest,
+        MCSLock* const qnode) noexcept
         : dest_{dest}
         , qnode_{qnode}
     {
     }
 
-    SIXGuard(const SIXGuard &) = delete;
+    SIXGuard(const SIXGuard&) = delete;
 
     constexpr SIXGuard(  //
-        SIXGuard &&obj) noexcept
+        SIXGuard&& obj) noexcept
         : dest_{std::exchange(obj.dest_, nullptr)}
         , qnode_{obj.qnode_}
     {
     }
 
-    auto operator=(const SIXGuard &) -> SIXGuard & = delete;
+    auto operator=(const SIXGuard&) -> SIXGuard& = delete;
 
     auto operator=(               //
-        SIXGuard &&rhs) noexcept  //
-        -> SIXGuard &;
+        SIXGuard&& rhs) noexcept  //
+        -> SIXGuard&;
 
     /*########################################################################*
      * Public destructors
@@ -188,10 +188,10 @@ class MCSLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    MCSLock *dest_{};
+    MCSLock* dest_{};
 
     /// @brief The corresponding queue node for unlocking.
-    MCSLock *qnode_{};
+    MCSLock* qnode_{};
   };
 
   /**
@@ -212,27 +212,27 @@ class MCSLock
      * @param qnode The corresponding queue node for unlocking.
      */
     constexpr XGuard(  //
-        MCSLock *dest,
-        MCSLock *qnode) noexcept
+        MCSLock* const dest,
+        MCSLock* const qnode) noexcept
         : dest_{dest}
         , qnode_{qnode}
     {
     }
 
-    XGuard(const XGuard &) = delete;
+    XGuard(const XGuard&) = delete;
 
     constexpr XGuard(  //
-        XGuard &&obj) noexcept
+        XGuard&& obj) noexcept
         : dest_{std::exchange(obj.dest_, nullptr)}
         , qnode_{obj.qnode_}
     {
     }
 
-    auto operator=(const XGuard &) -> XGuard & = delete;
+    auto operator=(const XGuard&) -> XGuard& = delete;
 
     auto operator=(             //
-        XGuard &&rhs) noexcept  //
-        -> XGuard &;
+        XGuard&& rhs) noexcept  //
+        -> XGuard&;
 
     /*########################################################################*
      * Public destructors
@@ -276,10 +276,10 @@ class MCSLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    MCSLock *dest_{};
+    MCSLock* dest_{};
 
     /// @brief The corresponding queue node for unlocking.
-    MCSLock *qnode_{};
+    MCSLock* qnode_{};
   };
 
   /*##########################################################################*
@@ -288,11 +288,11 @@ class MCSLock
 
   constexpr MCSLock() noexcept = default;
 
-  MCSLock(const MCSLock &) = delete;
-  MCSLock(MCSLock &&) = delete;
+  MCSLock(const MCSLock&) = delete;
+  MCSLock(MCSLock&&) = delete;
 
-  auto operator=(const MCSLock &) -> MCSLock & = delete;
-  auto operator=(MCSLock &&) -> MCSLock & = delete;
+  auto operator=(const MCSLock&) -> MCSLock& = delete;
+  auto operator=(MCSLock&&) -> MCSLock& = delete;
 
   /*##########################################################################*
    * Public destructors
@@ -347,7 +347,7 @@ class MCSLock
    * corrupt an internal lock state.
    */
   void UnlockS(  //
-      MCSLock *qnode);
+      MCSLock* qnode);
 
   /**
    * @brief Release a shared-with-intent-exclusive lock.
@@ -357,7 +357,7 @@ class MCSLock
    * will corrupt an internal lock state.
    */
   void UnlockSIX(  //
-      MCSLock *qnode);
+      MCSLock* qnode);
 
   /**
    * @brief Release an exclusive lock.
@@ -367,7 +367,7 @@ class MCSLock
    * corrupt an internal lock state.
    */
   void UnlockX(  //
-      MCSLock *qnode);
+      MCSLock* qnode);
 
   /*##########################################################################*
    * Internal member variables

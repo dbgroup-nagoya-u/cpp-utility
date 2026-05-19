@@ -50,13 +50,13 @@ struct CompareAsCString {
    */
   auto
   operator()(  //
-      const void *lhs,
-      const void *rhs) const noexcept  //
+      const void* const lhs,
+      const void* const rhs) const noexcept  //
       -> bool
   {
     if (lhs == nullptr) return false;
     if (rhs == nullptr) return true;
-    return std::strcmp(static_cast<const char *>(lhs), static_cast<const char *>(rhs)) < 0;
+    return std::strcmp(static_cast<const char*>(lhs), static_cast<const char*>(rhs)) < 0;
   }
 };
 
@@ -93,7 +93,7 @@ constexpr auto
 IsVarLenData() noexcept  //
     -> bool
 {
-  return std::is_same_v<T, std::byte *>;
+  return std::is_same_v<T, std::byte*>;
 }
 
 /**
@@ -121,8 +121,8 @@ IsTriviallyCopyable() noexcept  //
 template <class Comp, class T>
 constexpr auto
 IsEqual(  //
-    const T &lhs,
-    const T &rhs)  //
+    const T& lhs,
+    const T& rhs)  //
     -> bool
 {
   return !Comp{}(lhs, rhs) && !Comp{}(rhs, lhs);
@@ -136,8 +136,8 @@ IsEqual(  //
 template <class T>
 constexpr auto
 GetSrcAddr(                 //
-    const T &obj) noexcept  //
-    -> std::conditional_t<IsVarLenData<T>(), const T, const T *>
+    const T& obj) noexcept  //
+    -> std::conditional_t<IsVarLenData<T>(), const T, const T*>
 {
   if constexpr (IsVarLenData<T>()) {
     return obj;
@@ -159,7 +159,7 @@ GetSrcAddr(                 //
 template <class Entry>
 constexpr auto
 ParseEntry(                       //
-    const Entry &entry) noexcept  //
+    const Entry& entry) noexcept  //
     -> std::tuple<std::tuple_element_t<0, Entry>, std::tuple_element_t<1, Entry>, size_t, size_t>
 {
   using Key = std::tuple_element_t<0, Entry>;
@@ -171,10 +171,10 @@ ParseEntry(                       //
   if constexpr (kTupleSize == 4) {
     return entry;
   } else if constexpr (kTupleSize == 3) {
-    const auto &[key, payload, key_len] = entry;
+    const auto& [key, payload, key_len] = entry;
     return {key, payload, key_len, sizeof(Payload)};
   } else {
-    const auto &[key, payload] = entry;
+    const auto& [key, payload] = entry;
     return {key, payload, sizeof(Key), sizeof(Payload)};
   }
 }
@@ -190,7 +190,7 @@ ParseEntry(                       //
 template <class Entry>
 constexpr auto
 ParseKey(                         //
-    const Entry &entry) noexcept  //
+    const Entry& entry) noexcept  //
     -> std::pair<std::tuple_element_t<0, Entry>, size_t>
 {
   using Key = std::tuple_element_t<0, Entry>;
@@ -199,13 +199,13 @@ ParseKey(                         //
   static_assert(2 <= kTupleSize && kTupleSize <= 4);
 
   if constexpr (kTupleSize == 4) {
-    const auto &[key, payload, key_len, pay_len] = entry;
+    const auto& [key, payload, key_len, pay_len] = entry;
     return {key, key_len};
   } else if constexpr (kTupleSize == 3) {
-    const auto &[key, payload, key_len] = entry;
+    const auto& [key, payload, key_len] = entry;
     return {key, key_len};
   } else {
-    const auto &[key, payload] = entry;
+    const auto& [key, payload] = entry;
     return {key, sizeof(Key)};
   }
 }
@@ -221,7 +221,7 @@ ParseKey(                         //
 template <class Entry>
 constexpr auto
 ParsePayload(                     //
-    const Entry &entry) noexcept  //
+    const Entry& entry) noexcept  //
     -> std::tuple<std::tuple_element_t<1, Entry>, size_t>
 {
   using Payload = std::tuple_element_t<1, Entry>;
@@ -230,13 +230,13 @@ ParsePayload(                     //
   static_assert(2 <= kTupleSize && kTupleSize <= 4);
 
   if constexpr (kTupleSize == 4) {
-    const auto &[key, payload, key_len, pay_len] = entry;
+    const auto& [key, payload, key_len, pay_len] = entry;
     return {payload, pay_len};
   } else if constexpr (kTupleSize == 3) {
-    const auto &[key, payload, key_len] = entry;
+    const auto& [key, payload, key_len] = entry;
     return {payload, sizeof(Payload)};
   } else {
-    const auto &[key, payload] = entry;
+    const auto& [key, payload] = entry;
     return {payload, sizeof(Payload)};
   }
 }
@@ -251,7 +251,7 @@ ParsePayload(                     //
 template <uint32_t kMask, class XGuard>
 constexpr void
 VerIncrement(  //
-    XGuard &x_grd) noexcept
+    XGuard& x_grd) noexcept
 {
   constexpr uint32_t kUnit = ~kMask + 1U;
   static_assert(           //
@@ -314,8 +314,8 @@ ByteSwap(    //
 template <class T, class Binary = uint8_t>
 auto
 ConvertToBinaryData(  //
-    const T &src)     //
-    -> const Binary *
+    const T& src)     //
+    -> const Binary*
 {
   thread_local uint64_t buf{};  // zero filled for 32 bit sources
 
@@ -323,18 +323,18 @@ ConvertToBinaryData(  //
     /*------------------------*
      * Unsigend integers
      *------------------------*/
-    auto *swapped = std::bit_cast<T *>(&buf);
+    auto* const swapped = std::bit_cast<T*>(&buf);
     *swapped = ByteSwap(src);
-    return std::bit_cast<const Binary *>(swapped);
+    return std::bit_cast<const Binary*>(swapped);
   } else if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, int32_t>) {
     /*------------------------*
      * Sigend integers
      *------------------------*/
     using UInt = std::make_unsigned_t<T>;
     constexpr UInt kLSB = UInt{1} << (UInt{8} * sizeof(T) - UInt{1});
-    auto *swapped = std::bit_cast<UInt *>(&buf);
+    auto* const swapped = std::bit_cast<UInt*>(&buf);
     *swapped = ByteSwap(std::bit_cast<UInt>(src) ^ kLSB);
-    return std::bit_cast<const Binary *>(swapped);
+    return std::bit_cast<const Binary*>(swapped);
   } else if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
     /*------------------------*
      * Floating point numbers
@@ -342,7 +342,7 @@ ConvertToBinaryData(  //
     using UInt = std::conditional_t<std::is_same_v<T, float>, uint32_t, uint64_t>;
     constexpr UInt kLSB = UInt{1} << (UInt{8} * sizeof(T) - UInt{1});
     constexpr UInt kMask = ~UInt{0};
-    auto *swapped = std::bit_cast<UInt *>(&buf);
+    auto* const swapped = std::bit_cast<UInt*>(&buf);
     if (std::isnan(src)) {
       *swapped = 0;
     } else if (std::signbit(src)) {
@@ -350,17 +350,17 @@ ConvertToBinaryData(  //
     } else {
       *swapped = ByteSwap(std::bit_cast<UInt>(src) ^ kLSB);
     }
-    return std::bit_cast<const Binary *>(swapped);
+    return std::bit_cast<const Binary*>(swapped);
   } else if constexpr (std::is_array_v<T> || std::is_pointer_v<T>) {
     /*------------------------*
      * Pointers
      *------------------------*/
-    return std::bit_cast<const Binary *>(src);
+    return std::bit_cast<const Binary*>(src);
   } else {
     /*------------------------*
      * Others
      *------------------------*/
-    return std::bit_cast<const Binary *>(&src);
+    return std::bit_cast<const Binary*>(&src);
   }
 }
 
@@ -376,22 +376,22 @@ ConvertToBinaryData(  //
  */
 template <class T, class Binary = uint8_t>
 auto
-ConvertFromBinaryData(  //
-    const Binary *src)  //
+ConvertFromBinaryData(        //
+    const Binary* const src)  //
     -> T
 {
   if constexpr (std::is_same_v<T, uint64_t> || std::is_same_v<T, uint32_t>) {
     /*------------------------*
      * Unsigend integers
      *------------------------*/
-    return ByteSwap(*std::bit_cast<T *>(src));
+    return ByteSwap(*std::bit_cast<T*>(src));
   } else if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, int32_t>) {
     /*------------------------*
      * Sigend integers
      *------------------------*/
     using UInt = std::make_unsigned_t<T>;
     constexpr UInt kLSB = UInt{1} << (UInt{8} * sizeof(T) - UInt{1});
-    return std::bit_cast<T>(ByteSwap(*std::bit_cast<UInt *>(src)) ^ kLSB);
+    return std::bit_cast<T>(ByteSwap(*std::bit_cast<UInt*>(src)) ^ kLSB);
   } else if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
     /*------------------------*
      * Floating point numbers
@@ -399,7 +399,7 @@ ConvertFromBinaryData(  //
     using UInt = std::conditional_t<std::is_same_v<T, float>, uint32_t, uint64_t>;
     constexpr UInt kLSB = UInt{1} << (UInt{8} * sizeof(T) - UInt{1});
     constexpr UInt kMask = ~UInt{0};
-    const auto swapped = ByteSwap(*std::bit_cast<UInt *>(src));
+    const auto swapped = ByteSwap(*std::bit_cast<UInt*>(src));
     if (swapped == 0) return NAN;
     if (swapped & kLSB) return std::bit_cast<T>(swapped ^ kLSB);
     return std::bit_cast<T>(swapped ^ kMask);
@@ -412,7 +412,7 @@ ConvertFromBinaryData(  //
     /*------------------------*
      * Others
      *------------------------*/
-    return *std::bit_cast<const T *>(src);
+    return *std::bit_cast<const T*>(src);
   }
 }
 

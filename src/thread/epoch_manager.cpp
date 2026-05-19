@@ -60,7 +60,7 @@ EpochManager<Serial>::EpochManager(  //
 template <class Serial>
 EpochManager<Serial>::EpochManager(  //
     const size_t epoch_interval,
-    const std::function<Serial(void)> &get_new_epoch)
+    const std::function<Serial(void)>& get_new_epoch)
     : global_epoch_{get_new_epoch()}
     , min_epoch_{--GetCurrentEpoch()}
     , thread_num_{IDManager::GetMaxThreadNum()}
@@ -78,7 +78,7 @@ EpochManager<Serial>::~EpochManager()
     running_.store(false, kRelaxed);
     try {
       manager_.join();
-    } catch (const std::exception &e) {
+    } catch (const std::exception& e) {
       std::cerr << "The epoch manager could not be joined: " << e.what() << "\n";
     }
   }
@@ -109,7 +109,7 @@ auto
 EpochManager<Serial>::CreateEpochGuard()  //
     -> EpochGuard
 {
-  auto &tls = tls_fields_[dbgroup::thread::IDManager::GetThreadID()];
+  auto& tls = tls_fields_[dbgroup::thread::IDManager::GetThreadID()];
   tls.entered = --GetCurrentEpoch();  // add a safety buffer
   return EpochGuard{&(tls.active)};
 }
@@ -121,14 +121,14 @@ EpochManager<Serial>::CreateEpochGuard()  //
 template <class Serial>
 void
 EpochManager<Serial>::AdvanceEpochWorker(  //
-    const std::function<Serial(void)> &get_new_epoch)
+    const std::function<Serial(void)>& get_new_epoch)
 {
   auto wake_time = std::chrono::system_clock::now();
   while (running_.load(kRelaxed)) {
     wake_time += epoch_interval_;
     auto min = --GetCurrentEpoch();  // add a safety buffer
     for (size_t thd_id = 0; thd_id < thread_num_; ++thd_id) {
-      auto &tls = tls_fields_[thd_id];
+      auto& tls = tls_fields_[thd_id];
       if (!tls.active.load(kAcquire)) continue;
       min = std::min(min, tls.entered);
     }
