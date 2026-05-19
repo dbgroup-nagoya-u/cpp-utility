@@ -6,22 +6,22 @@ buildType:
       short: Debug
       long: Include debugging information without optimizations
       buildType: Debug
-      settings:
-        CPP_UTILITY_BUILD_TESTS: ON
-        DBGROUP_TEST_THREAD_NUM: 8
-        DBGROUP_TEST_RANDOM_SEED: 0
     relWithDebInfo:
       short: RelWithDebInfo
       long: Perform optimizations and include debugging informatin
       buildType: RelWithDebInfo
-      settings:
-        CPP_UTILITY_BUILD_TESTS: ON
-        DBGROUP_TEST_THREAD_NUM: 8
-        DBGROUP_TEST_RANDOM_SEED: 0
     release:
       short: Release
       long: Perform optimizations and omit debugging informatin
       buildType: Release
+
+defaltSettings:
+  default: default
+  description: ""
+  choices:
+    default:
+      short: "w/Test"
+      long: ""
       settings:
         CPP_UTILITY_BUILD_TESTS: ON
         DBGROUP_TEST_THREAD_NUM: 8
