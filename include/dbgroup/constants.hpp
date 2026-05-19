@@ -212,11 +212,11 @@ CeilOnVirtualPages(                //
 template <std::integral T>
 constexpr auto
 ShiftAddr(  //
-    const void *addr,
+    const void* const addr,
     const T offset) noexcept  //
-    -> void *
+    -> void*
 {
-  return std::bit_cast<std::byte *>(addr) + offset;
+  return std::bit_cast<std::byte*>(addr) + offset;
 }
 
 /**

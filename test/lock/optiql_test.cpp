@@ -82,7 +82,7 @@ class OptiQLFixture : public ::testing::Test
       const bool expected_rc)
   {
     {
-      [[maybe_unused]] const auto &guard = GetLock(lock_type);
+      [[maybe_unused]] const auto& guard = GetLock(lock_type);
       TryLock(kSLock, expected_rc);
     }
     t_.join();
@@ -94,7 +94,7 @@ class OptiQLFixture : public ::testing::Test
       const bool expected_rc)
   {
     {
-      [[maybe_unused]] const auto &guard = GetLock(lock_type);
+      [[maybe_unused]] const auto& guard = GetLock(lock_type);
       TryLock(kSIXLock, expected_rc);
     }
     t_.join();
@@ -106,7 +106,7 @@ class OptiQLFixture : public ::testing::Test
       const bool expected_rc)
   {
     {
-      [[maybe_unused]] const auto &guard = GetLock(lock_type);
+      [[maybe_unused]] const auto& guard = GetLock(lock_type);
       TryLock(kXLock, expected_rc);
     }
     t_.join();
@@ -124,7 +124,7 @@ class OptiQLFixture : public ::testing::Test
         threads.emplace_back([this]() {
           std::shared_lock<std::shared_mutex> lock(mtx_);
           for (size_t i = 0; i < kWriteNumPerThread; i++) {
-            auto &&x_guard = lock_.LockX();
+            auto&& x_guard = lock_.LockX();
             ++counter_;
           }
         });
@@ -136,7 +136,7 @@ class OptiQLFixture : public ::testing::Test
     }
 
     // release the shared lock, and then wait for the increment workers
-    for (auto &&t : threads) {
+    for (auto&& t : threads) {
       t.join();
     }
 
@@ -155,7 +155,7 @@ class OptiQLFixture : public ::testing::Test
   {
     switch (lock_type) {
       case kXLock: {
-        auto &&guard = lock_.LockX();
+        auto&& guard = lock_.LockX();
         EXPECT_TRUE(guard);
         return Guard{std::move(guard)};
       }
@@ -171,7 +171,7 @@ class OptiQLFixture : public ::testing::Test
       const LockType lock_type,
       std::promise<void> p)
   {
-    [[maybe_unused]] const auto &guard = GetLock(lock_type);
+    [[maybe_unused]] const auto& guard = GetLock(lock_type);
     p.set_value();
   }
 
@@ -182,7 +182,7 @@ class OptiQLFixture : public ::testing::Test
   {
     // try to get an exclusive lock by another thread
     std::promise<void> p{};
-    auto &&f = p.get_future();
+    auto&& f = p.get_future();
     t_ = std::thread{&OptiQLFixture::LockWorker, this, lock_type, std::move(p)};
 
     // after short sleep, give up on acquiring the lock

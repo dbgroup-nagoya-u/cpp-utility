@@ -43,7 +43,7 @@ namespace dbgroup::lock
  * @tparam T A target class.
  */
 template <class T>
-concept GuardClass = requires(T &x) {
+concept GuardClass = requires(T& x) {
   // public APIs
   { static_cast<bool>(x) } -> std::convertible_to<bool>;
 };
@@ -54,7 +54,7 @@ concept GuardClass = requires(T &x) {
  * @tparam T A target class.
  */
 template <class T>
-concept OptimisticXGuard = requires(T &x, uint32_t ver) {
+concept OptimisticXGuard = requires(T& x, uint32_t ver) {
   // public APIs
   { static_cast<bool>(x) } -> std::convertible_to<bool>;
   { x.GetVersion() } -> std::convertible_to<uint32_t>;
@@ -68,7 +68,7 @@ concept OptimisticXGuard = requires(T &x, uint32_t ver) {
  * @tparam XGuard A corresponding exclusive guard class.
  */
 template <class T, class XGuard>
-concept OptimisticReadGuard = requires(T &x, uint32_t mask, size_t max_retry) {
+concept OptimisticReadGuard = requires(T& x, uint32_t mask, size_t max_retry) {
   // public APIs
   { static_cast<bool>(x) } -> std::convertible_to<bool>;
   { x.GetVersion() } -> std::convertible_to<uint32_t>;
@@ -82,7 +82,7 @@ concept OptimisticReadGuard = requires(T &x, uint32_t mask, size_t max_retry) {
  * @tparam T A target class.
  */
 template <class T>
-concept PessimisticallyLockable = requires(T &x) {
+concept PessimisticallyLockable = requires(T& x) {
   // public types
   requires GuardClass<typename T::SGuard>;
   requires GuardClass<typename T::SIXGuard>;
@@ -100,7 +100,7 @@ concept PessimisticallyLockable = requires(T &x) {
  * @tparam T A target class.
  */
 template <class T>
-concept OptimisticallyLockable = requires(T &x) {
+concept OptimisticallyLockable = requires(T& x) {
   // public types
   requires OptimisticXGuard<typename T::XGuard>;
   requires OptimisticReadGuard<typename T::OptGuard, typename T::XGuard>;

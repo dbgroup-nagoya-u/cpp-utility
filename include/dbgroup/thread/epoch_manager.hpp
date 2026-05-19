@@ -61,13 +61,13 @@ class EpochManager
    */
   EpochManager(  //
       size_t epoch_interval,
-      const std::function<Serial(void)> &get_new_epoch);
+      const std::function<Serial(void)>& get_new_epoch);
 
-  EpochManager(const EpochManager &) = delete;
-  EpochManager(EpochManager &&) = delete;
+  EpochManager(const EpochManager&) = delete;
+  EpochManager(EpochManager&&) = delete;
 
-  auto operator=(const EpochManager &) -> EpochManager & = delete;
-  auto operator=(EpochManager &&) -> EpochManager & = delete;
+  auto operator=(const EpochManager&) -> EpochManager& = delete;
+  auto operator=(EpochManager&&) -> EpochManager& = delete;
 
   /*##########################################################################*
    * Public destructors
@@ -132,7 +132,7 @@ class EpochManager
    *
    */
   void AdvanceEpochWorker(  //
-      const std::function<Serial(void)> &get_new_epoch);
+      const std::function<Serial(void)>& get_new_epoch);
 
   /*##########################################################################*
    * Internal member variables

@@ -194,7 +194,7 @@ class ZipfDistributionFixture : public ::testing::Test
 
   [[nodiscard]] static auto
   RunZipfEngine(  //
-      const ZipfDist_t &zipf_dist,
+      const ZipfDist_t& zipf_dist,
       const IntType min,
       const IntType max,
       const size_t seed)  //
@@ -217,13 +217,13 @@ class ZipfDistributionFixture : public ::testing::Test
 
   static void
   CheckGeneratedIDsObeyZipfLaw(  //
-      const std::vector<IntType> &generated_ids,
+      const std::vector<IntType>& generated_ids,
       const IntType min,
       const double alpha)
   {
     // count ID frequency
     std::vector<size_t> freq_dist(kSmallBinNum, 0);
-    for (auto &&id : generated_ids) {
+    for (auto&& id : generated_ids) {
       ++freq_dist[id - min];
     }
 

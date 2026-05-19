@@ -27,7 +27,7 @@
 namespace dbgroup::thread
 {
 EpochGuard::EpochGuard(  //
-    std::atomic_bool *active) noexcept
+    std::atomic_bool* const active) noexcept
     : active_{active}
 {
   active_->store(true, kRelease);
@@ -35,8 +35,8 @@ EpochGuard::EpochGuard(  //
 
 auto
 EpochGuard::operator=(          //
-    EpochGuard &&rhs) noexcept  //
-    -> EpochGuard &
+    EpochGuard&& rhs) noexcept  //
+    -> EpochGuard&
 {
   if (active_) {
     active_->store(false, kRelaxed);

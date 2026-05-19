@@ -82,7 +82,7 @@ class MCSLockFixture : public ::testing::Test
       const bool expected_rc)
   {
     {
-      [[maybe_unused]] const auto &guard = GetLock(lock_type);
+      [[maybe_unused]] const auto& guard = GetLock(lock_type);
       TryLock(kSLock, expected_rc);
     }
     t_.join();
@@ -94,7 +94,7 @@ class MCSLockFixture : public ::testing::Test
       const bool expected_rc)
   {
     {
-      [[maybe_unused]] const auto &guard = GetLock(lock_type);
+      [[maybe_unused]] const auto& guard = GetLock(lock_type);
       TryLock(kSIXLock, expected_rc);
     }
     t_.join();
@@ -106,7 +106,7 @@ class MCSLockFixture : public ::testing::Test
       const bool expected_rc)
   {
     {
-      [[maybe_unused]] const auto &guard = GetLock(lock_type);
+      [[maybe_unused]] const auto& guard = GetLock(lock_type);
       TryLock(kXLock, expected_rc);
     }
     t_.join();
@@ -118,7 +118,7 @@ class MCSLockFixture : public ::testing::Test
       const bool expected_rc)
   {
     {
-      [[maybe_unused]] const auto &six_guard = lock_.LockX().DowngradeToSIX();
+      [[maybe_unused]] const auto& six_guard = lock_.LockX().DowngradeToSIX();
       TryLock(lock_type, expected_rc);
     }
     t_.join();
@@ -130,7 +130,7 @@ class MCSLockFixture : public ::testing::Test
       const bool expected_rc)
   {
     {
-      [[maybe_unused]] const auto &guard = GetLock(lock_type);
+      [[maybe_unused]] const auto& guard = GetLock(lock_type);
       TryUpgrade(lock_.LockSIX(), expected_rc);
     }
     t_.join();
@@ -143,11 +143,11 @@ class MCSLockFixture : public ::testing::Test
     std::vector<std::thread> threads{};
     threads.reserve(kThreadNumForLockS);
     for (size_t i = 0; i < kThreadNumForLockS; ++i) {
-      threads.emplace_back([this]() { auto &&s_guard = lock_.LockS(); });
+      threads.emplace_back([this]() { auto&& s_guard = lock_.LockS(); });
     }
 
     // check the counter of shared locks is correctly managed
-    for (auto &&t : threads) {
+    for (auto&& t : threads) {
       t.join();
     }
     TryLock(kXLock, kExpectSucceed);
@@ -162,13 +162,13 @@ class MCSLockFixture : public ::testing::Test
     threads.reserve(kThreadNum);
 
     {  // create a shared lock to prevent a counter from modifying
-      auto &&s_guard = lock_.LockS();
+      auto&& s_guard = lock_.LockS();
 
       // create incrementor threads
       for (size_t i = 0; i < kThreadNum; ++i) {
         threads.emplace_back([this]() {
           for (size_t i = 0; i < kWriteNumPerThread; i++) {
-            auto &&x_guard = lock_.LockX();
+            auto&& x_guard = lock_.LockX();
             ++counter_;
           }
         });
@@ -180,12 +180,12 @@ class MCSLockFixture : public ::testing::Test
     }
 
     // release the shared lock, and then wait for the increment workers
-    for (auto &&t : threads) {
+    for (auto&& t : threads) {
       t.join();
     }
 
     // check the counter
-    auto &&s_guard = lock_.LockS();
+    auto&& s_guard = lock_.LockS();
     ASSERT_EQ(counter_, kThreadNum * kWriteNumPerThread);
   }
 
@@ -200,17 +200,17 @@ class MCSLockFixture : public ::testing::Test
   {
     switch (lock_type) {
       case kSLock: {
-        auto &&guard = lock_.LockS();
+        auto&& guard = lock_.LockS();
         EXPECT_TRUE(guard);
         return Guard{std::move(guard)};
       }
       case kSIXLock: {
-        auto &&guard = lock_.LockSIX();
+        auto&& guard = lock_.LockSIX();
         EXPECT_TRUE(guard);
         return Guard{std::move(guard)};
       }
       case kXLock: {
-        auto &&guard = lock_.LockX();
+        auto&& guard = lock_.LockX();
         EXPECT_TRUE(guard);
         return Guard{std::move(guard)};
       }
@@ -226,7 +226,7 @@ class MCSLockFixture : public ::testing::Test
       const LockType lock_type,
       std::promise<void> p)
   {
-    [[maybe_unused]] const auto &guard = GetLock(lock_type);
+    [[maybe_unused]] const auto& guard = GetLock(lock_type);
     p.set_value();
   }
 
@@ -237,7 +237,7 @@ class MCSLockFixture : public ::testing::Test
   {
     // try to get an exclusive lock by another thread
     std::promise<void> p{};
-    auto &&f = p.get_future();
+    auto&& f = p.get_future();
     t_ = std::thread{&MCSLockFixture::LockWorker, this, lock_type, std::move(p)};
 
     // after short sleep, give up on acquiring the lock
@@ -257,13 +257,13 @@ class MCSLockFixture : public ::testing::Test
       const bool expect_success)
   {
     auto upgrade_worker = [](MCSLock::SIXGuard six_guard, std::promise<void> p) -> void {
-      [[maybe_unused]] const auto &x_guard = six_guard.UpgradeToX();
+      [[maybe_unused]] const auto& x_guard = six_guard.UpgradeToX();
       p.set_value();
     };
 
     // try to get an exclusive lock by another thread
     std::promise<void> p{};
-    auto &&f = p.get_future();
+    auto&& f = p.get_future();
     t_ = std::thread{upgrade_worker, std::move(six_guard), std::move(p)};
 
     // after short sleep, give up on acquiring the lock
