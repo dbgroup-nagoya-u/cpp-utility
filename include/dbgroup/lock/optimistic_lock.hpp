@@ -210,7 +210,9 @@ class OptimisticLock
     constexpr XGuard(  //
         OptimisticLock *dest,
         const uint32_t ver) noexcept
-        : dest_{dest}, old_ver_{ver}, new_ver_{ver + 1U}
+        : dest_{dest}
+        , old_ver_{ver}
+        , new_ver_{ver + 1U}
     {
     }
 
@@ -218,7 +220,9 @@ class OptimisticLock
 
     constexpr XGuard(  //
         XGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)}, old_ver_{obj.old_ver_}, new_ver_{obj.new_ver_}
+        : dest_{std::exchange(obj.dest_, nullptr)}
+        , old_ver_{obj.old_ver_}
+        , new_ver_{obj.new_ver_}
     {
     }
 
@@ -319,7 +323,8 @@ class OptimisticLock
     constexpr OptGuard(  //
         OptimisticLock *dest,
         const uint32_t ver) noexcept
-        : dest_{dest}, ver_{ver}
+        : dest_{dest}
+        , ver_{ver}
     {
     }
 
@@ -327,10 +332,10 @@ class OptimisticLock
 
     constexpr OptGuard(  //
         OptGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)},
-          ver_{obj.ver_},
-          retry_num_{obj.retry_num_},
-          has_lock_{std::exchange(obj.has_lock_, false)}
+        : dest_{std::exchange(obj.dest_, nullptr)}
+        , ver_{obj.ver_}
+        , retry_num_{obj.retry_num_}
+        , has_lock_{std::exchange(obj.has_lock_, false)}
     {
     }
 

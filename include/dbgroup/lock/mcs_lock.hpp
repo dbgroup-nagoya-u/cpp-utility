@@ -60,7 +60,8 @@ class MCSLock
     constexpr SGuard(  //
         MCSLock *dest,
         MCSLock *qnode) noexcept
-        : dest_{dest}, qnode_{qnode}
+        : dest_{dest}
+        , qnode_{qnode}
     {
     }
 
@@ -68,7 +69,8 @@ class MCSLock
 
     constexpr SGuard(  //
         SGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)}, qnode_{obj.qnode_}
+        : dest_{std::exchange(obj.dest_, nullptr)}
+        , qnode_{obj.qnode_}
     {
     }
 
@@ -130,7 +132,8 @@ class MCSLock
     constexpr SIXGuard(  //
         MCSLock *dest,
         MCSLock *qnode) noexcept
-        : dest_{dest}, qnode_{qnode}
+        : dest_{dest}
+        , qnode_{qnode}
     {
     }
 
@@ -138,7 +141,8 @@ class MCSLock
 
     constexpr SIXGuard(  //
         SIXGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)}, qnode_{obj.qnode_}
+        : dest_{std::exchange(obj.dest_, nullptr)}
+        , qnode_{obj.qnode_}
     {
     }
 
@@ -210,7 +214,8 @@ class MCSLock
     constexpr XGuard(  //
         MCSLock *dest,
         MCSLock *qnode) noexcept
-        : dest_{dest}, qnode_{qnode}
+        : dest_{dest}
+        , qnode_{qnode}
     {
     }
 
@@ -218,7 +223,8 @@ class MCSLock
 
     constexpr XGuard(  //
         XGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)}, qnode_{obj.qnode_}
+        : dest_{std::exchange(obj.dest_, nullptr)}
+        , qnode_{obj.qnode_}
     {
     }
 

@@ -46,13 +46,13 @@ using IDManager = dbgroup::thread::IDManager;
 template <class Serial>
 EpochManager<Serial>::EpochManager(  //
     const size_t epoch_interval)
-    : global_epoch_{Serial{1}},
-      min_epoch_{Serial{0}},
-      thread_num_{IDManager::GetMaxThreadNum()},
-      epoch_interval_{epoch_interval},
-      tls_fields_{std::make_unique<TLSEpoch[]>(thread_num_)},
-      running_{true},
-      manager_{&EpochManager::AdvanceEpochWorker, this,
+    : global_epoch_{Serial{1}}
+    , min_epoch_{Serial{0}}
+    , thread_num_{IDManager::GetMaxThreadNum()}
+    , epoch_interval_{epoch_interval}
+    , tls_fields_{std::make_unique<TLSEpoch[]>(thread_num_)}
+    , running_{true}
+    , manager_{&EpochManager::AdvanceEpochWorker, this,
                [this]() -> Serial { return ++GetCurrentEpoch(); }}
 {
 }
@@ -61,13 +61,13 @@ template <class Serial>
 EpochManager<Serial>::EpochManager(  //
     const size_t epoch_interval,
     const std::function<Serial(void)> &get_new_epoch)
-    : global_epoch_{get_new_epoch()},
-      min_epoch_{--GetCurrentEpoch()},
-      thread_num_{IDManager::GetMaxThreadNum()},
-      epoch_interval_{epoch_interval},
-      tls_fields_{std::make_unique<TLSEpoch[]>(thread_num_)},
-      running_{true},
-      manager_{&EpochManager::AdvanceEpochWorker, this, get_new_epoch}
+    : global_epoch_{get_new_epoch()}
+    , min_epoch_{--GetCurrentEpoch()}
+    , thread_num_{IDManager::GetMaxThreadNum()}
+    , epoch_interval_{epoch_interval}
+    , tls_fields_{std::make_unique<TLSEpoch[]>(thread_num_)}
+    , running_{true}
+    , manager_{&EpochManager::AdvanceEpochWorker, this, get_new_epoch}
 {
 }
 
