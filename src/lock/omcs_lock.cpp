@@ -171,7 +171,7 @@ OMCSLock::LockS()  //
     }
   }
 end:
-  return SGuard{this, qid};
+  return SGuard{this, qid, static_cast<uint32_t>(cur & kVersionMask)};
 }
 
 auto
@@ -280,7 +280,7 @@ OMCSLock::UnlockSIX(  //
     auto cur = lock_.load(kRelaxed);
     while (((cur & kQIDMask) >> kQIDShift) == qid) {
       if (cur & kSMask) {
-        if (lock_.compare_exchange_weak(cur, cur ^ kXLock, kRelease, kRelaxed)) return;
+        if (lock_.compare_exchange_weak(cur, (cur ^ kXLock) | ver, kRelease, kRelaxed)) return;
       } else if (lock_.compare_exchange_weak(cur, ver, kRelease, kRelaxed)) {
         tls_holder.ReleaseQID(qid);
         return;
@@ -314,7 +314,7 @@ OMCSLock::UnlockX(  //
     auto cur = lock_.load(kRelaxed);
     while (((cur & kQIDMask) >> kQIDShift) == qid) {
       if (cur & kSMask) {
-        if (lock_.compare_exchange_weak(cur, cur ^ kXLock, kRelease, kRelaxed)) return;
+        if (lock_.compare_exchange_weak(cur, (cur ^ kXLock) | ver, kRelease, kRelaxed)) return;
       } else if (lock_.compare_exchange_weak(cur, ver, kRelease, kRelaxed)) {
         tls_holder.ReleaseQID(qid);
         return;
@@ -447,20 +447,33 @@ OMCSLock::OptGuard::TryLockS(  //
     const uint32_t mask)       //
     -> SGuard
 {
-  if (has_lock_) return SGuard{std::exchange(dest_, nullptr), qid_};
+  auto cur = dest_->lock_.load(kRelaxed);
+  if (cur & kXLock)
+    return SGuard{std::exchange(dest_, nullptr), qid_, static_cast<uint32_t>(cur & kVersionMask)};
 
+  auto qid = tls_holder.GetQID();
+  auto *qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
+  qnode->lock_state.store(kNull, kRelaxed);
+  const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kSLock;
   const auto expected = ver_;
-  SpinWithBackoff(
-      [](std::atomic_uint64_t *lock, uint32_t *ver, uint32_t expected, uint32_t mask) -> bool {
-        auto cur = lock->load(kAcquire);
-        if (cur & kXLock) return false;
-        *ver = static_cast<uint32_t>(cur);
-        return ((*ver ^ expected) & mask)
-               || lock->compare_exchange_weak(cur, cur + kSLock, kRelaxed, kRelaxed);
-      },
-      &(dest_->lock_), &ver_, ver_, mask);
 
-  return ((ver_ ^ expected) & mask) ? SGuard{} : SGuard{std::exchange(dest_, nullptr), qid_};
+  auto tail_qid = (cur & kQIDMask) >> kQIDShift;
+  while (true) {
+    if (tail_qid) {  // there is the predecessor
+      if (dest_->lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) break;
+    } else if (dest_->lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) {
+      goto end;  // the initial shared lock
+    }
+    CPP_UTILITY_SPINLOCK_HINT
+  }
+
+  tls_holder.ReleaseQID(qid);
+  qid = (cur & kQIDMask) >> kQIDShift;
+
+end:
+  return ((ver_ ^ expected) & mask) ? SGuard{dest_, qid, static_cast<uint32_t>(cur & kVersionMask)}
+                                    : SGuard{std::exchange(dest_, nullptr), qid_,
+                                             static_cast<uint32_t>(cur & kVersionMask)};
 }
 
 auto
@@ -481,8 +494,7 @@ OMCSLock::OptGuard::TryLockSIX(  //
         *ver = static_cast<uint32_t>(cur);
         return ((*ver ^ expected) & mask)
                || ((cur & kXMask) == kNoLocks
-                   && lock->compare_exchange_weak(cur, cur, kRelaxed,
-                                                  kRelaxed));  // kSIXLockは何にあたる？
+                   && lock->compare_exchange_weak(cur, cur, kRelaxed, kRelaxed));
       },
       &(dest_->lock_), &ver_, ver_, mask);
 

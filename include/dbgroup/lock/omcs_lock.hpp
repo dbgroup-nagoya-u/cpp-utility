@@ -70,8 +70,9 @@ class OMCSLock
      */
     constexpr SGuard(  //
         OMCSLock *dest,
-        const uint64_t qid) noexcept
-        : dest_{dest}, qid_{qid}
+        const uint64_t qid,
+        const uint32_t ver) noexcept
+        : dest_{dest}, qid_{qid}, ver_{ver}
     {
     }
 
@@ -79,7 +80,7 @@ class OMCSLock
 
     constexpr SGuard(  //
         SGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)}, qid_{obj.qid_}
+        : dest_{std::exchange(obj.dest_, nullptr)}, qid_{obj.qid_}, ver_{obj.ver_}
     {
     }
 
@@ -121,10 +122,7 @@ class OMCSLock
     uint64_t qid_{};
 
     /// @brief A version when creating this guard.
-    uint32_t old_ver_{};
-
-    /// @brief A version when failing verification.
-    uint32_t new_ver_{};
+    uint32_t ver_{};
   };
 
   /**
