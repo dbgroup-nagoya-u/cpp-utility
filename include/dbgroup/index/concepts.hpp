@@ -160,6 +160,19 @@ HasBulkload() noexcept  //
 }
 
 template <class Index>
+concept HasMemoryUsageMethod = requires(Index& idx) {
+  { idx.MemoryUsage() } -> std::same_as<std::pair<size_t, size_t>>;
+};
+
+template <class Index>
+constexpr auto
+HasMemoryUsage() noexcept  //
+    -> bool
+{
+  return HasMemoryUsageMethod<Index>;
+}
+
+template <class Index>
 concept HasSetUpMethod = requires(Index& idx) {
   { idx.SetUp() };
 };
