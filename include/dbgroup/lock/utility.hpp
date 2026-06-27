@@ -45,7 +45,7 @@ namespace dbgroup::lock
 template <class T>
 concept GuardClass = requires(T& x) {
   // public APIs
-  { static_cast<bool>(x) } -> std::convertible_to<bool>;
+  { static_cast<bool>(x) } noexcept -> std::convertible_to<bool>;
 };
 
 /**
@@ -56,8 +56,8 @@ concept GuardClass = requires(T& x) {
 template <class T>
 concept OptimisticXGuard = requires(T& x, uint32_t ver) {
   // public APIs
-  { static_cast<bool>(x) } -> std::convertible_to<bool>;
-  { x.GetVersion() } -> std::convertible_to<uint32_t>;
+  { static_cast<bool>(x) } noexcept -> std::convertible_to<bool>;
+  { x.GetVersion() } noexcept -> std::convertible_to<uint32_t>;
   x.SetVersion(ver);
 };
 
@@ -71,8 +71,12 @@ template <class T, class XGuard>
 concept OptimisticReadGuard = requires(T& x, uint32_t mask, size_t max_retry) {
   // public APIs
   { static_cast<bool>(x) } -> std::convertible_to<bool>;
-  { x.GetVersion() } -> std::convertible_to<uint32_t>;
-  { x.VerifyVersion(mask, max_retry) } -> std::convertible_to<bool>;
+  { x.GetVersion() } noexcept -> std::convertible_to<uint32_t>;
+  requires requires {
+    { x.VerifyVersion(mask) } noexcept -> std::convertible_to<bool>;
+  } || requires {
+    { x.VerifyVersion(mask, max_retry) } noexcept -> std::convertible_to<bool>;
+  };
   { x.TryLockX(mask) } -> std::convertible_to<XGuard>;
 };
 
@@ -107,7 +111,7 @@ concept OptimisticallyLockable = requires(T& x) {
 
   // public APIs
   { x.LockX() } -> std::convertible_to<typename T::XGuard>;
-  { x.GetVersion() } -> std::convertible_to<typename T::OptGuard>;
+  { x.GetVersion() } noexcept -> std::convertible_to<typename T::OptGuard>;
 };
 
 /**
