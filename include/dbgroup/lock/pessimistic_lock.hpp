@@ -168,7 +168,8 @@ class PessimisticLock
      * @note After calling the function, this lock guard abandons the lock's
      * ownership.
      */
-    [[nodiscard]] auto UpgradeToX()  //
+    [[nodiscard]]
+    auto UpgradeToX()  //
         -> XGuard;
 
    private:
@@ -243,7 +244,8 @@ class PessimisticLock
      * @note After calling the function, this lock guard abandons the lock's
      * ownership.
      */
-    [[nodiscard]] auto DowngradeToSIX() noexcept  //
+    [[nodiscard]]
+    auto DowngradeToSIX() noexcept  //
         -> SIXGuard;
 
    private:
@@ -284,7 +286,8 @@ class PessimisticLock
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  [[nodiscard]] auto LockS()  //
+  [[nodiscard]]
+  auto LockS()  //
       -> SGuard;
 
   /**
@@ -294,7 +297,8 @@ class PessimisticLock
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  [[nodiscard]] auto LockSIX()  //
+  [[nodiscard]]
+  auto LockSIX()  //
       -> SIXGuard;
 
   /**
@@ -304,7 +308,8 @@ class PessimisticLock
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  [[nodiscard]] auto LockX()  //
+  [[nodiscard]]
+  auto LockX()  //
       -> XGuard;
 
  private:

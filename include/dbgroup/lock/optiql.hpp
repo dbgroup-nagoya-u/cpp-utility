@@ -114,7 +114,8 @@ class OptiQL
     /**
      * @return The version when this guard was created.
      */
-    [[nodiscard]] constexpr auto
+    [[nodiscard]]
+    constexpr auto
     GetVersion() const noexcept  //
         -> uint32_t
     {
@@ -205,7 +206,8 @@ class OptiQL
     /**
      * @return The version when this guard was created.
      */
-    [[nodiscard]] constexpr auto
+    [[nodiscard]]
+    constexpr auto
     GetVersion() const noexcept  //
         -> uint32_t
     {
@@ -220,7 +222,8 @@ class OptiQL
      * @retval true if a target version does not change from an expected one.
      * @retval false otherwise.
      */
-    [[nodiscard]] auto VerifyVersion() noexcept  //
+    [[nodiscard]]
+    auto VerifyVersion() noexcept  //
         -> bool;
 
    private:
@@ -263,7 +266,8 @@ class OptiQL
    * @note This function does not give up reading a version value and continues
    * with spinlock and back-off.
    */
-  [[nodiscard]] auto GetVersion() const noexcept  //
+  [[nodiscard]]
+  auto GetVersion() const noexcept  //
       -> OptGuard;
 
   /**
@@ -273,7 +277,8 @@ class OptiQL
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  [[nodiscard]] auto LockX()  //
+  [[nodiscard]]
+  auto LockX()  //
       -> XGuard;
 
  private:

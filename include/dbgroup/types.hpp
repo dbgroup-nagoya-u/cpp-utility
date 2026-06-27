@@ -196,7 +196,8 @@ struct Serial {
    * Public arithmetic operators
    *##########################################################################*/
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator+(                        //
       const UInt n) const noexcept  //
       -> Serial
@@ -204,7 +205,8 @@ struct Serial {
     return Serial{static_cast<UInt>(v + n)};
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator+(                            //
       const Serial rhs) const noexcept  //
       -> Serial
@@ -212,7 +214,8 @@ struct Serial {
     return Serial{static_cast<UInt>(v + rhs.v)};
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator-(                        //
       const UInt n) const noexcept  //
       -> Serial
@@ -220,7 +223,8 @@ struct Serial {
     return Serial{static_cast<UInt>(v - n)};
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator-(                            //
       const Serial rhs) const noexcept  //
       -> Serial
@@ -236,7 +240,8 @@ struct Serial {
     return *this;
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator&(                        //
       const UInt n) const noexcept  //
       -> Serial
@@ -244,7 +249,8 @@ struct Serial {
     return Serial{static_cast<UInt>(v & n)};
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator&(                            //
       const Serial rhs) const noexcept  //
       -> Serial
@@ -252,7 +258,8 @@ struct Serial {
     return Serial{static_cast<UInt>(v & rhs.v)};
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator|(                        //
       const UInt n) const noexcept  //
       -> Serial
@@ -260,7 +267,8 @@ struct Serial {
     return Serial{static_cast<UInt>(v | n)};
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator|(                            //
       const Serial rhs) const noexcept  //
       -> Serial
@@ -268,7 +276,8 @@ struct Serial {
     return Serial{static_cast<UInt>(v | rhs.v)};
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator^(                        //
       const UInt n) const noexcept  //
       -> Serial
@@ -276,7 +285,8 @@ struct Serial {
     return Serial{static_cast<UInt>(v ^ n)};
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator^(                            //
       const Serial rhs) const noexcept  //
       -> Serial
@@ -284,7 +294,8 @@ struct Serial {
     return Serial{static_cast<UInt>(v ^ rhs.v)};
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator<<(                       //
       const UInt n) const noexcept  //
       -> Serial
@@ -292,7 +303,8 @@ struct Serial {
     return Serial{static_cast<UInt>(v << n)};
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator>>(                       //
       const UInt n) const noexcept  //
       -> Serial
@@ -304,7 +316,8 @@ struct Serial {
    * Public comparison operators
    *##########################################################################*/
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator==(                          //
       const UInt& rhs) const noexcept  //
       -> bool
@@ -312,7 +325,8 @@ struct Serial {
     return v == rhs;
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator==(                            //
       const Serial& rhs) const noexcept  //
       -> bool
@@ -320,7 +334,8 @@ struct Serial {
     return v == rhs.v;
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator!=(                          //
       const UInt& rhs) const noexcept  //
       -> bool
@@ -328,7 +343,8 @@ struct Serial {
     return v != rhs;
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator!=(                            //
       const Serial& rhs) const noexcept  //
       -> bool
@@ -336,7 +352,8 @@ struct Serial {
     return v != rhs.v;
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator<(                           //
       const UInt& rhs) const noexcept  //
       -> bool
@@ -344,7 +361,8 @@ struct Serial {
     return static_cast<Int>(v - rhs) < 0;
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator<(                             //
       const Serial& rhs) const noexcept  //
       -> bool
@@ -352,7 +370,8 @@ struct Serial {
     return static_cast<Int>(v - rhs.v) < 0;
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator<=(                          //
       const UInt& rhs) const noexcept  //
       -> bool
@@ -360,7 +379,8 @@ struct Serial {
     return static_cast<Int>(v - rhs) <= 0;
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator<=(                            //
       const Serial& rhs) const noexcept  //
       -> bool
@@ -368,7 +388,8 @@ struct Serial {
     return static_cast<Int>(v - rhs.v) <= 0;
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator>(                           //
       const UInt& rhs) const noexcept  //
       -> bool
@@ -376,7 +397,8 @@ struct Serial {
     return static_cast<Int>(v - rhs) > 0;
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator>(                             //
       const Serial& rhs) const noexcept  //
       -> bool
@@ -384,7 +406,8 @@ struct Serial {
     return static_cast<Int>(v - rhs.v) > 0;
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator>=(                          //
       const UInt& rhs) const noexcept  //
       -> bool
@@ -392,7 +415,8 @@ struct Serial {
     return static_cast<Int>(v - rhs) >= 0;
   }
 
-  [[nodiscard]] constexpr auto
+  [[nodiscard]]
+  constexpr auto
   operator>=(                            //
       const Serial& rhs) const noexcept  //
       -> bool

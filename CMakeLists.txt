@@ -75,13 +75,13 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
 
   # set the default number of threads if needed
   if ("${DBGROUP_LOGICAL_CORE_NUM}" STREQUAL "")
-    message("[${PROJECT_NAME}] DBGROUP_LOGICAL_CORE_NUM is not set, so check the number of CPU cores.")
+    message(STATUS "[${PROJECT_NAME}] DBGROUP_LOGICAL_CORE_NUM is not set, so check the number of CPU cores.")
 
     # check the number of logical cores
     include(ProcessorCount)
     ProcessorCount(DBGROUP_LOGICAL_CORE_NUM)
     if(NOT DBGROUP_LOGICAL_CORE_NUM EQUAL 0)
-      message("[${PROJECT_NAME}] The detected number of cores: ${DBGROUP_LOGICAL_CORE_NUM}")
+      message(STATUS "[${PROJECT_NAME}] The detected number of cores: ${DBGROUP_LOGICAL_CORE_NUM}")
     else()
       message(WARNING "[${PROJECT_NAME}] The number of cores could not be detected, so use 64 as default.")
       set(
