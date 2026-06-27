@@ -179,7 +179,8 @@ class MCSLock
      * @note After calling the function, this lock guard abandons the lock's
      * ownership.
      */
-    [[nodiscard]] auto UpgradeToX()  //
+    [[nodiscard]]
+    auto UpgradeToX()  //
         -> XGuard;
 
    private:
@@ -263,7 +264,8 @@ class MCSLock
      * @note This function does not do anything actually due to a queue lock
      * structure.
      */
-    [[nodiscard]] auto
+    [[nodiscard]]
+    auto
     DowngradeToSIX()  //
         -> SIXGuard
     {
@@ -311,7 +313,8 @@ class MCSLock
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  [[nodiscard]] auto LockS()  //
+  [[nodiscard]]
+  auto LockS()  //
       -> SGuard;
 
   /**
@@ -321,7 +324,8 @@ class MCSLock
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  [[nodiscard]] auto LockSIX()  //
+  [[nodiscard]]
+  auto LockSIX()  //
       -> SIXGuard;
 
   /**
@@ -331,7 +335,8 @@ class MCSLock
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  [[nodiscard]] auto LockX()  //
+  [[nodiscard]]
+  auto LockX()  //
       -> XGuard;
 
  private:

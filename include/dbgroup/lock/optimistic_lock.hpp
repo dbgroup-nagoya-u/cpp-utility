@@ -178,7 +178,8 @@ class OptimisticLock
      * @note After calling the function, this lock guard abandons the lock's
      * ownership.
      */
-    [[nodiscard]] auto UpgradeToX()  //
+    [[nodiscard]]
+    auto UpgradeToX()  //
         -> XGuard;
 
    private:
@@ -259,7 +260,8 @@ class OptimisticLock
     /**
      * @return The version when this guard was created.
      */
-    [[nodiscard]] constexpr auto
+    [[nodiscard]]
+    constexpr auto
     GetVersion() const noexcept  //
         -> uint32_t
     {
@@ -285,7 +287,8 @@ class OptimisticLock
      * @note After calling the function, this lock guard abandons the lock's
      * ownership.
      */
-    [[nodiscard]] auto DowngradeToSIX() noexcept  //
+    [[nodiscard]]
+    auto DowngradeToSIX() noexcept  //
         -> SIXGuard;
 
    private:
@@ -368,7 +371,8 @@ class OptimisticLock
     /**
      * @return The version when this guard was created.
      */
-    [[nodiscard]] constexpr auto
+    [[nodiscard]]
+    constexpr auto
     GetVersion() const noexcept  //
         -> uint32_t
     {
@@ -387,7 +391,8 @@ class OptimisticLock
      * @note If the version verification failed, this function may wait to
      * update internal fields.
      */
-    [[nodiscard]] auto VerifyVersion(  //
+    [[nodiscard]]
+    auto VerifyVersion(  //
         uint32_t mask = kNoMask,
         size_t max_retry = std::numeric_limits<size_t>::max()) noexcept  //
         -> bool;
@@ -397,7 +402,8 @@ class OptimisticLock
      * @retval true if a target version does not change from an expected one.
      * @retval false otherwise.
      */
-    [[nodiscard]] auto ImmediateVerify(    //
+    [[nodiscard]]
+    auto ImmediateVerify(                  //
         uint32_t mask = kNoMask) noexcept  //
         -> bool;
 
@@ -410,7 +416,8 @@ class OptimisticLock
      * @note This function does not give up acquiring a lock and continues with
      * spinlock and back-off.
      */
-    [[nodiscard]] auto TryLockS(  //
+    [[nodiscard]]
+    auto TryLockS(                //
         uint32_t mask = kNoMask)  //
         -> SGuard;
 
@@ -421,8 +428,9 @@ class OptimisticLock
      * @retval A guard instance if the lock is acquired.
      * @retval An empty guard instance otherwise.
      */
-    [[nodiscard]] auto TryLockSIX(  //
-        uint32_t mask = kNoMask)    //
+    [[nodiscard]]
+    auto TryLockSIX(              //
+        uint32_t mask = kNoMask)  //
         -> SIXGuard;
 
     /**
@@ -432,7 +440,8 @@ class OptimisticLock
      * @retval A guard instance if the lock is acquired.
      * @retval An empty guard instance otherwise.
      */
-    [[nodiscard]] auto TryLockX(  //
+    [[nodiscard]]
+    auto TryLockX(                //
         uint32_t mask = kNoMask)  //
         -> XGuard;
 
@@ -482,7 +491,8 @@ class OptimisticLock
    * @note This function does not give up reading a version value and continues
    * with spinlock and back-off.
    */
-  [[nodiscard]] auto GetVersion() noexcept  //
+  [[nodiscard]]
+  auto GetVersion() noexcept  //
       -> OptGuard;
 
   /*##########################################################################*
@@ -496,7 +506,8 @@ class OptimisticLock
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  [[nodiscard]] auto LockS()  //
+  [[nodiscard]]
+  auto LockS()  //
       -> SGuard;
 
   /**
@@ -506,7 +517,8 @@ class OptimisticLock
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  [[nodiscard]] auto LockSIX()  //
+  [[nodiscard]]
+  auto LockSIX()  //
       -> SIXGuard;
 
   /**
@@ -516,7 +528,8 @@ class OptimisticLock
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  [[nodiscard]] auto LockX()  //
+  [[nodiscard]]
+  auto LockX()  //
       -> XGuard;
 
  private:
