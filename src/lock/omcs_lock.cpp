@@ -447,9 +447,11 @@ OMCSLock::OptGuard::TryLockS(  //
     const uint32_t mask)       //
     -> SGuard
 {
+  std::atomic_thread_fence(kRelease);
   auto cur = dest_->lock_.load(kRelaxed);
-  if (cur & kXLock)
+  if (cur & kXLock) {
     return SGuard{std::exchange(dest_, nullptr), qid_, static_cast<uint32_t>(cur & kVersionMask)};
+  };
 
   auto qid = tls_holder.GetQID();
   auto *qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
@@ -481,25 +483,32 @@ OMCSLock::OptGuard::TryLockSIX(  //
     const uint32_t mask)         //
     -> SIXGuard
 {
-  if (has_lock_) {
-    dest_->lock_.fetch_sub(kSLock, kRelaxed);
-    has_lock_ = false;
-  }
+  std::atomic_thread_fence(kRelease);
+  auto cur = dest_->lock_.load(kRelaxed);
+  if (cur & kLockMask) {
+    return SIXGuard{std::exchange(dest_, nullptr), qid_, static_cast<uint32_t>(cur & kVersionMask)};
+  };
 
+  const auto qid = tls_holder.GetQID();
+  auto *qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto expected = ver_;
   SpinWithBackoff(
-      [](std::atomic_uint64_t *lock, uint32_t *ver, uint32_t expected, uint32_t mask) -> bool {
+      [](std::atomic_uint64_t *lock, uint32_t *ver, uint32_t expected, uint32_t mask,
+         uint32_t qid) -> bool {
         auto cur = lock->load(kAcquire);
-        if (cur & kXLock) return false;
+        const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
+        if (cur & kLockMask) return false;
         *ver = static_cast<uint32_t>(cur);
         return ((*ver ^ expected) & mask)
-               || ((cur & kXMask) == kNoLocks
-                   && lock->compare_exchange_weak(cur, cur, kRelaxed, kRelaxed));
+               || ((cur & kXLock) == kNoLocks
+                   && lock->compare_exchange_weak(cur, new_tail, kRelaxed, kRelaxed));
       },
-      &(dest_->lock_), &ver_, ver_, mask);
+      &(dest_->lock_), &ver_, ver_, mask, qid);
 
-  return ((ver_ ^ expected) & mask) ? SIXGuard{}
-                                    : SIXGuard{std::exchange(dest_, nullptr), qid_, ver_};
+  return ((ver_ ^ expected) & mask)
+             ? SIXGuard{dest_, qid, static_cast<uint32_t>(cur & kVersionMask)}
+             : SIXGuard{std::exchange(dest_, nullptr), qid,
+                        static_cast<uint32_t>(cur & kVersionMask)};
 }
 
 auto
@@ -507,24 +516,31 @@ OMCSLock::OptGuard::TryLockX(  //
     const uint32_t mask)       //
     -> XGuard
 {
-  if (has_lock_) {
-    dest_->lock_.fetch_sub(kSLock, kRelaxed);
-    has_lock_ = false;
-  }
+  std::atomic_thread_fence(kRelease);
+  auto cur = dest_->lock_.load(kRelaxed);
+  if (cur & kLockMask) {
+    return XGuard{std::exchange(dest_, nullptr), qid_, static_cast<uint32_t>(cur & kVersionMask)};
+  };
 
+  const auto qid = tls_holder.GetQID();
+  auto *qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto expected = ver_;
   SpinWithBackoff(
-      [](std::atomic_uint64_t *lock, uint32_t *ver, uint32_t expected, uint32_t mask) -> bool {
+      [](std::atomic_uint64_t *lock, uint32_t *ver, uint32_t expected, uint32_t mask,
+         uint32_t qid) -> bool {
         auto cur = lock->load(kAcquire);
-        if (cur & kXLock) return false;
+        const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
+        if (cur & kLockMask) return false;
         *ver = static_cast<uint32_t>(cur);
         return ((*ver ^ expected) & mask)
                || ((cur & kLockMask) == kNoLocks
-                   && lock->compare_exchange_weak(cur, cur | kXLock, kRelaxed, kRelaxed));
+                   && lock->compare_exchange_weak(cur, new_tail, kRelaxed, kRelaxed));
       },
-      &(dest_->lock_), &ver_, ver_, mask);
+      &(dest_->lock_), &ver_, ver_, mask, qid);
 
-  return ((ver_ ^ expected) & mask) ? XGuard{} : XGuard{std::exchange(dest_, nullptr), qid_, ver_};
+  return ((ver_ ^ expected) & mask) ? XGuard{dest_, qid, static_cast<uint32_t>(cur & kVersionMask)}
+                                    : XGuard{std::exchange(dest_, nullptr), qid,
+                                             static_cast<uint32_t>(cur & kVersionMask)};
 }
 
 /*############################################################################*
