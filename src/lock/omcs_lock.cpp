@@ -450,14 +450,14 @@ OMCSLock::OptGuard::TryLockS(  //
   std::atomic_thread_fence(kRelease);
   auto cur = dest_->lock_.load(kRelaxed);
   if (cur & kXLock) {
-    return SGuard{std::exchange(dest_, nullptr), qid_, static_cast<uint32_t>(cur & kVersionMask)};
+    return SGuard{};
   };
 
+  const auto expected = ver_;
   auto qid = tls_holder.GetQID();
   auto *qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
   qnode->lock_state.store(kNull, kRelaxed);
   const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kSLock;
-  const auto expected = ver_;
 
   auto tail_qid = (cur & kQIDMask) >> kQIDShift;
   while (true) {
@@ -471,11 +471,33 @@ OMCSLock::OptGuard::TryLockS(  //
 
   tls_holder.ReleaseQID(qid);
   qid = (cur & kQIDMask) >> kQIDShift;
+  qnode = QNodeHolder::GetQNode(qid);
+  if (cur & kXLock) {  // wait for the predecessor to release the lock
+    while (((cur & kQIDMask) >> kQIDShift) == qid && (cur & kXLock)) {
+      std::this_thread::yield();
+      cur = dest_->lock_.load(kAcquire);
+    }
+    auto *next_ptr = qnode->next.load(kAcquire);
+    if (((cur & kQIDMask) >> kQIDShift) != qid) {
+      while (true) {  // wait until successor fills in its next field
+        next_ptr = qnode->next.load(kRelaxed);
+        if (next_ptr) break;
+        CPP_UTILITY_SPINLOCK_HINT
+      }
+
+      while (next_ptr->lock_state.load(kRelaxed) & kXLock) {
+        std::this_thread::yield();
+      }
+    }
+  }
+  ver_ = qnode->lock_state & kVersionMask;
 
 end:
-  return ((ver_ ^ expected) & mask) ? SGuard{dest_, qid, static_cast<uint32_t>(cur & kVersionMask)}
-                                    : SGuard{std::exchange(dest_, nullptr), qid_,
-                                             static_cast<uint32_t>(cur & kVersionMask)};
+  if (((ver_ ^ expected) & mask)) {
+    dest_->UnlockS(qid_);
+  } else {
+    return SGuard{std::exchange(dest_, nullptr), qid, static_cast<uint32_t>(cur & kVersionMask)};
+  }
 }
 
 auto
@@ -485,30 +507,37 @@ OMCSLock::OptGuard::TryLockSIX(  //
 {
   std::atomic_thread_fence(kRelease);
   auto cur = dest_->lock_.load(kRelaxed);
-  if (cur & kLockMask) {
-    return SIXGuard{std::exchange(dest_, nullptr), qid_, static_cast<uint32_t>(cur & kVersionMask)};
+  if (cur & kXLock) {
+    return SIXGuard{};
   };
 
+  const auto expected = ver_;
   const auto qid = tls_holder.GetQID();
   auto *qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
-  const auto expected = ver_;
-  SpinWithBackoff(
-      [](std::atomic_uint64_t *lock, uint32_t *ver, uint32_t expected, uint32_t mask,
-         uint32_t qid) -> bool {
-        auto cur = lock->load(kAcquire);
-        const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
-        if (cur & kLockMask) return false;
-        *ver = static_cast<uint32_t>(cur);
-        return ((*ver ^ expected) & mask)
-               || ((cur & kXLock) == kNoLocks
-                   && lock->compare_exchange_weak(cur, new_tail, kRelaxed, kRelaxed));
-      },
-      &(dest_->lock_), &ver_, ver_, mask, qid);
+  const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
-  return ((ver_ ^ expected) & mask)
-             ? SIXGuard{dest_, qid, static_cast<uint32_t>(cur & kVersionMask)}
-             : SIXGuard{std::exchange(dest_, nullptr), qid,
-                        static_cast<uint32_t>(cur & kVersionMask)};
+  while (true) {
+    if (dest_->lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
+    CPP_UTILITY_SPINLOCK_HINT
+  }
+
+  if ((cur & kLockMask) != kNoLocks) {
+    // wait until predecessor gives up the lock
+    auto *pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
+    pred_qnode->next.store(qnode, kRelaxed);
+    while (qnode->lock_state.load(kAcquire) & kXLock) {
+      std::this_thread::yield();
+    }
+    // disable opportunistic read
+    cur = dest_->lock_.fetch_xor(kOPReadFlag, kAcquire);
+  }
+  ver_ = qnode->lock_state & kVersionMask;
+
+  if (((ver_ ^ expected) & mask)) {
+    dest_->UnlockSIX(qid_, ver_);
+  } else {
+    return SIXGuard{std::exchange(dest_, nullptr), qid, static_cast<uint32_t>(cur & kVersionMask)};
+  }
 }
 
 auto
@@ -519,28 +548,36 @@ OMCSLock::OptGuard::TryLockX(  //
   std::atomic_thread_fence(kRelease);
   auto cur = dest_->lock_.load(kRelaxed);
   if (cur & kLockMask) {
-    return XGuard{std::exchange(dest_, nullptr), qid_, static_cast<uint32_t>(cur & kVersionMask)};
+    return XGuard{};
   };
 
+  const auto expected = ver_;
   const auto qid = tls_holder.GetQID();
   auto *qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
-  const auto expected = ver_;
-  SpinWithBackoff(
-      [](std::atomic_uint64_t *lock, uint32_t *ver, uint32_t expected, uint32_t mask,
-         uint32_t qid) -> bool {
-        auto cur = lock->load(kAcquire);
-        const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
-        if (cur & kLockMask) return false;
-        *ver = static_cast<uint32_t>(cur);
-        return ((*ver ^ expected) & mask)
-               || ((cur & kLockMask) == kNoLocks
-                   && lock->compare_exchange_weak(cur, new_tail, kRelaxed, kRelaxed));
-      },
-      &(dest_->lock_), &ver_, ver_, mask, qid);
+  const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
-  return ((ver_ ^ expected) & mask) ? XGuard{dest_, qid, static_cast<uint32_t>(cur & kVersionMask)}
-                                    : XGuard{std::exchange(dest_, nullptr), qid,
-                                             static_cast<uint32_t>(cur & kVersionMask)};
+  while (true) {
+    if (dest_->lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
+    CPP_UTILITY_SPINLOCK_HINT
+  }
+
+  if ((cur & kLockMask) != kNoLocks) {
+    // wait until predecessor gives up the lock
+    auto *pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
+    pred_qnode->next.store(qnode, kRelaxed);
+    while (!qnode->hold_lock.load(kRelaxed)) {
+      std::this_thread::yield();
+    }
+    // disable opportunistic read
+    cur = dest_->lock_.fetch_xor(kOPReadFlag, kAcquire);
+  }
+  ver_ = qnode->lock_state & kVersionMask;
+
+  if (((ver_ ^ expected) & mask)) {
+    dest_->UnlockX(qid_, ver_);
+  } else {
+    return XGuard{std::exchange(dest_, nullptr), qid, static_cast<uint32_t>(cur & kVersionMask)};
+  }
 }
 
 /*############################################################################*
