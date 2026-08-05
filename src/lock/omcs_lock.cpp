@@ -534,7 +534,7 @@ OMCSLock::OptGuard::TryLockSIX(  //
     // disable opportunistic read
     cur = dest_->lock_.fetch_xor(kOPReadFlag, kAcquire);
   }
-  ver_ = qnode->lock_state & kVersionMask;
+  ver_ = cur & kVersionMask;
 
   if ((ver_ ^ expected) & mask) {
     dest_->UnlockSIX(qid, ver_);
@@ -576,7 +576,7 @@ OMCSLock::OptGuard::TryLockX(  //
     // disable opportunistic read
     cur = dest_->lock_.fetch_xor(kOPReadFlag, kAcquire);
   }
-  ver_ = qnode->lock_state & kVersionMask;
+  ver_ = cur & kVersionMask;
 
   if ((ver_ ^ expected) & mask) {
     dest_->UnlockX(qid, ver_);
