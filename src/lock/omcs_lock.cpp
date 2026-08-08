@@ -491,7 +491,7 @@ OMCSLock::OptGuard::TryLockS(  //
       }
     }
   }
-  ver_ = qnode->lock_state & kVersionMask;
+  ver_ = cur & kVersionMask;
 
 end:
   if ((ver_ ^ expected) & mask) {
@@ -520,6 +520,7 @@ OMCSLock::OptGuard::TryLockSIX(  //
       tls_holder.ReleaseQID(qid);
       return SIXGuard{};
     }
+    qnode->lock_state.store(cur & kLockMask, kRelaxed);
     if (dest_->lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
@@ -595,7 +596,7 @@ OMCSLock::SIXGuard::operator=(  //
     -> SIXGuard &
 {
   if (dest_) {
-    dest_->UnlockSIX(qid_, new_ver_);
+    dest_->UnlockSIX(qid_, ver_);
   }
   dest_ = std::exchange(rhs.dest_, nullptr);
   qid_ = rhs.qid_;
@@ -605,7 +606,7 @@ OMCSLock::SIXGuard::operator=(  //
 OMCSLock::SIXGuard::~SIXGuard()
 {
   if (dest_) {
-    dest_->UnlockSIX(qid_, new_ver_);
+    dest_->UnlockSIX(qid_, ver_);
   }
 }
 
@@ -622,7 +623,7 @@ OMCSLock::SIXGuard::UpgradeToX()  //
     if ((next_state & kSMask) == kNoLocks) break;
     std::this_thread::yield();
   }
-  return XGuard{std::exchange(dest_, nullptr), qid_, new_ver_};
+  return XGuard{std::exchange(dest_, nullptr), qid_, ver_};
 }
 /*############################################################################*
  * Shared lock guards

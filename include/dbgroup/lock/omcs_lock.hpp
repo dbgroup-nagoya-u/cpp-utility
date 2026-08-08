@@ -146,7 +146,7 @@ class OMCSLock
         OMCSLock *dest,
         const uint64_t qid,
         const uint32_t ver) noexcept
-        : dest_{dest}, qid_{qid}, old_ver_{ver}, new_ver_{ver + 1U}
+        : dest_{dest}, qid_{qid}, ver_{ver}
     {
     }
 
@@ -154,10 +154,7 @@ class OMCSLock
 
     constexpr SIXGuard(  //
         SIXGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)},
-          qid_{obj.qid_},
-          old_ver_{obj.old_ver_},
-          new_ver_{obj.new_ver_}
+        : dest_{std::exchange(obj.dest_, nullptr)}, qid_{obj.qid_}, ver_{obj.ver_}
     {
     }
 
@@ -209,10 +206,7 @@ class OMCSLock
     uint64_t qid_{};
 
     /// @brief A version when creating this guard.
-    uint32_t old_ver_{};
-
-    /// @brief A version when failing verification.
-    uint32_t new_ver_{};
+    uint32_t ver_{};
   };
 
   /**
