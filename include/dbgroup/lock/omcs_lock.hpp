@@ -40,6 +40,7 @@ class OMCSLock
 
   // forward declarations
   class XGuard;
+
   /*##########################################################################*
    * Public constants
    *##########################################################################*/
@@ -69,26 +70,30 @@ class OMCSLock
      * @param ver The current version.
      */
     constexpr SGuard(  //
-        OMCSLock *dest,
+        OMCSLock* dest,
         const uint64_t qid,
         const uint32_t ver) noexcept
-        : dest_{dest}, qid_{qid}, ver_{ver}
+        : dest_{dest}
+        , qid_{qid}
+        , ver_{ver}
     {
     }
-
-    SGuard(const SGuard &) = delete;
 
     constexpr SGuard(  //
-        SGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)}, qid_{obj.qid_}, ver_{obj.ver_}
+        SGuard&& obj) noexcept
+        : dest_{std::exchange(obj.dest_, nullptr)}
+        , qid_{obj.qid_}
+        , ver_{obj.ver_}
     {
     }
 
-    auto operator=(const SGuard &) -> SGuard & = delete;
-
     auto operator=(             //
-        SGuard &&rhs) noexcept  //
-        -> SGuard &;
+        SGuard&& rhs) noexcept  //
+        -> SGuard&;
+
+    // forbit copying
+    SGuard(const SGuard&) = delete;
+    auto operator=(const SGuard&) -> SGuard& = delete;
 
     /*########################################################################*
      * Public destructors
@@ -116,7 +121,7 @@ class OMCSLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    OMCSLock *dest_{};
+    OMCSLock* dest_{};
 
     /// @brief The corresponding queue node for unlocking.
     uint64_t qid_{};
@@ -143,26 +148,30 @@ class OMCSLock
      * @param ver The current version.
      */
     constexpr SIXGuard(  //
-        OMCSLock *dest,
+        OMCSLock* dest,
         const uint64_t qid,
         const uint32_t ver) noexcept
-        : dest_{dest}, qid_{qid}, ver_{ver}
+        : dest_{dest}
+        , qid_{qid}
+        , ver_{ver}
     {
     }
 
-    SIXGuard(const SIXGuard &) = delete;
+    SIXGuard(const SIXGuard&) = delete;
 
     constexpr SIXGuard(  //
-        SIXGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)}, qid_{obj.qid_}, ver_{obj.ver_}
+        SIXGuard&& obj) noexcept
+        : dest_{std::exchange(obj.dest_, nullptr)}
+        , qid_{obj.qid_}
+        , ver_{obj.ver_}
     {
     }
 
-    auto operator=(const SIXGuard &) -> SIXGuard & = delete;
+    auto operator=(const SIXGuard&) -> SIXGuard& = delete;
 
     auto operator=(               //
-        SIXGuard &&rhs) noexcept  //
-        -> SIXGuard &;
+        SIXGuard&& rhs) noexcept  //
+        -> SIXGuard&;
 
     /*########################################################################*
      * Public destructors
@@ -200,7 +209,7 @@ class OMCSLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    OMCSLock *dest_{};
+    OMCSLock* dest_{};
 
     /// @brief The corresponding queue node for unlocking.
     uint64_t qid_{};
@@ -227,29 +236,32 @@ class OMCSLock
      * @param ver The current version.
      */
     constexpr XGuard(  //
-        OMCSLock *dest,
+        OMCSLock* dest,
         const uint64_t qid,
         const uint32_t ver) noexcept
-        : dest_{dest}, qid_{qid}, old_ver_{ver}, new_ver_{ver + 1U}
+        : dest_{dest}
+        , qid_{qid}
+        , old_ver_{ver}
+        , new_ver_{ver + 1U}
     {
     }
-
-    XGuard(const XGuard &) = delete;
 
     constexpr XGuard(  //
-        XGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)},
-          qid_{obj.qid_},
-          old_ver_{obj.old_ver_},
-          new_ver_{obj.new_ver_}
+        XGuard&& obj) noexcept
+        : dest_{std::exchange(obj.dest_, nullptr)}
+        , qid_{obj.qid_}
+        , old_ver_{obj.old_ver_}
+        , new_ver_{obj.new_ver_}
     {
     }
 
-    auto operator=(const XGuard &) -> XGuard & = delete;
-
     auto operator=(             //
-        XGuard &&rhs) noexcept  //
-        -> XGuard &;
+        XGuard&& rhs) noexcept  //
+        -> XGuard&;
+
+    // forbit copying
+    XGuard(const XGuard&) = delete;
+    auto operator=(const XGuard&) -> XGuard& = delete;
 
     /*########################################################################*
      * Public destructors
@@ -319,7 +331,7 @@ class OMCSLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    OMCSLock *dest_{};
+    OMCSLock* dest_{};
 
     /// @brief The corresponding queue node for unlocking.
     uint64_t qid_{};
@@ -349,28 +361,30 @@ class OMCSLock
      * @param ver The current version.
      */
     constexpr OptGuard(  //
-        OMCSLock *dest,
+        OMCSLock* dest,
         const uint32_t ver) noexcept
-        : dest_{dest}, ver_{ver}
+        : dest_{dest}
+        , ver_{ver}
     {
     }
 
     constexpr OptGuard(  //
-        OptGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)},
-          qid_{obj.qid_},
-          ver_{obj.ver_},
-          retry_num_{obj.retry_num_},
-          has_lock_{std::exchange(obj.has_lock_, false)}
+        OptGuard&& obj) noexcept
+        : dest_{std::exchange(obj.dest_, nullptr)}
+        , qid_{obj.qid_}
+        , ver_{obj.ver_}
+        , retry_num_{obj.retry_num_}
+        , has_lock_{std::exchange(obj.has_lock_, false)}
     {
     }
 
-    constexpr OptGuard(const OptGuard &) noexcept = default;
     auto operator=(               //
-        OptGuard &&rhs) noexcept  //
-        -> OptGuard &;
+        OptGuard&& rhs) noexcept  //
+        -> OptGuard&;
 
-    constexpr auto operator=(const OptGuard &) noexcept -> OptGuard & = default;
+    // forbit copying
+    OptGuard(const OptGuard&) = delete;
+    auto operator=(const OptGuard&) -> OptGuard& = delete;
 
     /*########################################################################*
      * Public destructors
@@ -465,7 +479,7 @@ class OMCSLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    OMCSLock *dest_{};
+    OMCSLock* dest_{};
 
     /// @brief The corresponding queue node for unlocking.
     uint64_t qid_{};
@@ -486,11 +500,11 @@ class OMCSLock
 
   constexpr OMCSLock() noexcept = default;
 
-  OMCSLock(const OMCSLock &) = delete;
-  OMCSLock(OMCSLock &&) = delete;
+  OMCSLock(const OMCSLock&) = delete;
+  OMCSLock(OMCSLock&&) = delete;
 
-  auto operator=(const OMCSLock &) -> OMCSLock & = delete;
-  auto operator=(OMCSLock &&) -> OMCSLock & = delete;
+  auto operator=(const OMCSLock&) -> OMCSLock& = delete;
+  auto operator=(OMCSLock&&) -> OMCSLock& = delete;
 
   /*##########################################################################*
    * Public destructors

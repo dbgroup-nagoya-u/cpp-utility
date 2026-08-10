@@ -19,15 +19,9 @@
 
 // C++ standard libraries
 #include <atomic>
-#include <bit>
 #include <cstdint>
-#include <functional>
 #include <thread>
 #include <utility>
-#include <vector>
-
-// temp
-#include <stdexcept>
 
 // local sources
 #include "dbgroup/constants.hpp"
@@ -48,7 +42,7 @@ namespace
  */
 struct QNode {
   /// @brief The next queue node if exist.
-  std::atomic<QNode *> next;
+  std::atomic<QNode*> next;
 
   /// @brief A flag for indicating this node's owner holds a lock.
   std::atomic_bool hold_lock;
@@ -83,7 +77,7 @@ constexpr uint64_t kSLock = 1UL << 48UL;
 constexpr uint64_t kXMask = kXLock;
 
 /// @brief A bit mask for extracting an X-lock state and opportunistic read flag.
-constexpr uint64_t kXAndOPReadMask = kXLock | kOPReadFlag;
+constexpr uint64_t kXAndOPReadMask = kXMask | kOPReadFlag;
 
 /// @brief A bit mask for extracting a version value.
 constexpr uint64_t kVersionMask = ~(~0UL << 32UL);
@@ -134,7 +128,7 @@ OMCSLock::LockS()  //
     -> SGuard
 {
   auto qid = tls_holder.GetQID();
-  auto *qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
+  auto* qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
   qnode->lock_state.store(kNull, kRelaxed);
   const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kSLock;
 
@@ -157,7 +151,7 @@ OMCSLock::LockS()  //
       std::this_thread::yield();
       cur = lock_.load(kAcquire);
     }
-    auto *next_ptr = qnode->next.load(kAcquire);
+    auto* next_ptr = qnode->next.load(kAcquire);
     if (((cur & kQIDMask) >> kQIDShift) != qid) {
       while (true) {  // wait until successor fills in its next field
         next_ptr = qnode->next.load(kRelaxed);
@@ -179,7 +173,7 @@ OMCSLock::LockSIX()  //
     -> SIXGuard
 {
   const auto qid = tls_holder.GetQID();
-  auto *qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
+  auto* qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
   auto cur = lock_.load(kRelaxed);
@@ -191,7 +185,7 @@ OMCSLock::LockSIX()  //
 
   if ((cur & kLockMask) != kNoLocks) {
     // wait until predecessor gives up the lock
-    auto *pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
+    auto* pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
     pred_qnode->next.store(qnode, kRelaxed);
     while (qnode->lock_state.load(kAcquire) & kXLock) {
       std::this_thread::yield();
@@ -209,7 +203,7 @@ OMCSLock::LockX()  //
     -> XGuard
 {
   const auto qid = tls_holder.GetQID();
-  auto *qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
+  auto* qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
   auto cur = lock_.load(kRelaxed);
@@ -220,7 +214,7 @@ OMCSLock::LockX()  //
 
   if ((cur & kLockMask) != kNoLocks) {
     // wait until predecessor gives up the lock
-    auto *pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
+    auto* pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
     pred_qnode->next.store(qnode, kRelaxed);
     while (!qnode->hold_lock.load(kRelaxed)) {
       std::this_thread::yield();
@@ -240,9 +234,9 @@ void
 OMCSLock::UnlockS(  //
     const uint64_t qid)
 {
-  auto *qnode = QNodeHolder::GetQNode(qid);
+  auto* qnode = QNodeHolder::GetQNode(qid);
 
-  auto *next_node = qnode->next.load(kAcquire);
+  auto* next_node = qnode->next.load(kAcquire);
   if (next_node == nullptr) {  // this is the tail node
     auto cur = lock_.load(kRelaxed);
     while (((cur & kQIDMask) >> kQIDShift) == qid) {
@@ -273,9 +267,9 @@ OMCSLock::UnlockSIX(  //
     const uint64_t qid,
     const uint64_t ver)
 {
-  auto *qnode = QNodeHolder::GetQNode(qid);
+  auto* qnode = QNodeHolder::GetQNode(qid);
 
-  auto *next_ptr = qnode->next.load(kAcquire);
+  auto* next_ptr = qnode->next.load(kAcquire);
   if (next_ptr == nullptr) {  // this is the tail node
     auto cur = lock_.load(kRelaxed);
     while (((cur & kQIDMask) >> kQIDShift) == qid) {
@@ -307,9 +301,9 @@ OMCSLock::UnlockX(  //
     const uint64_t qid,
     const uint64_t ver)
 {
-  auto *qnode = QNodeHolder::GetQNode(qid);
+  auto* qnode = QNodeHolder::GetQNode(qid);
 
-  auto *next_ptr = qnode->next.load(kAcquire);
+  auto* next_ptr = qnode->next.load(kAcquire);
   if (next_ptr == nullptr) {  // this is the tail node
     auto cur = lock_.load(kRelaxed);
     while (((cur & kQIDMask) >> kQIDShift) == qid) {
@@ -341,8 +335,8 @@ OMCSLock::UnlockX(  //
 
 auto
 OMCSLock::XGuard::operator=(  //
-    XGuard &&rhs) noexcept    //
-    -> XGuard &
+    XGuard&& rhs) noexcept    //
+    -> XGuard&
 {
   if (dest_) {
     dest_->UnlockX(qid_, new_ver_);
@@ -367,8 +361,8 @@ OMCSLock::XGuard::~XGuard()
 
 auto
 OMCSLock::OptGuard::operator=(  //
-    OptGuard &&rhs) noexcept    //
-    -> OptGuard &
+    OptGuard&& rhs) noexcept    //
+    -> OptGuard&
 {
   if (dest_ && has_lock_) {
     dest_->UnlockS(qid_);
@@ -450,7 +444,7 @@ OMCSLock::OptGuard::TryLockS(  //
   std::atomic_thread_fence(kRelease);
   const auto expected = ver_;
   auto qid = tls_holder.GetQID();
-  auto *qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
+  auto* qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kSLock;
 
   std::atomic_thread_fence(kRelease);
@@ -478,7 +472,7 @@ OMCSLock::OptGuard::TryLockS(  //
       std::this_thread::yield();
       cur = dest_->lock_.load(kAcquire);
     }
-    auto *next_ptr = qnode->next.load(kAcquire);
+    auto* next_ptr = qnode->next.load(kAcquire);
     if (((cur & kQIDMask) >> kQIDShift) != qid) {
       while (true) {  // wait until successor fills in its next field
         next_ptr = qnode->next.load(kRelaxed);
@@ -509,7 +503,7 @@ OMCSLock::OptGuard::TryLockSIX(  //
   std::atomic_thread_fence(kRelease);
   const auto expected = ver_;
   const auto qid = tls_holder.GetQID();
-  auto *qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
+  auto* qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
   std::atomic_thread_fence(kRelease);
@@ -527,7 +521,7 @@ OMCSLock::OptGuard::TryLockSIX(  //
 
   if ((cur & kLockMask) != kNoLocks) {
     // wait until predecessor gives up the lock
-    auto *pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
+    auto* pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
     pred_qnode->next.store(qnode, kRelaxed);
     while (qnode->lock_state.load(kAcquire) & kXLock) {
       std::this_thread::yield();
@@ -552,7 +546,7 @@ OMCSLock::OptGuard::TryLockX(  //
   std::atomic_thread_fence(kRelease);
   const auto expected = ver_;
   const auto qid = tls_holder.GetQID();
-  auto *qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
+  auto* qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
   std::atomic_thread_fence(kRelease);
@@ -569,7 +563,7 @@ OMCSLock::OptGuard::TryLockX(  //
 
   if ((cur & kLockMask) != kNoLocks) {
     // wait until predecessor gives up the lock
-    auto *pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
+    auto* pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
     pred_qnode->next.store(qnode, kRelaxed);
     while (!qnode->hold_lock.load(kRelaxed)) {
       std::this_thread::yield();
@@ -592,8 +586,8 @@ OMCSLock::OptGuard::TryLockX(  //
 
 auto
 OMCSLock::SIXGuard::operator=(  //
-    SIXGuard &&rhs) noexcept    //
-    -> SIXGuard &
+    SIXGuard&& rhs) noexcept    //
+    -> SIXGuard&
 {
   if (dest_) {
     dest_->UnlockSIX(qid_, ver_);
@@ -616,7 +610,7 @@ OMCSLock::SIXGuard::UpgradeToX()  //
 {
   if (dest_ == nullptr) return XGuard{};
 
-  auto *qnode = QNodeHolder::GetQNode(qid_);
+  auto* qnode = QNodeHolder::GetQNode(qid_);
   uint64_t next_state;
   while (true) {  // wait for shared lock holders to release their locks
     next_state = qnode->lock_state.load(kRelaxed);
@@ -631,8 +625,8 @@ OMCSLock::SIXGuard::UpgradeToX()  //
 
 auto
 OMCSLock::SGuard::operator=(  //
-    SGuard &&rhs) noexcept    //
-    -> SGuard &
+    SGuard&& rhs) noexcept    //
+    -> SGuard&
 {
   if (dest_) {
     dest_->UnlockS(qid_);
