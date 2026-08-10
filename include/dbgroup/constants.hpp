@@ -19,7 +19,10 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <bit>
+#include <concepts>
 #include <cstddef>
+#include <cstdint>
 #include <new>
 
 namespace dbgroup
@@ -169,6 +172,75 @@ GetAlignValOnVirtualPages(       //
     -> std::align_val_t
 {
   return static_cast<std::align_val_t>(size < kVMPageSize ? size : kVMPageSize);
+}
+
+/**
+ * @param addr A target address or size.
+ * @return The aligned address on virtual pages.
+ * @note The addresss may be rounded down for alignment.
+ */
+constexpr auto
+FloorOnVirtualPages(               //
+    const uint64_t addr) noexcept  //
+    -> uint64_t
+{
+  return addr & ~(kVMPageSize - 1UL);
+}
+
+/**
+ * @param addr A target address or size.
+ * @return The aligned address on virtual pages.
+ * @note The addresss may be rounded up for alignment.
+ */
+constexpr auto
+CeilOnVirtualPages(                //
+    const uint64_t addr) noexcept  //
+    -> uint64_t
+{
+  constexpr auto kFillBits = kVMPageSize - 1UL;
+  return (addr + kFillBits) & ~kFillBits;
+}
+
+/**
+ * @brief Shift a memory address by a byte offset.
+ *
+ * @tparam T An integral type.
+ * @param addr An original address.
+ * @param offset An offset in bytes.
+ * @return A shifted address.
+ */
+template <std::integral T>
+constexpr auto
+ShiftAddr(  //
+    const void* const addr,
+    const T offset) noexcept  //
+    -> void*
+{
+  return std::bit_cast<std::byte*>(addr) + offset;
+}
+
+/**
+ * @tparam T1 Unsigned integers or pointers.
+ * @tparam T2 Unsigned integers or pointers.
+ * @param base A base address.
+ * @param rel A destination address.
+ * @return The offset between `base` and `rel` (`rel` - `base`).
+ */
+template <class T1, class T2>
+constexpr auto
+GetOffsetBetween(  //
+    const T1 base,
+    const T2 rel) noexcept  //
+    -> int64_t
+{
+  static_assert(                                              //
+      std::is_same_v<T1, uint64_t> || std::is_pointer_v<T1>,  //
+      "The first argument must be address values or pointers.");
+  static_assert(                                              //
+      std::is_same_v<T2, uint64_t> || std::is_pointer_v<T2>,  //
+      "The second argument must be address values or pointers.");
+
+  return std::bit_cast<std::int64_t>(rel) - std::bit_cast<std::int64_t>(base);
 }
 
 }  // namespace dbgroup

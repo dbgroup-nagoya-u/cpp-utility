@@ -18,11 +18,9 @@
 #define CPP_UTILITY_DBGROUP_LOCK_UTILITY_HPP_
 
 // C++ standard libraries
-#include <atomic>
 #include <chrono>
 #include <concepts>
 #include <cstddef>
-#include <functional>
 #include <thread>
 
 // define spinlock hints if exist
@@ -45,9 +43,9 @@ namespace dbgroup::lock
  * @tparam T A target class.
  */
 template <class T>
-concept GuardClass = requires(T &x) {
+concept GuardClass = requires(T& x) {
   // public APIs
-  { static_cast<bool>(x) } -> std::convertible_to<bool>;
+  { static_cast<bool>(x) } noexcept -> std::convertible_to<bool>;
 };
 
 /**
@@ -56,10 +54,10 @@ concept GuardClass = requires(T &x) {
  * @tparam T A target class.
  */
 template <class T>
-concept OptimisticXGuard = requires(T &x, uint32_t ver) {
+concept OptimisticXGuard = requires(T& x, uint32_t ver) {
   // public APIs
-  { static_cast<bool>(x) } -> std::convertible_to<bool>;
-  { x.GetVersion() } -> std::convertible_to<uint32_t>;
+  { static_cast<bool>(x) } noexcept -> std::convertible_to<bool>;
+  { x.GetVersion() } noexcept -> std::convertible_to<uint32_t>;
   x.SetVersion(ver);
 };
 
@@ -70,11 +68,15 @@ concept OptimisticXGuard = requires(T &x, uint32_t ver) {
  * @tparam XGuard A corresponding exclusive guard class.
  */
 template <class T, class XGuard>
-concept OptimisticReadGuard = requires(T &x, uint32_t mask, size_t max_retry) {
+concept OptimisticReadGuard = requires(T& x, uint32_t mask, size_t max_retry) {
   // public APIs
   { static_cast<bool>(x) } -> std::convertible_to<bool>;
-  { x.GetVersion() } -> std::convertible_to<uint32_t>;
-  { x.VerifyVersion(mask, max_retry) } -> std::convertible_to<bool>;
+  { x.GetVersion() } noexcept -> std::convertible_to<uint32_t>;
+  requires requires {
+    { x.VerifyVersion(mask) } noexcept -> std::convertible_to<bool>;
+  } || requires {
+    { x.VerifyVersion(mask, max_retry) } noexcept -> std::convertible_to<bool>;
+  };
   { x.TryLockX(mask) } -> std::convertible_to<XGuard>;
 };
 
@@ -84,7 +86,7 @@ concept OptimisticReadGuard = requires(T &x, uint32_t mask, size_t max_retry) {
  * @tparam T A target class.
  */
 template <class T>
-concept PessimisticallyLockable = requires(T &x) {
+concept PessimisticallyLockable = requires(T& x) {
   // public types
   requires GuardClass<typename T::SGuard>;
   requires GuardClass<typename T::SIXGuard>;
@@ -102,14 +104,14 @@ concept PessimisticallyLockable = requires(T &x) {
  * @tparam T A target class.
  */
 template <class T>
-concept OptimisticallyLockable = requires(T &x) {
+concept OptimisticallyLockable = requires(T& x) {
   // public types
   requires OptimisticXGuard<typename T::XGuard>;
   requires OptimisticReadGuard<typename T::OptGuard, typename T::XGuard>;
 
   // public APIs
   { x.LockX() } -> std::convertible_to<typename T::XGuard>;
-  { x.GetVersion() } -> std::convertible_to<typename T::OptGuard>;
+  { x.GetVersion() } noexcept -> std::convertible_to<typename T::OptGuard>;
 };
 
 /**
@@ -158,6 +160,30 @@ SpinWithBackoff(  //
       CPP_UTILITY_SPINLOCK_HINT
     }
     std::this_thread::sleep_for(kBackOffTime);
+  }
+}
+
+/**
+ * @brief Execute a given procedure with spinning and yield.
+ *
+ * @param proc A target procedure.
+ * @param args Arguments for executing a given procedure.
+ * @tparam Func A function pointer.
+ * @tparam Args A parameter pack for calling a given function.
+ */
+template <class Func, class... Args>
+void
+SpinWithYield(  //
+    Func proc,
+    Args... args)
+{
+  while (true) {
+    for (size_t i = 0; true; ++i) {
+      if (proc(args...)) return;
+      if (i >= kRetryNum) break;
+      CPP_UTILITY_SPINLOCK_HINT
+    }
+    std::this_thread::yield();
   }
 }
 

@@ -22,7 +22,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>
-#include <string>
 
 namespace dbgroup::random
 {
@@ -41,7 +40,9 @@ ZipfDistribution<IntType>::ZipfDistribution(  //
     const IntType min,
     const IntType max,
     const double alpha)
-    : min_{min}, max_{max}, alpha_{alpha}
+    : min_{min}
+    , max_{max}
+    , alpha_{alpha}
 {
   if (max < min) {
     throw std::runtime_error{"The maximum value must be greater than the minimum one."};
@@ -91,7 +92,9 @@ ApproxZipfDistribution<IntType>::ApproxZipfDistribution(  //
     const IntType min,
     const IntType max,
     const double alpha)
-    : min_{min}, max_{max}, alpha_{alpha}
+    : min_{min}
+    , max_{max}
+    , alpha_{alpha}
 {
   if (max < min) {
     throw std::runtime_error{"The maximum value must be greater than the minimum one."};

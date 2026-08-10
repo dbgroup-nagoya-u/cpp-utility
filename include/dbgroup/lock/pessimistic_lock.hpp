@@ -57,24 +57,24 @@ class PessimisticLock
      * @param dest The address of a target lock.
      */
     constexpr explicit SGuard(  //
-        PessimisticLock *dest) noexcept
+        PessimisticLock* const dest) noexcept
         : dest_{dest}
     {
     }
 
-    SGuard(const SGuard &) = delete;
+    SGuard(const SGuard&) = delete;
 
     constexpr SGuard(  //
-        SGuard &&obj) noexcept
+        SGuard&& obj) noexcept
         : dest_{std::exchange(obj.dest_, nullptr)}
     {
     }
 
-    auto operator=(const SGuard &) -> SGuard & = delete;
+    auto operator=(const SGuard&) -> SGuard& = delete;
 
     auto operator=(             //
-        SGuard &&rhs) noexcept  //
-        -> SGuard &;
+        SGuard&& rhs) noexcept  //
+        -> SGuard&;
 
     /*########################################################################*
      * Public destructors
@@ -102,7 +102,7 @@ class PessimisticLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    PessimisticLock *dest_{};
+    PessimisticLock* dest_{};
   };
 
   /**
@@ -122,24 +122,24 @@ class PessimisticLock
      * @param dest The address of a target lock.
      */
     constexpr explicit SIXGuard(  //
-        PessimisticLock *dest) noexcept
+        PessimisticLock* const dest) noexcept
         : dest_{dest}
     {
     }
 
-    SIXGuard(const SIXGuard &) = delete;
+    SIXGuard(const SIXGuard&) = delete;
 
     constexpr SIXGuard(  //
-        SIXGuard &&obj) noexcept
+        SIXGuard&& obj) noexcept
         : dest_{std::exchange(obj.dest_, nullptr)}
     {
     }
 
-    auto operator=(const SIXGuard &) -> SIXGuard & = delete;
+    auto operator=(const SIXGuard&) -> SIXGuard& = delete;
 
     auto operator=(               //
-        SIXGuard &&rhs) noexcept  //
-        -> SIXGuard &;
+        SIXGuard&& rhs) noexcept  //
+        -> SIXGuard&;
 
     /*########################################################################*
      * Public destructors
@@ -168,7 +168,8 @@ class PessimisticLock
      * @note After calling the function, this lock guard abandons the lock's
      * ownership.
      */
-    [[nodiscard]] auto UpgradeToX()  //
+    [[nodiscard]]
+    auto UpgradeToX()  //
         -> XGuard;
 
    private:
@@ -177,7 +178,7 @@ class PessimisticLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    PessimisticLock *dest_{};
+    PessimisticLock* dest_{};
   };
 
   /**
@@ -197,24 +198,24 @@ class PessimisticLock
      * @param dest The address of a target lock.
      */
     constexpr explicit XGuard(  //
-        PessimisticLock *dest) noexcept
+        PessimisticLock* const dest) noexcept
         : dest_{dest}
     {
     }
 
-    XGuard(const XGuard &) = delete;
+    XGuard(const XGuard&) = delete;
 
     constexpr XGuard(  //
-        XGuard &&obj) noexcept
+        XGuard&& obj) noexcept
         : dest_{std::exchange(obj.dest_, nullptr)}
     {
     }
 
-    auto operator=(const XGuard &) -> XGuard & = delete;
+    auto operator=(const XGuard&) -> XGuard& = delete;
 
     auto operator=(             //
-        XGuard &&rhs) noexcept  //
-        -> XGuard &;
+        XGuard&& rhs) noexcept  //
+        -> XGuard&;
 
     /*########################################################################*
      * Public destructors
@@ -243,7 +244,8 @@ class PessimisticLock
      * @note After calling the function, this lock guard abandons the lock's
      * ownership.
      */
-    [[nodiscard]] auto DowngradeToSIX() noexcept  //
+    [[nodiscard]]
+    auto DowngradeToSIX() noexcept  //
         -> SIXGuard;
 
    private:
@@ -252,7 +254,7 @@ class PessimisticLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    PessimisticLock *dest_{};
+    PessimisticLock* dest_{};
   };
 
   /*##########################################################################*
@@ -261,11 +263,11 @@ class PessimisticLock
 
   constexpr PessimisticLock() noexcept = default;
 
-  PessimisticLock(const PessimisticLock &) = delete;
-  PessimisticLock(PessimisticLock &&) = delete;
+  PessimisticLock(const PessimisticLock&) = delete;
+  PessimisticLock(PessimisticLock&&) = delete;
 
-  auto operator=(const PessimisticLock &) -> PessimisticLock & = delete;
-  auto operator=(PessimisticLock &&) -> PessimisticLock & = delete;
+  auto operator=(const PessimisticLock&) -> PessimisticLock& = delete;
+  auto operator=(PessimisticLock&&) -> PessimisticLock& = delete;
 
   /*##########################################################################*
    * Public destructors
@@ -284,7 +286,8 @@ class PessimisticLock
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  [[nodiscard]] auto LockS()  //
+  [[nodiscard]]
+  auto LockS()  //
       -> SGuard;
 
   /**
@@ -294,7 +297,8 @@ class PessimisticLock
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  [[nodiscard]] auto LockSIX()  //
+  [[nodiscard]]
+  auto LockSIX()  //
       -> SIXGuard;
 
   /**
@@ -304,7 +308,8 @@ class PessimisticLock
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  [[nodiscard]] auto LockX()  //
+  [[nodiscard]]
+  auto LockX()  //
       -> XGuard;
 
  private:

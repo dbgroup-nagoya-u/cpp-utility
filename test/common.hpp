@@ -19,7 +19,6 @@
 
 #include <cassert>
 #include <cstddef>
-#include <cstdint>
 
 /// the number of threads for testing.
 constexpr size_t kThreadNum = DBGROUP_TEST_THREAD_NUM;

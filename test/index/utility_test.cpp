@@ -21,7 +21,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <limits>
 #include <random>
 #include <type_traits>
 #include <vector>
@@ -30,7 +29,6 @@
 #include "gtest/gtest.h"
 
 // library sources
-#include "dbgroup/constants.hpp"
 #include "dbgroup/lock/optimistic_lock.hpp"
 
 // local sources
@@ -119,8 +117,8 @@ class BinaryConverterFixture : public ::testing::Test
   void
   VerifyRestore()
   {
-    for (const auto &v : values_) {
-      const auto *bin_data = ConvertToBinaryData(v);
+    for (const auto& v : values_) {
+      const auto* bin_data = ConvertToBinaryData(v);
       const auto restored = ConvertFromBinaryData<T>(bin_data);
       ASSERT_EQ(v, restored);
     }
@@ -171,10 +169,10 @@ TEST(  //
 {
   lock::OptimisticLock lock{};
   {
-    auto &&grd = lock.LockX();
+    auto&& grd = lock.LockX();
     VerIncrement<kInsDelMask>(grd);
   }
-  auto &&grd = lock.GetVersion();
+  auto&& grd = lock.GetVersion();
   EXPECT_EQ(grd.GetVersion() + kInsDelMask, 0);
 }
 

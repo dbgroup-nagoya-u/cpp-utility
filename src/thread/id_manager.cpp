@@ -23,7 +23,6 @@
 #include <iostream>
 #include <memory>
 #include <thread>
-#include <vector>
 
 // local sources
 #include "dbgroup/constants.hpp"
@@ -85,7 +84,7 @@ IDManager::GetHeartBeat()  //
 
 auto
 IDManager::GetHeartBeater()  //
-    -> const HeartBeater &
+    -> const HeartBeater&
 {
   thread_local HeartBeater hb{};
   if (!hb.HasID()) [[unlikely]] {

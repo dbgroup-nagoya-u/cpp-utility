@@ -60,29 +60,32 @@ class OptiQL
      * @param ver The current version.
      */
     constexpr XGuard(  //
-        OptiQL *dest,
+        OptiQL* const dest,
         const uint64_t qid,
         const uint32_t ver) noexcept
-        : dest_{dest}, qid_{qid}, old_ver_{ver}, new_ver_{ver + 1U}
+        : dest_{dest}
+        , qid_{qid}
+        , old_ver_{ver}
+        , new_ver_{ver + 1U}
     {
     }
 
-    XGuard(const XGuard &) = delete;
+    XGuard(const XGuard&) = delete;
 
     constexpr XGuard(  //
-        XGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)},
-          qid_{obj.qid_},
-          old_ver_{obj.old_ver_},
-          new_ver_{obj.new_ver_}
+        XGuard&& obj) noexcept
+        : dest_{std::exchange(obj.dest_, nullptr)}
+        , qid_{obj.qid_}
+        , old_ver_{obj.old_ver_}
+        , new_ver_{obj.new_ver_}
     {
     }
 
-    auto operator=(const XGuard &) -> XGuard & = delete;
+    auto operator=(const XGuard&) -> XGuard& = delete;
 
     auto operator=(             //
-        XGuard &&rhs) noexcept  //
-        -> XGuard &;
+        XGuard&& rhs) noexcept  //
+        -> XGuard&;
 
     /*########################################################################*
      * Public destructors
@@ -111,7 +114,8 @@ class OptiQL
     /**
      * @return The version when this guard was created.
      */
-    [[nodiscard]] constexpr auto
+    [[nodiscard]]
+    constexpr auto
     GetVersion() const noexcept  //
         -> uint32_t
     {
@@ -136,7 +140,7 @@ class OptiQL
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    OptiQL *dest_{};
+    OptiQL* dest_{};
 
     /// @brief The corresponding queue node for unlocking.
     uint64_t qid_{};
@@ -166,17 +170,18 @@ class OptiQL
      * @param ver The current version.
      */
     constexpr OptGuard(  //
-        const OptiQL *dest,
+        const OptiQL* const dest,
         const uint32_t ver) noexcept
-        : dest_{dest}, ver_{ver}
+        : dest_{dest}
+        , ver_{ver}
     {
     }
 
-    constexpr OptGuard(const OptGuard &) noexcept = default;
-    constexpr OptGuard(OptGuard &&) noexcept = default;
+    constexpr OptGuard(const OptGuard&) noexcept = default;
+    constexpr OptGuard(OptGuard&&) noexcept = default;
 
-    constexpr auto operator=(const OptGuard &) noexcept -> OptGuard & = default;
-    constexpr auto operator=(OptGuard &&) noexcept -> OptGuard & = default;
+    constexpr auto operator=(const OptGuard&) noexcept -> OptGuard& = default;
+    constexpr auto operator=(OptGuard&&) noexcept -> OptGuard& = default;
 
     /*########################################################################*
      * Public destructors
@@ -201,7 +206,8 @@ class OptiQL
     /**
      * @return The version when this guard was created.
      */
-    [[nodiscard]] constexpr auto
+    [[nodiscard]]
+    constexpr auto
     GetVersion() const noexcept  //
         -> uint32_t
     {
@@ -216,7 +222,8 @@ class OptiQL
      * @retval true if a target version does not change from an expected one.
      * @retval false otherwise.
      */
-    [[nodiscard]] auto VerifyVersion() noexcept  //
+    [[nodiscard]]
+    auto VerifyVersion() noexcept  //
         -> bool;
 
    private:
@@ -225,7 +232,7 @@ class OptiQL
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    const OptiQL *dest_{};
+    const OptiQL* dest_{};
 
     /// @brief A version when creating this guard.
     uint32_t ver_{};
@@ -237,11 +244,11 @@ class OptiQL
 
   constexpr OptiQL() noexcept = default;
 
-  OptiQL(const OptiQL &) = delete;
-  OptiQL(OptiQL &&) = delete;
+  OptiQL(const OptiQL&) = delete;
+  OptiQL(OptiQL&&) = delete;
 
-  auto operator=(const OptiQL &) -> OptiQL & = delete;
-  auto operator=(OptiQL &&) -> OptiQL & = delete;
+  auto operator=(const OptiQL&) -> OptiQL& = delete;
+  auto operator=(OptiQL&&) -> OptiQL& = delete;
 
   /*##########################################################################*
    * Public destructors
@@ -259,7 +266,8 @@ class OptiQL
    * @note This function does not give up reading a version value and continues
    * with spinlock and back-off.
    */
-  [[nodiscard]] auto GetVersion() const noexcept  //
+  [[nodiscard]]
+  auto GetVersion() const noexcept  //
       -> OptGuard;
 
   /**
@@ -269,7 +277,8 @@ class OptiQL
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  [[nodiscard]] auto LockX()  //
+  [[nodiscard]]
+  auto LockX()  //
       -> XGuard;
 
  private:

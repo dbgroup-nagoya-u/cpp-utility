@@ -51,11 +51,11 @@ class StopWatch
 
   constexpr StopWatch() noexcept = default;
 
-  constexpr StopWatch(const StopWatch &) noexcept = default;
-  constexpr StopWatch(StopWatch &&) noexcept = default;
+  constexpr StopWatch(const StopWatch&) noexcept = default;
+  constexpr StopWatch(StopWatch&&) noexcept = default;
 
-  constexpr auto operator=(const StopWatch &obj) noexcept -> StopWatch & = default;
-  constexpr auto operator=(StopWatch &&) noexcept -> StopWatch & = default;
+  constexpr auto operator=(const StopWatch&) noexcept -> StopWatch& = default;
+  constexpr auto operator=(StopWatch&&) noexcept -> StopWatch& = default;
 
   /*##########################################################################*
    * Public destructors
@@ -85,7 +85,7 @@ class StopWatch
    */
   constexpr void
   operator+=(  //
-      const StopWatch &rhs) noexcept
+      const StopWatch& rhs) noexcept
   {
     exec_num_ += rhs.exec_num_;
     exec_time_ += rhs.exec_time_;

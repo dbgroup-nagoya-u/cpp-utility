@@ -59,24 +59,24 @@ class OptimisticLock
      * @param dest The address of a target lock.
      */
     constexpr explicit SGuard(  //
-        OptimisticLock *dest) noexcept
+        OptimisticLock* const dest) noexcept
         : dest_{dest}
     {
     }
 
-    SGuard(const SGuard &) = delete;
+    SGuard(const SGuard&) = delete;
 
     constexpr SGuard(  //
-        SGuard &&obj) noexcept
+        SGuard&& obj) noexcept
         : dest_{std::exchange(obj.dest_, nullptr)}
     {
     }
 
-    auto operator=(const SGuard &) -> SGuard & = delete;
+    auto operator=(const SGuard&) -> SGuard& = delete;
 
     auto operator=(             //
-        SGuard &&rhs) noexcept  //
-        -> SGuard &;
+        SGuard&& rhs) noexcept  //
+        -> SGuard&;
 
     /*########################################################################*
      * Public destructors
@@ -108,7 +108,7 @@ class OptimisticLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    OptimisticLock *dest_{};
+    OptimisticLock* dest_{};
   };
 
   /**
@@ -128,24 +128,24 @@ class OptimisticLock
      * @param dest The address of a target lock.
      */
     constexpr explicit SIXGuard(  //
-        OptimisticLock *dest) noexcept
+        OptimisticLock* const dest) noexcept
         : dest_{dest}
     {
     }
 
-    SIXGuard(const SIXGuard &) = delete;
+    SIXGuard(const SIXGuard&) = delete;
 
     constexpr SIXGuard(  //
-        SIXGuard &&obj) noexcept
+        SIXGuard&& obj) noexcept
         : dest_{std::exchange(obj.dest_, nullptr)}
     {
     }
 
-    auto operator=(const SIXGuard &) -> SIXGuard & = delete;
+    auto operator=(const SIXGuard&) -> SIXGuard& = delete;
 
     auto operator=(               //
-        SIXGuard &&rhs) noexcept  //
-        -> SIXGuard &;
+        SIXGuard&& rhs) noexcept  //
+        -> SIXGuard&;
 
     /*########################################################################*
      * Public destructors
@@ -178,7 +178,8 @@ class OptimisticLock
      * @note After calling the function, this lock guard abandons the lock's
      * ownership.
      */
-    [[nodiscard]] auto UpgradeToX()  //
+    [[nodiscard]]
+    auto UpgradeToX()  //
         -> XGuard;
 
    private:
@@ -187,7 +188,7 @@ class OptimisticLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    OptimisticLock *dest_{};
+    OptimisticLock* dest_{};
   };
 
   /**
@@ -208,25 +209,29 @@ class OptimisticLock
      * @param ver The current version.
      */
     constexpr XGuard(  //
-        OptimisticLock *dest,
+        OptimisticLock* const dest,
         const uint32_t ver) noexcept
-        : dest_{dest}, old_ver_{ver}, new_ver_{ver + 1U}
+        : dest_{dest}
+        , old_ver_{ver}
+        , new_ver_{ver + 1U}
     {
     }
 
-    XGuard(const XGuard &) = delete;
+    XGuard(const XGuard&) = delete;
 
     constexpr XGuard(  //
-        XGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)}, old_ver_{obj.old_ver_}, new_ver_{obj.new_ver_}
+        XGuard&& obj) noexcept
+        : dest_{std::exchange(obj.dest_, nullptr)}
+        , old_ver_{obj.old_ver_}
+        , new_ver_{obj.new_ver_}
     {
     }
 
-    auto operator=(const XGuard &) -> XGuard & = delete;
+    auto operator=(const XGuard&) -> XGuard& = delete;
 
     auto operator=(             //
-        XGuard &&rhs) noexcept  //
-        -> XGuard &;
+        XGuard&& rhs) noexcept  //
+        -> XGuard&;
 
     /*########################################################################*
      * Public destructors
@@ -255,7 +260,8 @@ class OptimisticLock
     /**
      * @return The version when this guard was created.
      */
-    [[nodiscard]] constexpr auto
+    [[nodiscard]]
+    constexpr auto
     GetVersion() const noexcept  //
         -> uint32_t
     {
@@ -281,7 +287,8 @@ class OptimisticLock
      * @note After calling the function, this lock guard abandons the lock's
      * ownership.
      */
-    [[nodiscard]] auto DowngradeToSIX() noexcept  //
+    [[nodiscard]]
+    auto DowngradeToSIX() noexcept  //
         -> SIXGuard;
 
    private:
@@ -290,7 +297,7 @@ class OptimisticLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    OptimisticLock *dest_{};
+    OptimisticLock* dest_{};
 
     /// @brief A version when creating this guard.
     uint32_t old_ver_{};
@@ -317,28 +324,29 @@ class OptimisticLock
      * @param ver The current version.
      */
     constexpr OptGuard(  //
-        OptimisticLock *dest,
+        OptimisticLock* const dest,
         const uint32_t ver) noexcept
-        : dest_{dest}, ver_{ver}
+        : dest_{dest}
+        , ver_{ver}
     {
     }
 
-    OptGuard(const OptGuard &) = delete;
+    OptGuard(const OptGuard&) = delete;
 
     constexpr OptGuard(  //
-        OptGuard &&obj) noexcept
-        : dest_{std::exchange(obj.dest_, nullptr)},
-          ver_{obj.ver_},
-          retry_num_{obj.retry_num_},
-          has_lock_{std::exchange(obj.has_lock_, false)}
+        OptGuard&& obj) noexcept
+        : dest_{std::exchange(obj.dest_, nullptr)}
+        , ver_{obj.ver_}
+        , retry_num_{obj.retry_num_}
+        , has_lock_{std::exchange(obj.has_lock_, false)}
     {
     }
 
-    auto operator=(const OptGuard &) -> OptGuard & = delete;
+    auto operator=(const OptGuard&) -> OptGuard& = delete;
 
     auto operator=(               //
-        OptGuard &&rhs) noexcept  //
-        -> OptGuard &;
+        OptGuard&& rhs) noexcept  //
+        -> OptGuard&;
 
     /*########################################################################*
      * Public destructors
@@ -363,7 +371,8 @@ class OptimisticLock
     /**
      * @return The version when this guard was created.
      */
-    [[nodiscard]] constexpr auto
+    [[nodiscard]]
+    constexpr auto
     GetVersion() const noexcept  //
         -> uint32_t
     {
@@ -382,7 +391,8 @@ class OptimisticLock
      * @note If the version verification failed, this function may wait to
      * update internal fields.
      */
-    [[nodiscard]] auto VerifyVersion(  //
+    [[nodiscard]]
+    auto VerifyVersion(  //
         uint32_t mask = kNoMask,
         size_t max_retry = std::numeric_limits<size_t>::max()) noexcept  //
         -> bool;
@@ -392,7 +402,8 @@ class OptimisticLock
      * @retval true if a target version does not change from an expected one.
      * @retval false otherwise.
      */
-    [[nodiscard]] auto ImmediateVerify(    //
+    [[nodiscard]]
+    auto ImmediateVerify(                  //
         uint32_t mask = kNoMask) noexcept  //
         -> bool;
 
@@ -405,7 +416,8 @@ class OptimisticLock
      * @note This function does not give up acquiring a lock and continues with
      * spinlock and back-off.
      */
-    [[nodiscard]] auto TryLockS(  //
+    [[nodiscard]]
+    auto TryLockS(                //
         uint32_t mask = kNoMask)  //
         -> SGuard;
 
@@ -416,8 +428,9 @@ class OptimisticLock
      * @retval A guard instance if the lock is acquired.
      * @retval An empty guard instance otherwise.
      */
-    [[nodiscard]] auto TryLockSIX(  //
-        uint32_t mask = kNoMask)    //
+    [[nodiscard]]
+    auto TryLockSIX(              //
+        uint32_t mask = kNoMask)  //
         -> SIXGuard;
 
     /**
@@ -427,7 +440,8 @@ class OptimisticLock
      * @retval A guard instance if the lock is acquired.
      * @retval An empty guard instance otherwise.
      */
-    [[nodiscard]] auto TryLockX(  //
+    [[nodiscard]]
+    auto TryLockX(                //
         uint32_t mask = kNoMask)  //
         -> XGuard;
 
@@ -437,7 +451,7 @@ class OptimisticLock
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    OptimisticLock *dest_{};
+    OptimisticLock* dest_{};
 
     /// @brief A version when creating this guard.
     uint32_t ver_{};
@@ -455,11 +469,11 @@ class OptimisticLock
 
   constexpr OptimisticLock() noexcept = default;
 
-  OptimisticLock(const OptimisticLock &) = delete;
-  OptimisticLock(OptimisticLock &&) = delete;
+  OptimisticLock(const OptimisticLock&) = delete;
+  OptimisticLock(OptimisticLock&&) = delete;
 
-  auto operator=(const OptimisticLock &) -> OptimisticLock & = delete;
-  auto operator=(OptimisticLock &&) -> OptimisticLock & = delete;
+  auto operator=(const OptimisticLock&) -> OptimisticLock& = delete;
+  auto operator=(OptimisticLock&&) -> OptimisticLock& = delete;
 
   /*##########################################################################*
    * Public destructors
@@ -477,7 +491,8 @@ class OptimisticLock
    * @note This function does not give up reading a version value and continues
    * with spinlock and back-off.
    */
-  [[nodiscard]] auto GetVersion() noexcept  //
+  [[nodiscard]]
+  auto GetVersion() noexcept  //
       -> OptGuard;
 
   /*##########################################################################*
@@ -491,7 +506,8 @@ class OptimisticLock
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  [[nodiscard]] auto LockS()  //
+  [[nodiscard]]
+  auto LockS()  //
       -> SGuard;
 
   /**
@@ -501,7 +517,8 @@ class OptimisticLock
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  [[nodiscard]] auto LockSIX()  //
+  [[nodiscard]]
+  auto LockSIX()  //
       -> SIXGuard;
 
   /**
@@ -511,7 +528,8 @@ class OptimisticLock
    * @note This function does not give up acquiring a lock and continues with
    * spinlock and back-off.
    */
-  [[nodiscard]] auto LockX()  //
+  [[nodiscard]]
+  auto LockX()  //
       -> XGuard;
 
  private:

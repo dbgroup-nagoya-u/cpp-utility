@@ -18,13 +18,10 @@
 #include "dbgroup/thread/epoch_manager.hpp"
 
 // C++ standard libraries
-#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <memory>
-#include <mutex>
 #include <thread>
-#include <vector>
 
 // external libraries
 #include "gtest/gtest.h"
@@ -81,7 +78,7 @@ class EpochManagerFixture : public ::testing::Test
   void
   GlobalEpochWithGuardProgressOverTime()
   {
-    [[maybe_unused]] const auto &grd = epoch_manager_->CreateEpochGuard();
+    [[maybe_unused]] const auto& grd = epoch_manager_->CreateEpochGuard();
     auto prev = epoch_manager_->GetCurrentEpoch();
     for (size_t i = 0; i < kLoopNum; ++i) {
       Serial cur;
@@ -114,7 +111,7 @@ class EpochManagerFixture : public ::testing::Test
   void
   MinEpochWithGuardRemainUnchangedOverTime()
   {
-    [[maybe_unused]] const auto &grd = epoch_manager_->CreateEpochGuard();
+    [[maybe_unused]] const auto& grd = epoch_manager_->CreateEpochGuard();
     auto prev = epoch_manager_->GetMinEpoch();
     for (size_t i = 0; i < kLoopNum; ++i) {
       const auto cur = epoch_manager_->GetMinEpoch();

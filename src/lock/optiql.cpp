@@ -26,9 +26,6 @@
 #include <utility>
 #include <vector>
 
-// temp
-#include <stdexcept>
-
 // local sources
 #include "dbgroup/constants.hpp"
 #include "dbgroup/lock/component/queue_node_holder.hpp"
@@ -48,7 +45,7 @@ namespace
  */
 struct QNode {
   /// @brief The next queue node if exist.
-  std::atomic<QNode *> next;
+  std::atomic<QNode*> next;
 
   /// @brief A flag for indicating this node's owner holds a lock.
   std::atomic_bool hold_lock;
@@ -119,7 +116,7 @@ OptiQL::LockX()  //
     -> XGuard
 {
   const auto qid = tls_holder.GetQID();
-  auto *qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
+  auto* qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
   auto cur = lock_.load(kRelaxed);
@@ -130,7 +127,7 @@ OptiQL::LockX()  //
 
   if ((cur & kLockMask) != kNoLocks) {
     // wait until predecessor gives up the lock
-    auto *pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
+    auto* pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
     pred_qnode->next.store(qnode, kRelaxed);
     while (!qnode->hold_lock.load(kRelaxed)) {
       std::this_thread::yield();
@@ -151,9 +148,9 @@ OptiQL::UnlockX(  //
     const uint64_t qid,
     const uint64_t ver)
 {
-  auto *qnode = QNodeHolder::GetQNode(qid);
+  auto* qnode = QNodeHolder::GetQNode(qid);
 
-  auto *next_ptr = qnode->next.load(kAcquire);
+  auto* next_ptr = qnode->next.load(kAcquire);
   if (next_ptr == nullptr) {  // this is the tail node
     auto cur = lock_.load(kRelaxed);
     while (((cur & kQIDMask) >> kQIDShift) == qid) {
@@ -182,8 +179,8 @@ OptiQL::UnlockX(  //
 
 auto
 OptiQL::XGuard::operator=(  //
-    XGuard &&rhs) noexcept  //
-    -> XGuard &
+    XGuard&& rhs) noexcept  //
+    -> XGuard&
 {
   if (dest_) {
     dest_->UnlockX(qid_, new_ver_);
