@@ -97,6 +97,7 @@ StopWatch::Quantile(       //
   while (i < kBinNum - 1 && cnt <= bound) {
     cnt += bins_[++i];
   }
+  if (i == kBinNum - 1) return max_;
   return static_cast<size_t>(2 * std::pow(kGamma, i) / (kGamma + 1));
 }
 
