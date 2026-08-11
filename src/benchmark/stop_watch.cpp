@@ -54,7 +54,7 @@ PrepareLatArray(         //
  *############################################################################*/
 
 /// @brief A desired relative error.
-constexpr double kAlpha = 0.01;
+constexpr double kAlpha = 0.007;
 
 /// @brief The base value for approximation.
 constexpr double kGamma = (1.0 + kAlpha) / (1.0 - kAlpha);
