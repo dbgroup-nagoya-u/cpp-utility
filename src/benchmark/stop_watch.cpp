@@ -30,6 +30,26 @@ namespace dbgroup::benchmark
 namespace
 {
 /*############################################################################*
+ * Local utilities for constants
+ *############################################################################*/
+
+constexpr auto
+PrepareLatArray(         //
+    const double gamma)  //
+    -> std::array<size_t, StopWatch::kBinNum>
+{
+  std::array<size_t, StopWatch::kBinNum> lat{};
+  const double denom = gamma + 1;
+  double pow = 1;
+  lat[0] = static_cast<size_t>(2 / denom);
+  for (uint32_t i = 1; i < StopWatch::kBinNum; ++i) {
+    pow *= gamma;
+    lat[i] = static_cast<size_t>(2 * pow / denom);
+  }
+  return lat;
+}
+
+/*############################################################################*
  * Local constants
  *############################################################################*/
 
@@ -38,6 +58,9 @@ constexpr double kAlpha = 0.01;
 
 /// @brief The base value for approximation.
 constexpr double kGamma = (1.0 + kAlpha) / (1.0 - kAlpha);
+
+/// @brief A precomputed latency array.
+constexpr std::array<size_t, StopWatch::kBinNum> kLatArr = PrepareLatArray(kGamma);
 
 /// @brief The denominator for the logarithm change of base.
 const double denom = std::log(kGamma);
@@ -97,8 +120,7 @@ StopWatch::Quantile(       //
   while (i < kBinNum - 1 && cnt <= bound) {
     cnt += bins_[++i];
   }
-  if (i == kBinNum - 1) return max_;
-  return static_cast<size_t>(2 * std::pow(kGamma, i) / (kGamma + 1));
+  return kLatArr[i];
 }
 
 }  // namespace dbgroup::benchmark
