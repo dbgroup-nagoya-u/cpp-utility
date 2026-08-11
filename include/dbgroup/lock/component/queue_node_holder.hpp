@@ -45,10 +45,10 @@ class QueueNodeHolder
   constexpr QueueNodeHolder() noexcept = default;
 
   // forbid any copying/moving
-  QueueNodeHolder(const QueueNodeHolder &) = delete;
-  QueueNodeHolder(QueueNodeHolder &&) = delete;
-  auto operator=(const QueueNodeHolder &) -> QueueNodeHolder & = delete;
-  auto operator=(QueueNodeHolder &&) -> QueueNodeHolder & = delete;
+  QueueNodeHolder(const QueueNodeHolder&) = delete;
+  QueueNodeHolder(QueueNodeHolder&&) = delete;
+  auto operator=(const QueueNodeHolder&) -> QueueNodeHolder& = delete;
+  auto operator=(QueueNodeHolder&&) -> QueueNodeHolder& = delete;
 
   /*##########################################################################*
    * Public destructors
@@ -72,7 +72,7 @@ class QueueNodeHolder
   static constexpr auto
   GetQNode(                   //
       uint32_t qid) noexcept  //
-      -> QNode *
+      -> QNode*
   {
     return &qnodes_[qid];
   }
