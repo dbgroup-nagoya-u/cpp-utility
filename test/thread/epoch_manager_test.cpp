@@ -112,6 +112,7 @@ class EpochManagerFixture : public ::testing::Test
   MinEpochWithGuardRemainUnchangedOverTime()
   {
     [[maybe_unused]] const auto& grd = epoch_manager_->CreateEpochGuard();
+    std::this_thread::sleep_for(kSleepTime);
     auto prev = epoch_manager_->GetMinEpoch();
     for (size_t i = 0; i < kLoopNum; ++i) {
       const auto cur = epoch_manager_->GetMinEpoch();
