@@ -129,9 +129,8 @@ OMCSLock::LockS()  //
   const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kSLock;
 
   auto cur = lock_.load(kRelaxed);
-  auto tail_qid = (cur & kQIDMask) >> kQIDShift;
   while (true) {
-    if (tail_qid) {  // there is the predecessor
+    if (cur & kQIDMask) {  // there is the predecessor
       if (lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) break;
     } else if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) {
       goto end;  // the initial shared lock
