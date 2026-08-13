@@ -156,7 +156,7 @@ OMCSLock::LockS()  //
         CPP_UTILITY_SPINLOCK_HINT
       }
 
-      while (next_ptr->lock_state.load(kRelaxed) & kXLock) {
+      while (next_ptr->lock_state.load(kAcquire) & kXLock) {
         std::this_thread::yield();
       }
     }
