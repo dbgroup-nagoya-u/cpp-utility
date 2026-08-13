@@ -131,7 +131,7 @@ class OMCSLock
   };
 
   /**
-   * @brief A class for representing a guard instance for exclusive locks.
+   * @brief A class for representing a guard instance for SIX locks.
    *
    */
   class SIXGuard
