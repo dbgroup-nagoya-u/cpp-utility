@@ -151,8 +151,8 @@ OMCSLock::LockS()  //
       std::this_thread::yield();
       cur = lock_.load(kAcquire);
     }
-    auto* next_ptr = qnode->next.load(kAcquire);
     if (((cur & kQIDMask) >> kQIDShift) != qid) {
+      QNode *next_ptr;
       while (true) {  // wait until successor fills in its next field
         next_ptr = qnode->next.load(kRelaxed);
         if (next_ptr) break;
