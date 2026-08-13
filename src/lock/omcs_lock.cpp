@@ -45,9 +45,6 @@ struct QNode {
   std::atomic<QNode*> next;
 
   /// @brief A flag for indicating this node's owner holds a lock.
-  std::atomic_bool hold_lock;
-
-  /// @brief A flag for indicating this node's owner holds a lock.
   std::atomic<uint64_t> lock_state;
 };
 
