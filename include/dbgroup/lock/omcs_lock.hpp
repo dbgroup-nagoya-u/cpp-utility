@@ -28,7 +28,7 @@
 namespace dbgroup::lock
 {
 /**
- * @brief A class for representing the MCS queue lock.
+ * @brief A class for representing an optimistic MCS queue lock.
  *
  */
 class OMCSLock
