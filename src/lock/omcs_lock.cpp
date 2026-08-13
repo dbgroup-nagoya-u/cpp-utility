@@ -126,7 +126,6 @@ OMCSLock::LockS()  //
 {
   auto qid = tls_holder.GetQID();
   auto* qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
-  qnode->lock_state.store(kNull, kRelaxed);
   const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kSLock;
 
   auto cur = lock_.load(kRelaxed);
