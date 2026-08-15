@@ -118,7 +118,7 @@ OMCSLock::GetVersion() noexcept  //
   }
 
   return OptGuard{this, static_cast<uint32_t>(cur & kVersionMask)};
-}  // namespace
+}
 
 auto
 OMCSLock::LockS()  //
@@ -147,7 +147,7 @@ OMCSLock::LockS()  //
       cur = lock_.load(kAcquire);
     }
     if (((cur & kQIDMask) >> kQIDShift) != qid) {
-      QNode *next_ptr;
+      QNode* next_ptr;
       while (true) {  // wait until successor fills in its next field
         next_ptr = qnode->next.load(kRelaxed);
         if (next_ptr) break;
@@ -173,7 +173,7 @@ OMCSLock::LockSIX()  //
 
   auto cur = lock_.load(kRelaxed);
   while (true) {
-    qnode->lock_state.store(cur & kLockMask, kRelaxed);
+    qnode->lock_state.store(cur, kRelaxed);
     if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
@@ -182,12 +182,11 @@ OMCSLock::LockSIX()  //
     // wait until predecessor gives up the lock
     auto* pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
     pred_qnode->next.store(qnode, kRelaxed);
-    while (qnode->lock_state.load(kAcquire) & kXLock) {
+    while (true) {
+      cur = qnode->lock_state.load(kAcquire);
+      if ((cur & kXLock) == kNoLocks) break;
       std::this_thread::yield();
-      cur = lock_.load(kRelaxed);
     }
-    // disable opportunistic read
-    cur = lock_.fetch_xor(kOPReadFlag, kAcquire);
   }
 
   return SIXGuard{this, qid, static_cast<uint32_t>(cur & kVersionMask)};
@@ -203,6 +202,7 @@ OMCSLock::LockX()  //
 
   auto cur = lock_.load(kRelaxed);
   while (true) {
+    qnode->lock_state.store(cur, kRelaxed);
     if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
@@ -211,7 +211,7 @@ OMCSLock::LockX()  //
     // wait until predecessor gives up the lock
     auto* pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
     pred_qnode->next.store(qnode, kRelaxed);
-    while (!qnode->hold_lock.load(kRelaxed)) {
+    while (qnode->lock_state.load(kRelaxed) & kLockMask) {
       std::this_thread::yield();
     }
     // disable opportunistic read
@@ -251,7 +251,6 @@ OMCSLock::UnlockS(  //
       CPP_UTILITY_SPINLOCK_HINT
     }
   }
-  next_node->hold_lock.store(true, kRelaxed);
   if ((next_node->lock_state.fetch_sub(kSLock, kRelease) & kLockMask) == kSLock) {
     tls_holder.ReleaseQID(qid);
   }
@@ -278,14 +277,12 @@ OMCSLock::UnlockSIX(  //
     }
   }
 
-  // enable opportunistic read
-  lock_.fetch_or(kOPReadFlag | ver, kRelease);
   while (true) {  // wait until successor fills in its next field
     next_ptr = qnode->next.load(kRelaxed);
     if (next_ptr) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
-  next_ptr->hold_lock.store(true, kRelaxed);
+
   if ((next_ptr->lock_state.fetch_xor(kXLock, kRelease) & kLockMask) == kXLock) {
     tls_holder.ReleaseQID(qid);
   }
@@ -318,7 +315,9 @@ OMCSLock::UnlockX(  //
     if (next_ptr) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
-  next_ptr->hold_lock.store(true, kRelaxed);
+  if ((next_ptr->lock_state.load(kRelaxed) & kOPReadFlag) == kOPReadFlag) {
+    next_ptr->lock_state.fetch_xor(kOPReadFlag, kRelease);
+  }
   if ((next_ptr->lock_state.fetch_xor(kXLock, kRelease) & kLockMask) == kXLock) {
     tls_holder.ReleaseQID(qid);
   }
@@ -509,7 +508,7 @@ OMCSLock::OptGuard::TryLockSIX(  //
       tls_holder.ReleaseQID(qid);
       return SIXGuard{};
     }
-    qnode->lock_state.store(cur & kLockMask, kRelaxed);
+    qnode->lock_state.store(cur, kRelaxed);
     if (dest_->lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
@@ -552,6 +551,7 @@ OMCSLock::OptGuard::TryLockX(  //
       tls_holder.ReleaseQID(qid);
       return XGuard{};
     }
+    qnode->lock_state.store(cur, kRelaxed);
     if (dest_->lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
@@ -560,7 +560,7 @@ OMCSLock::OptGuard::TryLockX(  //
     // wait until predecessor gives up the lock
     auto* pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
     pred_qnode->next.store(qnode, kRelaxed);
-    while (!qnode->hold_lock.load(kRelaxed)) {
+    while (qnode->lock_state.load(kRelaxed) & kLockMask) {
       std::this_thread::yield();
     }
     // disable opportunistic read

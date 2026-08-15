@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef CPP_UTILITY_DBGROUP_LOCK_OMCSLock_HPP_
-#define CPP_UTILITY_DBGROUP_LOCK_OMCSLock_HPP_
+#ifndef CPP_UTILITY_DBGROUP_LOCK_OMCS_LOCK_HPP_
+#define CPP_UTILITY_DBGROUP_LOCK_OMCS_LOCK_HPP_
 
 // C++ standard libraries
 #include <atomic>
@@ -92,7 +92,7 @@ class OMCSLock
         SGuard&& rhs) noexcept  //
         -> SGuard&;
 
-    // forbit copying
+    // forbid copying
     SGuard(const SGuard&) = delete;
     auto operator=(const SGuard&) -> SGuard& = delete;
 
@@ -146,6 +146,7 @@ class OMCSLock
 
     /**
      * @param dest The address of a target lock.
+     * @param qid A queue node ID to be held.
      * @param ver The current version.
      */
     constexpr SIXGuard(  //
@@ -158,7 +159,6 @@ class OMCSLock
     {
     }
 
-    SIXGuard(const SIXGuard&) = delete;
 
     constexpr SIXGuard(  //
         SIXGuard&& obj) noexcept
@@ -168,11 +168,15 @@ class OMCSLock
     {
     }
 
-    auto operator=(const SIXGuard&) -> SIXGuard& = delete;
 
     auto operator=(               //
         SIXGuard&& rhs) noexcept  //
         -> SIXGuard&;
+
+    // forbid copying
+    SIXGuard(const SIXGuard&) = delete;
+    auto operator=(const SIXGuard&) -> SIXGuard& = delete;
+
 
     /*########################################################################*
      * Public destructors
@@ -234,6 +238,7 @@ class OMCSLock
 
     /**
      * @param dest The address of a target lock.
+     * @param qid A queue node ID to be held.
      * @param ver The current version.
      */
     constexpr XGuard(  //
@@ -260,7 +265,7 @@ class OMCSLock
         XGuard&& rhs) noexcept  //
         -> XGuard&;
 
-    // forbit copying
+    // forbid copying
     XGuard(const XGuard&) = delete;
     auto operator=(const XGuard&) -> XGuard& = delete;
 
@@ -383,7 +388,7 @@ class OMCSLock
         OptGuard&& rhs) noexcept  //
         -> OptGuard&;
 
-    // forbit copying
+    // forbid copying
     OptGuard(const OptGuard&) = delete;
     auto operator=(const OptGuard&) -> OptGuard& = delete;
 
@@ -564,7 +569,7 @@ class OMCSLock
   /**
    * @brief Release a shared lock.
    *
-   * @param qnode The queue node corresponding to this lock.
+   * @param qid A queue node ID to be held.
    * @note If a thread calls this function without acquiring an S lock, it will
    * corrupt an internal lock state.
    */
@@ -574,7 +579,7 @@ class OMCSLock
   /**
    * @brief Release a shared-with-intent-exclusive lock.
    *
-   * @param qnode The queue node corresponding to this lock.
+   * @param qid A queue node ID to be held.
    * @note If a thread calls this function without acquiring an SIX lock, it
    * will corrupt an internal lock state.
    */
@@ -585,7 +590,7 @@ class OMCSLock
   /**
    * @brief Release an exclusive lock.
    *
-   * @param qnode The queue node corresponding to this lock.
+   * @param qid A queue node ID to be held.
    * @param ver A desired version after unlocking.
    * @note If a thread calls this function without acquiring an X lock, it will
    * corrupt an internal lock state.
@@ -604,4 +609,4 @@ class OMCSLock
 
 }  // namespace dbgroup::lock
 
-#endif  // CPP_UTILITY_DBGROUP_LOCK_OMCSLock_HPP_
+#endif  // CPP_UTILITY_DBGROUP_LOCK_OMCSLOCK_HPP_
