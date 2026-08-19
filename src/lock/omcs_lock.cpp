@@ -292,10 +292,13 @@ OMCSLock::UnlockSIX(  //
 void
 OMCSLock::UnlockX(  //
     const uint64_t qid,
-    const uint64_t ver)
+    const uint64_t old_ver,
+    const uint64_t new_ver)
 {
   auto* qnode = QNodeHolder::GetQNode(qid);
 
+  const auto ver_xor = static_cast<uint64_t>(old_ver ^ new_ver);
+  lock_.fetch_xor(kOPReadFlag | ver_xor, kRelease);
   auto* next_ptr = qnode->next.load(kAcquire);
   if (next_ptr == nullptr) {  // this is the tail node
     auto cur = lock_.load(kRelaxed);
