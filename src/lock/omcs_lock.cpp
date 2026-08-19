@@ -233,14 +233,14 @@ OMCSLock::UnlockS(  //
 {
   auto* qnode = QNodeHolder::GetQNode(qid);
 
-  auto* next_node = qnode->next.load(kAcquire);
+  auto* next_node = qnode->next.load(kRelaxed);
   if (next_node == nullptr) {  // this is the tail node
     auto cur = lock_.load(kRelaxed);
     while (((cur & kQIDMask) >> kQIDShift) == qid) {
       const auto unlock = cur - kSLock;
       if (unlock & kLockMask) {
-        if (lock_.compare_exchange_weak(cur, unlock, kRelaxed, kRelaxed)) return;
-      } else if (lock_.compare_exchange_weak(cur, cur & kVersionMask, kRelaxed, kRelaxed)) {
+        if (lock_.compare_exchange_weak(cur, unlock, kRelease, kRelaxed)) return;
+      } else if (lock_.compare_exchange_weak(cur, cur & kVersionMask, kRelease, kRelaxed)) {
         tls_holder.ReleaseQID(qid);
         return;
       }
