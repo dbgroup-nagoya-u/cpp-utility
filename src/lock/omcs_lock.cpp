@@ -269,10 +269,10 @@ OMCSLock::UnlockSIX(  //
   if (next_ptr == nullptr) {  // this is the tail node
     auto cur = lock_.load(kRelaxed);
     while (((cur & kQIDMask) >> kQIDShift) == qid) {
-      if (cur & kSMask) {
-        if (lock_.compare_exchange_weak(cur, (cur ^ kXLock) | ver, kRelease, kRelaxed)) return;
-      } else if (lock_.compare_exchange_weak(cur, ver, kRelease, kRelaxed)) {
-        tls_holder.ReleaseQID(qid);
+      if (lock_.compare_exchange_weak(cur, cur ^ kXLock, kRelease, kRelaxed)) {
+        if ((cur & kSMask) == kNoLocks) {
+          tls_holder.ReleaseQID(qid);
+        }
         return;
       }
       CPP_UTILITY_SPINLOCK_HINT
