@@ -113,7 +113,7 @@ OMCSLock::GetVersion() noexcept  //
   uint64_t cur{};
   while (true) {
     cur = lock_.load(kAcquire);
-    if ((cur & kXAndOPReadMask) != kXLock) break;  // lock released or opportunistically readable
+    if (cur & kSFlag) break;
     std::this_thread::yield();
   }
 
