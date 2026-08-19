@@ -260,8 +260,7 @@ OMCSLock::UnlockS(  //
 
 void
 OMCSLock::UnlockSIX(  //
-    const uint64_t qid,
-    const uint64_t ver)
+    const uint64_t qid)
 {
   auto* qnode = QNodeHolder::GetQNode(qid);
 
