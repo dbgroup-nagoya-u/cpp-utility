@@ -86,10 +86,10 @@ constexpr uint64_t kQIDMask = (kSLock - 1UL) ^ kVersionMask;
 constexpr uint64_t kQIDShift = 32UL;
 
 /// @brief A bit mask for extracting a lock state.
-constexpr uint64_t kLockMask = ~(kVersionMask | kQIDMask);
+constexpr uint64_t kLockMask = ~(kVersionMask | kQIDMask | kOPReadFlag);
 
 /// @brief A bit mask for extracting a sharedlock state.
-constexpr uint64_t kSMask = kLockMask ^ kXAndOPReadMask;
+constexpr uint64_t kSMask = kLockMask ^ kXLock;
 
 /*############################################################################*
  * Static variables
