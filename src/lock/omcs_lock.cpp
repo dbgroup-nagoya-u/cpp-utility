@@ -132,12 +132,12 @@ OMCSLock::LockS()  //
   const auto ebd_id = (static_cast<uint64_t>(qid) << kQIDShift) | kSFlag | kSLock;
 
   auto cur = lock_.load(kRelaxed);
-  const auto new_tail =  ebd_id | (cur & kOPReadMask) | kSLock;
   while (true) {
     if (cur & kQIDMask) {  // there is the predecessor
       if (lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) break;
-    } else if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) {
-      goto end;  // the initial shared lock
+    } else {  // the initial shared lock
+      const auto new_tail =  ebd_id | (cur & kVersionMask);
+      if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) goto end;
     }
     CPP_UTILITY_SPINLOCK_HINT
   }
