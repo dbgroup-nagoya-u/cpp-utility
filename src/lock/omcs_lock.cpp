@@ -203,11 +203,12 @@ OMCSLock::LockX()  //
 {
   const auto qid = tls_holder.GetQID();
   auto* qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
-  const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
+  const auto ebd_id = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
   auto cur = lock_.load(kRelaxed);
   while (true) {
-    qnode->lock_state.store(cur, kRelaxed);
+    qnode->lock_state.store(cur & kLockMask, kRelaxed);
+    const auto new_tail = ebd_id | (cur & kSAndVersionMask);
     if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
