@@ -316,16 +316,12 @@ OMCSLock::UnlockX(  //
     }
   }
 
-  // enable opportunistic read
-  lock_.fetch_or(kSFlag, kRelease);
   while (true) {  // wait until successor fills in its next field
     next_ptr = qnode->next.load(kRelaxed);
     if (next_ptr) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
-  if ((next_ptr->lock_state.load(kRelaxed) & kSFlag) == kSFlag) {
-    next_ptr->lock_state.fetch_xor(kSFlag, kRelease);
-  }
+
   if ((next_ptr->lock_state.fetch_xor(kXLock, kRelease) & kLockMask) == kXLock) {
     tls_holder.ReleaseQID(qid);
   }
