@@ -178,8 +178,7 @@ OMCSLock::LockSIX()  //
   auto cur = lock_.load(kRelaxed);
   while (true) {
     qnode->lock_state.store(cur & kLockMask, kRelaxed);
-    const auto opr_flag = ((cur & kXLock) >> 1UL) ^ kSFlag;
-    const auto new_tail = ebd_id | (cur & kOPReadMask) | opr_flag;
+    const auto new_tail = ebd_id | (cur & kSAndVersionMask);
     if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
