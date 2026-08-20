@@ -48,6 +48,9 @@ class OMCSLock
   /// @brief The maximum number of queue nodes.
   static constexpr uint64_t kQNodeNum = 1UL << 16UL;
 
+  /// @brief A lock state representing an opportunistic lock.
+  static constexpr uint64_t kInitLock = 1UL << 62UL;
+
   /*##########################################################################*
    * Public inner classes
    *##########################################################################*/
@@ -569,7 +572,7 @@ class OMCSLock
   /**
    * @brief Release a shared lock.
    *
-   * @param qid A queue node ID to be held.
+   * @param qid A queue node ID that holds the lock.
    * @note If a thread calls this function without acquiring an S lock, it will
    * corrupt an internal lock state.
    */
@@ -579,32 +582,32 @@ class OMCSLock
   /**
    * @brief Release a shared-with-intent-exclusive lock.
    *
-   * @param qid A queue node ID to be held.
+   * @param qid A queue node ID that holds the lock.
    * @note If a thread calls this function without acquiring an SIX lock, it
    * will corrupt an internal lock state.
    */
   void UnlockSIX(  //
-      uint64_t qid,
-      uint64_t ver);
+      uint64_t qid);
 
   /**
    * @brief Release an exclusive lock.
    *
-   * @param qid A queue node ID to be held.
+   * @param qid A queue node ID that holds the lock.
    * @param ver A desired version after unlocking.
    * @note If a thread calls this function without acquiring an X lock, it will
    * corrupt an internal lock state.
    */
   void UnlockX(  //
       uint64_t qid,
-      uint64_t ver);
+      uint64_t old_ver,
+      uint64_t new_ver);
 
   /*##########################################################################*
    * Internal member variables
    *##########################################################################*/
 
   /// @brief The current lock state.
-  std::atomic_uint64_t lock_{};
+  std::atomic_uint64_t lock_{kInitLock};
 };
 
 }  // namespace dbgroup::lock
