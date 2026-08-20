@@ -65,7 +65,7 @@ constexpr uint64_t kNoLocks = 0b000;
 constexpr uint64_t kXLock = 1UL << 63UL;
 
 /// @brief A lock state representing an opportunistic lock.
-constexpr uint64_t kSFlag = 1UL << 62UL;
+constexpr uint64_t kSFlag = OMCSLock::kSFlag;
 
 /// @brief A lock state representing a shared lock.
 constexpr uint64_t kSLock = 1UL << 48UL;
