@@ -62,7 +62,7 @@ constexpr uint64_t kNull = 0;
 constexpr uint64_t kNoLocks = 0b000;
 
 /// @brief A lock state representing an exclusive lock.
-constexpr uint64_t kXLock = 1UL << 63UL;
+constexpr uint64_t kXLock = 1UL << 62UL;
 
 /// @brief A lock state representing an opportunistic lock.
 constexpr uint64_t kSFlag = OMCSLock::kSFlag;
@@ -93,6 +93,9 @@ constexpr uint64_t kLockMask = ~(kVersionMask | kQIDMask | kSFlag);
 
 /// @brief A bit mask for extracting a sharedlock state.
 constexpr uint64_t kSMask = kLockMask ^ kXLock;
+
+/// @brief A bit mask for extracting a opportunistic read flag and a version value.
+constexpr uint64_t kSAndVersionMask = kSFlag | kVersionMask;
 
 /*############################################################################*
  * Static variables

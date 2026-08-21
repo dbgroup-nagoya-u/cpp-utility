@@ -49,7 +49,7 @@ class OMCSLock
   static constexpr uint64_t kQNodeNum = 1UL << 16UL;
 
   /// @brief A lock state representing an opportunistic lock.
-  static constexpr uint64_t kInitLock = 1UL << 62UL;
+  static constexpr uint64_t kSFlag = 1UL << 63UL;
 
   /*##########################################################################*
    * Public inner classes
@@ -607,7 +607,7 @@ class OMCSLock
    *##########################################################################*/
 
   /// @brief The current lock state.
-  std::atomic_uint64_t lock_{kInitLock};
+  std::atomic_uint64_t lock_{kSFlag};
 };
 
 }  // namespace dbgroup::lock
