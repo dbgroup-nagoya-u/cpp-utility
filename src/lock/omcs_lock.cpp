@@ -408,9 +408,13 @@ OMCSLock::OptGuard::VerifyVersion(const uint32_t mask, const size_t max_retry) n
   if (++retry_num_ < max_retry) return false;  // continue with OCC
 
   // try to acquire a shared lock
-  while ((cur & kSMask) == kNoLocks) {
-    has_lock_ = dest_->lock_.compare_exchange_weak(cur, cur | kSLock, kAcquire, kRelaxed);
-    if (has_lock_) break;
+  retry_num_ = 0;
+  while ((cur & kSMask) == kNoLocks && (cur & kQIDMask) != kNull) {
+    has_lock_ = dest_->lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed);
+    if (has_lock_) {
+      qid_ = dest_->WaitSLock(cur);
+      break;
+    }
     CPP_UTILITY_SPINLOCK_HINT
   }
   return false;
