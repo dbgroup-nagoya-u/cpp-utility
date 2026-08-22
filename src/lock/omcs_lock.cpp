@@ -146,26 +146,7 @@ OMCSLock::LockS()  //
   }
 
   tls_holder.ReleaseQID(qid);
-  qid = (cur & kQIDMask) >> kQIDShift;
-  qnode = QNodeHolder::GetQNode(qid);
-  if (cur & kXLock) {  // wait for the predecessor to release the lock
-    while (((cur & kQIDMask) >> kQIDShift) == qid && (cur & kXLock)) {
-      std::this_thread::yield();
-      cur = lock_.load(kAcquire);
-    }
-    if (((cur & kQIDMask) >> kQIDShift) != qid) {
-      QNode* next_ptr;
-      while (true) {  // wait until successor fills in its next field
-        next_ptr = qnode->next.load(kRelaxed);
-        if (next_ptr) break;
-        CPP_UTILITY_SPINLOCK_HINT
-      }
-
-      while (next_ptr->lock_state.load(kAcquire) & kXLock) {
-        std::this_thread::yield();
-      }
-    }
-  }
+  qid = WaitSLock(cur);
 end:
   return SGuard{this, qid, static_cast<uint32_t>(cur & kVersionMask)};
 }
