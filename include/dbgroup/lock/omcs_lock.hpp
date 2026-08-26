@@ -329,10 +329,7 @@ class OMCSLock
      */
     [[nodiscard]] auto
     DowngradeToSIX()  //
-        -> SIXGuard
-    {
-      return SIXGuard{std::exchange(dest_, nullptr), qid_, old_ver_};
-    }
+        -> SIXGuard;
 
    private:
     /*########################################################################*
@@ -601,6 +598,17 @@ class OMCSLock
       uint64_t qid,
       uint64_t old_ver,
       uint64_t new_ver);
+
+  /**
+   * @brief Wait for shared lock acquisition.
+   *
+   * @param cur The current lock state.
+   * @return The queue node ID associated with the acquired lock.
+   */
+  auto
+  WaitSLock(  //
+      uint64_t cur) noexcept  //
+      -> uint64_t;
 
   /*##########################################################################*
    * Internal member variables
