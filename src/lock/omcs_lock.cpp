@@ -554,7 +554,7 @@ OMCSLock::OptGuard::TryLockX(  //
   auto* qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto ebd_id = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
-  std::atomic_thread_fence(kRelease);
+  std::atomic_thread_fence(kAcquire);
   auto cur = dest_->lock_.load(kRelaxed);
   while (true) {
     ver_ = cur & kVersionMask;
