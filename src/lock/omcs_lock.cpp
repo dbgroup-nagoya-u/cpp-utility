@@ -549,7 +549,6 @@ OMCSLock::OptGuard::TryLockX(  //
     const uint32_t mask)       //
     -> XGuard
 {
-  std::atomic_thread_fence(kRelease);
   const auto expected = ver_;
   const auto qid = tls_holder.GetQID();
   auto* qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
