@@ -413,7 +413,7 @@ OMCSLock::OptGuard::VerifyVersion(const uint32_t mask, const size_t max_retry) n
   // verify using the optimistic read procedure
   uint64_t cur{};
   while (true) {
-    std::atomic_thread_fence(kRelease);
+    std::atomic_thread_fence(kAcquire);
     cur = dest_->lock_.load(kRelaxed);
     if (cur & kSFlag) break;
     std::this_thread::yield();
