@@ -618,13 +618,11 @@ OMCSLock::SIXGuard::UpgradeToX()  //
   if (dest_ == nullptr) return XGuard{};
 
   auto* qnode = QNodeHolder::GetQNode(qid_);
-  uint64_t next_state;
-  while (true) {  // wait for shared lock holders to release their locks
-    next_state = qnode->lock_state.load(kRelaxed);
-    if ((next_state & kSMask) == kNoLocks) break;
-    std::this_thread::yield();
+  while (qnode->lock_state.load(kRelaxed) & kSMask) {
+    // wait for shared lock holders to release their locks
+    CPP_UTILITY_SPINLOCK_HINT
   }
-  dest_->lock_.fetch_xor(kSFlag, kAcquire);
+  dest_->lock_.fetch_xor(kSFlag, kRelaxed);
 
   return XGuard{std::exchange(dest_, nullptr), qid_, ver_};
 }
