@@ -450,8 +450,8 @@ OMCSLock::OptGuard::ImmediateVerify(  //
 
   // verify using the optimistic read procedure
   const auto expected = ver_;
-  std::atomic_thread_fence(kRelease);
-  const auto cur = dest_->lock_.load(kAcquire);
+  std::atomic_thread_fence(kAcquire);
+  const auto cur = dest_->lock_.load(kRelaxed);
   ver_ = static_cast<uint32_t>(cur);
   return ((ver_ ^ expected) & mask) == 0 && (cur & kSFlag) > 0;
 }
