@@ -562,7 +562,7 @@ OMCSLock::OptGuard::TryLockX(  //
       tls_holder.ReleaseQID(qid);
       return XGuard{};
     }
-    qnode->lock_state.store(cur, kRelaxed);
+    qnode->lock_state.store(cur & kLockMask, kRelaxed);
     const auto new_tail = ebd_id | (cur & kSAndVersionMask);
     if (dest_->lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
