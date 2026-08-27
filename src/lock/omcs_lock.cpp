@@ -369,8 +369,9 @@ auto
 OMCSLock::XGuard::DowngradeToSIX() //
     -> SIXGuard
 {
-  dest_->lock_.fetch_xor(kSFlag, kAcquire);
-  return SIXGuard{std::exchange(dest_, nullptr), qid_, old_ver_};
+  const auto ver_xor = static_cast<uint64_t>(old_ver_ ^ new_ver_);
+  dest_->lock_.fetch_xor(kSFlag | ver_xor, kRelease);
+  return SIXGuard{std::exchange(dest_, nullptr), qid_, new_ver_};
 }
 
 /*############################################################################*
