@@ -584,7 +584,7 @@ OMCSLock::OptGuard::TryLockX(  //
     dest_->UnlockX(qid, ver_, ver_);
     return XGuard{};
   }
-  return XGuard{std::exchange(dest_, nullptr), qid, static_cast<uint32_t>(cur & kVersionMask)};
+  return XGuard{std::exchange(dest_, nullptr), qid, ver_};
 }
 
 /*############################################################################*
