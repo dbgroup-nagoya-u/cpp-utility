@@ -102,6 +102,7 @@ class OMCSLock
       }
       dest_ = std::exchange(rhs.dest_, nullptr);
       qid_ = rhs.qid_;
+      ver_ = rhs.ver_;
       return *this;
     }
 
@@ -195,6 +196,7 @@ class OMCSLock
       }
       dest_ = std::exchange(rhs.dest_, nullptr);
       qid_ = rhs.qid_;
+      ver_ = rhs.ver_;
       return *this;
     }
 

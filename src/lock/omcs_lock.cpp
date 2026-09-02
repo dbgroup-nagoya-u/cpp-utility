@@ -423,10 +423,9 @@ OMCSLock::OptGuard::TryLockSIX(  //
     while (qnode->lock_state.load(kRelaxed) & kXLock) {
       std::this_thread::yield();
     }
+    cur = dest_->lock_.load(kAcquire);
+    ver_ = static_cast<uint32_t>(cur & kVersionMask);
   }
-
-  cur = dest_->lock_.load(kAcquire);
-  ver_ = static_cast<uint32_t>(cur & kVersionMask);
 
   if ((ver_ ^ expected) & mask) {
     dest_->UnlockSIX(qid);
