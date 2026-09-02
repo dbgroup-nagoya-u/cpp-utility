@@ -128,17 +128,18 @@ OMCSLock::LockS()  //
   auto cur = lock_.load(kRelaxed);
   while (true) {
     if (cur & kQIDMask) {  // there is the predecessor
-      if (lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) break;
+      if (lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) {
+        tls_holder.ReleaseQID(qid);
+        qid = WaitSLock(cur);
+        break;
+      }
     } else {  // the initial shared lock
       const auto new_tail = ebd_id | (cur & kVersionMask);
-      if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) goto end;
+      if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
     }
     CPP_UTILITY_SPINLOCK_HINT
   }
 
-  tls_holder.ReleaseQID(qid);
-  qid = WaitSLock(cur);
-end:
   return SGuard{this, qid, static_cast<uint32_t>(cur & kVersionMask)};
 }
 
@@ -158,7 +159,7 @@ OMCSLock::LockSIX()  //
     CPP_UTILITY_SPINLOCK_HINT
   }
 
-  if ((cur & kLockMask) != kNoLocks) {
+  if (cur & kLockMask) {
     // wait until predecessor gives up the lock
     auto* pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
     pred_qnode->next.store(qnode, kRelaxed);
@@ -188,7 +189,7 @@ OMCSLock::LockX()  //
     CPP_UTILITY_SPINLOCK_HINT
   }
 
-  if ((cur & kLockMask) != kNoLocks) {
+  if (cur & kLockMask) {
     // wait until predecessor gives up the lock
     auto* pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
     pred_qnode->next.store(qnode, kRelaxed);
@@ -219,8 +220,8 @@ OMCSLock::UnlockS(  //
       const auto unlock = cur - kSLock;
       if (unlock & kLockMask) {
         if (lock_.compare_exchange_weak(cur, unlock, kRelease, kRelaxed)) return;
-      } else if (lock_.compare_exchange_weak(cur, (cur & kVersionMask) | kSFlag, kRelease,
-                                             kRelaxed)) {
+      } else if (lock_.compare_exchange_weak(cur, (cur & kVersionMask) | kSFlag,  //
+                                             kRelease, kRelaxed)) {
         tls_holder.ReleaseQID(qid);
         return;
       }
@@ -233,6 +234,7 @@ OMCSLock::UnlockS(  //
       CPP_UTILITY_SPINLOCK_HINT
     }
   }
+
   if ((next_node->lock_state.fetch_sub(kSLock, kRelease) & kLockMask) == kSLock) {
     tls_holder.ReleaseQID(qid);
   }
@@ -458,7 +460,9 @@ OMCSLock::OptGuard::~OptGuard()
 }
 
 auto
-OMCSLock::OptGuard::VerifyVersion(const uint32_t mask, const size_t max_retry) noexcept  //
+OMCSLock::OptGuard::VerifyVersion(  //
+    const uint32_t mask,
+    const size_t max_retry) noexcept  //
     -> bool
 {
   if (has_lock_) {
@@ -533,21 +537,20 @@ OMCSLock::OptGuard::TryLockS(  //
       return SGuard{};
     }
     if (tail_qid) {  // there is the predecessor
-      if (dest_->lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) break;
+      if (dest_->lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) {
+        tls_holder.ReleaseQID(qid);
+        qid = dest_->WaitSLock(cur);
+        cur = dest_->lock_.load(kAcquire);
+        ver_ = cur & kVersionMask;
+        break;
+      }
     } else {  // the initial shared lock
       const auto new_tail = ebd_id | (cur & kVersionMask);
-      if (dest_->lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) goto end;
+      if (dest_->lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
     }
     CPP_UTILITY_SPINLOCK_HINT
   }
 
-  tls_holder.ReleaseQID(qid);
-  qid = dest_->WaitSLock(cur);
-
-  cur = dest_->lock_.load(kAcquire);
-  ver_ = cur & kVersionMask;
-
-end:
   if ((ver_ ^ expected) & mask) {
     dest_->UnlockS(qid);
     return SGuard{};
@@ -579,7 +582,7 @@ OMCSLock::OptGuard::TryLockSIX(  //
     CPP_UTILITY_SPINLOCK_HINT
   }
 
-  if ((cur & kLockMask) != kNoLocks) {
+  if (cur & kLockMask) {
     // wait until predecessor gives up the lock
     auto* pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
     pred_qnode->next.store(qnode, kRelaxed);
@@ -622,7 +625,7 @@ OMCSLock::OptGuard::TryLockX(  //
     CPP_UTILITY_SPINLOCK_HINT
   }
 
-  if ((cur & kLockMask) != kNoLocks) {
+  if (cur & kLockMask) {
     // wait until predecessor gives up the lock
     auto* pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
     pred_qnode->next.store(qnode, kRelaxed);
