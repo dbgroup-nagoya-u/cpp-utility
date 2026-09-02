@@ -92,9 +92,18 @@ class OMCSLock
     {
     }
 
-    auto operator=(             //
+    auto
+    operator=(                  //
         SGuard&& rhs) noexcept  //
-        -> SGuard&;
+        -> SGuard&
+    {
+      if (dest_) {
+        dest_->UnlockS(qid_);
+      }
+      dest_ = std::exchange(rhs.dest_, nullptr);
+      qid_ = rhs.qid_;
+      return *this;
+    }
 
     // forbid copying
     SGuard(const SGuard&) = delete;
@@ -104,7 +113,12 @@ class OMCSLock
      * Public destructors
      *########################################################################*/
 
-    ~SGuard();
+    ~SGuard()
+    {
+      if (dest_) {
+        dest_->UnlockS(qid_);
+      }
+    }
 
     /*########################################################################*
      * Public APIs
@@ -171,9 +185,18 @@ class OMCSLock
     {
     }
 
-    auto operator=(               //
+    auto
+    operator=(                    //
         SIXGuard&& rhs) noexcept  //
-        -> SIXGuard&;
+        -> SIXGuard&
+    {
+      if (dest_) {
+        dest_->UnlockSIX(qid_);
+      }
+      dest_ = std::exchange(rhs.dest_, nullptr);
+      qid_ = rhs.qid_;
+      return *this;
+    }
 
     // forbid copying
     SIXGuard(const SIXGuard&) = delete;
@@ -183,7 +206,12 @@ class OMCSLock
      * Public destructors
      *########################################################################*/
 
-    ~SIXGuard();
+    ~SIXGuard()
+    {
+      if (dest_) {
+        dest_->UnlockSIX(qid_);
+      }
+    }
 
     /*########################################################################*
      * Public APIs
@@ -263,9 +291,20 @@ class OMCSLock
     {
     }
 
-    auto operator=(             //
+    auto
+    operator=(                  //
         XGuard&& rhs) noexcept  //
-        -> XGuard&;
+        -> XGuard&
+    {
+      if (dest_) {
+        dest_->UnlockX(qid_, old_ver_, new_ver_);
+      }
+      dest_ = std::exchange(rhs.dest_, nullptr);
+      qid_ = rhs.qid_;
+      old_ver_ = rhs.old_ver_;
+      new_ver_ = rhs.new_ver_;
+      return *this;
+    }
 
     // forbid copying
     XGuard(const XGuard&) = delete;
@@ -275,11 +314,12 @@ class OMCSLock
      * Public destructors
      *########################################################################*/
 
-    /**
-     * @brief Destroy this instance and release a lock if holding.
-     *
-     */
-    ~XGuard();
+    ~XGuard()
+    {
+      if (dest_) {
+        dest_->UnlockX(qid_, old_ver_, new_ver_);
+      }
+    }
 
     /*########################################################################*
      * Public APIs
@@ -328,8 +368,14 @@ class OMCSLock
      * structure.
      */
     [[nodiscard]]
-    auto DowngradeToSIX()  //
-        -> SIXGuard;
+    auto
+    DowngradeToSIX()  //
+        -> SIXGuard
+    {
+      const auto ver_xor = static_cast<uint64_t>(old_ver_ ^ new_ver_);
+      dest_->lock_.fetch_xor(kSFlag | ver_xor, kRelease);
+      return SIXGuard{std::exchange(dest_, nullptr), qid_, new_ver_};
+    }
 
    private:
     /*########################################################################*
@@ -384,9 +430,21 @@ class OMCSLock
     {
     }
 
-    auto operator=(               //
+    auto
+    operator=(                    //
         OptGuard&& rhs) noexcept  //
-        -> OptGuard&;
+        -> OptGuard&
+    {
+      if (dest_ && has_lock_) {
+        dest_->UnlockS(qid_);
+      }
+      dest_ = std::exchange(rhs.dest_, nullptr);
+      qid_ = rhs.qid_;
+      ver_ = rhs.ver_;
+      retry_num_ = rhs.retry_num_;
+      has_lock_ = std::exchange(rhs.has_lock_, false);
+      return *this;
+    }
 
     // forbid copying
     OptGuard(const OptGuard&) = delete;
@@ -396,7 +454,12 @@ class OMCSLock
      * Public destructors
      *########################################################################*/
 
-    ~OptGuard();
+    ~OptGuard()
+    {
+      if (dest_ && has_lock_) {
+        dest_->UnlockS(qid_);
+      }
+    }
 
     /*########################################################################*
      * Public getters

@@ -269,52 +269,8 @@ OMCSLock::WaitSLock(        //
 }
 
 /*############################################################################*
- * Shared lock guards
- *############################################################################*/
-
-auto
-OMCSLock::SGuard::operator=(  //
-    SGuard&& rhs) noexcept    //
-    -> SGuard&
-{
-  if (dest_) {
-    dest_->UnlockS(qid_);
-  }
-  dest_ = std::exchange(rhs.dest_, nullptr);
-  qid_ = rhs.qid_;
-  return *this;
-}
-
-OMCSLock::SGuard::~SGuard()
-{
-  if (dest_) {
-    dest_->UnlockS(qid_);
-  }
-}
-
-/*############################################################################*
  * Shared-with-intent-exclusive lock guards
  *############################################################################*/
-
-auto
-OMCSLock::SIXGuard::operator=(  //
-    SIXGuard&& rhs) noexcept    //
-    -> SIXGuard&
-{
-  if (dest_) {
-    dest_->UnlockSIX(qid_);
-  }
-  dest_ = std::exchange(rhs.dest_, nullptr);
-  qid_ = rhs.qid_;
-  return *this;
-}
-
-OMCSLock::SIXGuard::~SIXGuard()
-{
-  if (dest_) {
-    dest_->UnlockSIX(qid_);
-  }
-}
 
 auto
 OMCSLock::SIXGuard::UpgradeToX()  //
@@ -333,66 +289,8 @@ OMCSLock::SIXGuard::UpgradeToX()  //
 }
 
 /*############################################################################*
- * Exclusive lock guards
- *############################################################################*/
-
-auto
-OMCSLock::XGuard::operator=(  //
-    XGuard&& rhs) noexcept    //
-    -> XGuard&
-{
-  if (dest_) {
-    dest_->UnlockX(qid_, old_ver_, new_ver_);
-  }
-  dest_ = std::exchange(rhs.dest_, nullptr);
-  qid_ = rhs.qid_;
-  old_ver_ = rhs.old_ver_;
-  new_ver_ = rhs.new_ver_;
-  return *this;
-}
-
-OMCSLock::XGuard::~XGuard()
-{
-  if (dest_) {
-    dest_->UnlockX(qid_, old_ver_, new_ver_);
-  }
-}
-
-auto
-OMCSLock::XGuard::DowngradeToSIX()  //
-    -> SIXGuard
-{
-  const auto ver_xor = static_cast<uint64_t>(old_ver_ ^ new_ver_);
-  dest_->lock_.fetch_xor(kSFlag | ver_xor, kRelease);
-  return SIXGuard{std::exchange(dest_, nullptr), qid_, new_ver_};
-}
-
-/*############################################################################*
  * Optimistic lock guards
  *############################################################################*/
-
-auto
-OMCSLock::OptGuard::operator=(  //
-    OptGuard&& rhs) noexcept    //
-    -> OptGuard&
-{
-  if (dest_ && has_lock_) {
-    dest_->UnlockS(qid_);
-  }
-  dest_ = std::exchange(rhs.dest_, nullptr);
-  qid_ = rhs.qid_;
-  ver_ = rhs.ver_;
-  retry_num_ = rhs.retry_num_;
-  has_lock_ = std::exchange(rhs.has_lock_, false);
-  return *this;
-}
-
-OMCSLock::OptGuard::~OptGuard()
-{
-  if (dest_ && has_lock_) {
-    dest_->UnlockS(qid_);
-  }
-}
 
 auto
 OMCSLock::OptGuard::VerifyVersion(  //
@@ -466,7 +364,7 @@ OMCSLock::OptGuard::TryLockS(  //
   auto cur = dest_->lock_.load(kRelaxed);
   auto tail_qid = (cur & kQIDMask) >> kQIDShift;
   while (true) {
-    ver_ = cur & kVersionMask;
+    ver_ = static_cast<uint32_t>(cur & kVersionMask);
     if ((cur ^ expected) & mask) {
       tls_holder.ReleaseQID(qid);
       return SGuard{};
@@ -506,7 +404,7 @@ OMCSLock::OptGuard::TryLockSIX(  //
   std::atomic_thread_fence(kAcquire);
   auto cur = dest_->lock_.load(kRelaxed);
   while (true) {
-    ver_ = cur & kVersionMask;
+    ver_ = static_cast<uint32_t>(cur & kVersionMask);
     if ((cur ^ expected) & mask) {
       tls_holder.ReleaseQID(qid);
       return SIXGuard{};
@@ -527,7 +425,7 @@ OMCSLock::OptGuard::TryLockSIX(  //
   }
 
   cur = dest_->lock_.load(kAcquire);
-  ver_ = cur & kVersionMask;
+  ver_ = static_cast<uint32_t>(cur & kVersionMask);
 
   if ((ver_ ^ expected) & mask) {
     dest_->UnlockSIX(qid);
