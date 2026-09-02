@@ -691,11 +691,11 @@ class OMCSLock
   /**
    * @brief Wait for shared lock acquisition.
    *
-   * @param cur The current lock state.
+   * @param[in,out] cur The current lock state.
    * @return The queue node ID associated with the acquired lock.
    */
-  auto WaitSLock(             //
-      uint64_t cur) noexcept  //
+  auto WaitSLock(              //
+      uint64_t& cur) noexcept  //
       -> uint64_t;
 
   /*##########################################################################*

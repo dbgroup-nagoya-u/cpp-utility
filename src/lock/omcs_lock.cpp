@@ -215,11 +215,11 @@ OMCSLock::UnlockSIX(  //
 {
   auto* qnode = QNodeHolder::GetQNode(qid);
 
-  auto* next_ptr = qnode->next.load(kAcquire);
+  auto* next_ptr = qnode->next.load(kRelaxed);
   if (next_ptr == nullptr) {  // this is the tail node
     auto cur = lock_.load(kRelaxed);
     while (((cur & kQIDMask) >> kQIDShift) == qid) {
-      if (lock_.compare_exchange_weak(cur, cur ^ kXLock, kRelaxed, kRelaxed)) {
+      if (lock_.compare_exchange_weak(cur, cur ^ kXLock, kRelease, kRelaxed)) {
         if ((cur & kSMask) == kNoLocks) {
           tls_holder.ReleaseQID(qid);
         }
@@ -241,8 +241,8 @@ OMCSLock::UnlockSIX(  //
 }
 
 auto
-OMCSLock::WaitSLock(        //
-    uint64_t cur) noexcept  //
+OMCSLock::WaitSLock(         //
+    uint64_t& cur) noexcept  //
     -> uint64_t
 {
   auto qid = (cur & kQIDMask) >> kQIDShift;
@@ -260,9 +260,10 @@ OMCSLock::WaitSLock(        //
         CPP_UTILITY_SPINLOCK_HINT
       }
 
-      while (next_ptr->lock_state.load(kAcquire) & kXLock) {
+      while (next_ptr->lock_state.load(kRelaxed) & kXLock) {
         std::this_thread::yield();
       }
+      cur = lock_.load(kAcquire);
     }
   }
   return qid;
@@ -283,7 +284,7 @@ OMCSLock::SIXGuard::UpgradeToX()  //
     // wait for shared lock holders to release their locks
     CPP_UTILITY_SPINLOCK_HINT
   }
-  dest_->lock_.fetch_xor(kSFlag, kRelaxed);
+  dest_->lock_.fetch_xor(kSFlag, kAcquire);
 
   return XGuard{std::exchange(dest_, nullptr), qid_, ver_};
 }
@@ -305,9 +306,9 @@ OMCSLock::OptGuard::VerifyVersion(  //
   }
 
   // verify using the optimistic read procedure
-  uint64_t cur{};
+  std::atomic_thread_fence(kAcquire);
+  uint64_t cur;
   while (true) {
-    std::atomic_thread_fence(kAcquire);
     cur = dest_->lock_.load(kRelaxed);
     if (cur & kSFlag) break;
     std::this_thread::yield();
@@ -328,6 +329,7 @@ OMCSLock::OptGuard::VerifyVersion(  //
     }
     CPP_UTILITY_SPINLOCK_HINT
   }
+  ver_ = static_cast<uint32_t>(cur & kVersionMask);
   return false;
 }
 
@@ -373,8 +375,7 @@ OMCSLock::OptGuard::TryLockS(  //
       if (dest_->lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) {
         tls_holder.ReleaseQID(qid);
         qid = dest_->WaitSLock(cur);
-        cur = dest_->lock_.load(kAcquire);
-        ver_ = cur & kVersionMask;
+        ver_ = static_cast<uint32_t>(cur & kVersionMask);
         break;
       }
     } else {  // the initial shared lock
@@ -419,7 +420,7 @@ OMCSLock::OptGuard::TryLockSIX(  //
     // wait until predecessor gives up the lock
     auto* pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
     pred_qnode->next.store(qnode, kRelaxed);
-    while (qnode->lock_state.load(kAcquire) & kXLock) {
+    while (qnode->lock_state.load(kRelaxed) & kXLock) {
       std::this_thread::yield();
     }
   }
