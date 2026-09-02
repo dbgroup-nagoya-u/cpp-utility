@@ -23,6 +23,7 @@
 #include <utility>
 
 // local sources
+#include "dbgroup/constants.hpp"
 #include "dbgroup/lock/utility.hpp"
 
 namespace dbgroup::lock
@@ -482,9 +483,13 @@ class OMCSLock
      * @retval An empty guard instance otherwise.
      */
     [[nodiscard]]
-    auto TryLockX(                //
+    auto
+    TryLockX(                     //
         uint32_t mask = kNoMask)  //
-        -> XGuard;
+        -> XGuard
+    {
+      return TryLockSIX(mask).UpgradeToX();
+    }
 
    private:
     /*########################################################################*
@@ -569,8 +574,12 @@ class OMCSLock
    * spinlock and back-off.
    */
   [[nodiscard]]
-  auto LockX()  //
-      -> XGuard;
+  auto
+  LockX()  //
+      -> XGuard
+  {
+    return LockSIX().UpgradeToX();
+  }
 
  private:
   /*##########################################################################*
@@ -601,14 +610,20 @@ class OMCSLock
    * @brief Release an exclusive lock.
    *
    * @param qid A queue node ID that holds the lock.
-   * @param ver A desired version after unlocking.
+   * @param old_ver The current version before unlocking.
+   * @param new_ver The desired version after unlocking.
    * @note If a thread calls this function without acquiring an X lock, it will
    * corrupt an internal lock state.
    */
-  void UnlockX(  //
+  void
+  UnlockX(  //
       uint64_t qid,
       uint64_t old_ver,
-      uint64_t new_ver);
+      uint64_t new_ver)
+  {
+    lock_.fetch_xor(kSFlag | static_cast<uint64_t>(old_ver ^ new_ver), kRelease);
+    UnlockSIX(qid);
+  }
 
   /**
    * @brief Wait for shared lock acquisition.
