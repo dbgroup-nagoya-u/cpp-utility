@@ -118,7 +118,7 @@ OMCSLock::GetVersion() noexcept  //
 }
 
 auto
-OMCSLock::LockS()  //
+OMCSLock::LockS() noexcept  //
     -> SGuard
 {
   auto qid = tls_holder.GetQID();
@@ -144,7 +144,7 @@ OMCSLock::LockS()  //
 }
 
 auto
-OMCSLock::LockSIX()  //
+OMCSLock::LockSIX() noexcept  //
     -> SIXGuard
 {
   const auto qid = tls_holder.GetQID();
@@ -178,7 +178,7 @@ OMCSLock::LockSIX()  //
 
 void
 OMCSLock::UnlockS(  //
-    const uint64_t qid)
+    const uint64_t qid) noexcept
 {
   auto* qnode = QNodeHolder::GetQNode(qid);
 
@@ -211,7 +211,7 @@ OMCSLock::UnlockS(  //
 
 void
 OMCSLock::UnlockSIX(  //
-    const uint64_t qid)
+    const uint64_t qid) noexcept
 {
   auto* qnode = QNodeHolder::GetQNode(qid);
 
@@ -274,7 +274,7 @@ OMCSLock::WaitSLock(         //
  *############################################################################*/
 
 auto
-OMCSLock::SIXGuard::UpgradeToX()  //
+OMCSLock::SIXGuard::UpgradeToX() noexcept  //
     -> XGuard
 {
   if (dest_ == nullptr) return XGuard{};
@@ -353,8 +353,8 @@ OMCSLock::OptGuard::ImmediateVerify(  //
 }
 
 auto
-OMCSLock::OptGuard::TryLockS(  //
-    const uint32_t mask)       //
+OMCSLock::OptGuard::TryLockS(      //
+    const uint32_t mask) noexcept  //
     -> SGuard
 {
   const auto expected = ver_;
@@ -393,8 +393,8 @@ OMCSLock::OptGuard::TryLockS(  //
 }
 
 auto
-OMCSLock::OptGuard::TryLockSIX(  //
-    const uint32_t mask)         //
+OMCSLock::OptGuard::TryLockSIX(    //
+    const uint32_t mask) noexcept  //
     -> SIXGuard
 {
   const auto expected = ver_;

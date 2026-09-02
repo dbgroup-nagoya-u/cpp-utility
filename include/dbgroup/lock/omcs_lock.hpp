@@ -237,7 +237,7 @@ class OMCSLock
      * ownership.
      */
     [[nodiscard]]
-    auto UpgradeToX()  //
+    auto UpgradeToX() noexcept  //
         -> XGuard;
 
    private:
@@ -371,7 +371,7 @@ class OMCSLock
      */
     [[nodiscard]]
     auto
-    DowngradeToSIX()  //
+    DowngradeToSIX() noexcept  //
         -> SIXGuard
     {
       const auto ver_xor = static_cast<uint64_t>(old_ver_ ^ new_ver_);
@@ -524,8 +524,8 @@ class OMCSLock
      * spinlock and back-off.
      */
     [[nodiscard]]
-    auto TryLockS(                //
-        uint32_t mask = kNoMask)  //
+    auto TryLockS(                         //
+        uint32_t mask = kNoMask) noexcept  //
         -> SGuard;
 
     /**
@@ -536,8 +536,8 @@ class OMCSLock
      * @retval An empty guard instance otherwise.
      */
     [[nodiscard]]
-    auto TryLockSIX(              //
-        uint32_t mask = kNoMask)  //
+    auto TryLockSIX(                       //
+        uint32_t mask = kNoMask) noexcept  //
         -> SIXGuard;
 
     /**
@@ -549,8 +549,8 @@ class OMCSLock
      */
     [[nodiscard]]
     auto
-    TryLockX(                     //
-        uint32_t mask = kNoMask)  //
+    TryLockX(                              //
+        uint32_t mask = kNoMask) noexcept  //
         -> XGuard
     {
       return TryLockSIX(mask).UpgradeToX();
@@ -617,7 +617,7 @@ class OMCSLock
    * spinlock and back-off.
    */
   [[nodiscard]]
-  auto LockS()  //
+  auto LockS() noexcept  //
       -> SGuard;
 
   /**
@@ -628,7 +628,7 @@ class OMCSLock
    * spinlock and back-off.
    */
   [[nodiscard]]
-  auto LockSIX()  //
+  auto LockSIX() noexcept  //
       -> SIXGuard;
 
   /**
@@ -640,7 +640,7 @@ class OMCSLock
    */
   [[nodiscard]]
   auto
-  LockX()  //
+  LockX() noexcept  //
       -> XGuard
   {
     return LockSIX().UpgradeToX();
@@ -659,7 +659,7 @@ class OMCSLock
    * corrupt an internal lock state.
    */
   void UnlockS(  //
-      uint64_t qid);
+      uint64_t qid) noexcept;
 
   /**
    * @brief Release a shared-with-intent-exclusive lock.
@@ -669,7 +669,7 @@ class OMCSLock
    * will corrupt an internal lock state.
    */
   void UnlockSIX(  //
-      uint64_t qid);
+      uint64_t qid) noexcept;
 
   /**
    * @brief Release an exclusive lock.
@@ -684,7 +684,7 @@ class OMCSLock
   UnlockX(  //
       uint64_t qid,
       uint64_t old_ver,
-      uint64_t new_ver)
+      uint64_t new_ver) noexcept
   {
     lock_.fetch_xor(kSFlag | static_cast<uint64_t>(old_ver ^ new_ver), kRelease);
     UnlockSIX(qid);
