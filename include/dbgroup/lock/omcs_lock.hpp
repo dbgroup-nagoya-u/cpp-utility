@@ -29,18 +29,39 @@
 namespace dbgroup::lock
 {
 /**
- * @brief A class for representing an optimistic MCS queue lock.
+ * @brief An optimistic MCS lock.
  *
  */
 class OMCSLock
 {
  public:
   /*##########################################################################*
-   * Public types
+   * Public type declarations
    *##########################################################################*/
 
-  // forward declarations
+  /**
+   * @brief A scoped guard for shared locks.
+   *
+   */
+  class SGuard;
+
+  /**
+   * @brief A scoped guard for shared-with-intent-exclusive locks.
+   *
+   */
+  class SIXGuard;
+
+  /**
+   * @brief A scoped guard for exclusive locks.
+   *
+   */
   class XGuard;
+
+  /**
+   * @brief A guard for optimistic reads with version-based verification.
+   *
+   */
+  class OptGuard;
 
   /*##########################################################################*
    * Public constants
@@ -53,13 +74,78 @@ class OMCSLock
   static constexpr uint64_t kSFlag = 1UL << 63UL;
 
   /*##########################################################################*
-   * Public inner classes
+   * Public constructors and assignment operators
+   *##########################################################################*/
+
+  constexpr OMCSLock() noexcept = default;
+
+  OMCSLock(const OMCSLock&) = delete;
+  OMCSLock(OMCSLock&&) = delete;
+
+  auto operator=(const OMCSLock&) -> OMCSLock& = delete;
+  auto operator=(OMCSLock&&) -> OMCSLock& = delete;
+
+  /*##########################################################################*
+   * Public destructors
+   *##########################################################################*/
+
+  ~OMCSLock() = default;
+
+  /*##########################################################################*
+   * Public APIs
    *##########################################################################*/
 
   /**
-   * @brief A class for representing a guard instance for shared locks.
+   * @return An empty guard instance with the current version value.
    *
+   * @note This function does not give up reading a version value and continues
+   * with spinlock and back-off.
    */
+  [[nodiscard]]
+  auto GetVersion() noexcept  //
+      -> OptGuard;
+
+  /**
+   * @brief Get a shared lock.
+   *
+   * @return A guard instance for the acquired lock.
+   * @note This function does not give up acquiring a lock and continues with
+   * spinlock and back-off.
+   */
+  [[nodiscard]]
+  auto LockS() noexcept  //
+      -> SGuard;
+
+  /**
+   * @brief Get a shared-with-intent-exclusive lock.
+   *
+   * @return A guard instance for the acquired lock.
+   * @note This function does not give up acquiring a lock and continues with
+   * spinlock and back-off.
+   */
+  [[nodiscard]]
+  auto LockSIX() noexcept  //
+      -> SIXGuard;
+
+  /**
+   * @brief Get an exclusive lock.
+   *
+   * @return A guard instance for the acquired lock.
+   * @note This function does not give up acquiring a lock and continues with
+   * spinlock and back-off.
+   */
+  [[nodiscard]]
+  auto
+  LockX() noexcept  //
+      -> XGuard
+  {
+    return LockSIX().UpgradeToX();
+  }
+
+  /*##########################################################################*
+   * Public type definitions
+   *##########################################################################*/
+
   class SGuard
   {
    public:
@@ -150,10 +236,6 @@ class OMCSLock
     uint32_t ver_{};
   };
 
-  /**
-   * @brief A class for representing a guard instance for SIX locks.
-   *
-   */
   class SIXGuard
   {
    public:
@@ -255,10 +337,6 @@ class OMCSLock
     uint32_t ver_{};
   };
 
-  /**
-   * @brief A class for representing a guard instance for exclusive locks.
-   *
-   */
   class XGuard
   {
    public:
@@ -397,10 +475,6 @@ class OMCSLock
     uint32_t new_ver_{};
   };
 
-  /**
-   * @brief A class for representing a guard instance for optimistic locking.
-   *
-   */
   class OptGuard
   {
    public:
@@ -577,75 +651,6 @@ class OMCSLock
     bool has_lock_{};
   };
 
-  /*##########################################################################*
-   * Public constructors and assignment operators
-   *##########################################################################*/
-
-  constexpr OMCSLock() noexcept = default;
-
-  OMCSLock(const OMCSLock&) = delete;
-  OMCSLock(OMCSLock&&) = delete;
-
-  auto operator=(const OMCSLock&) -> OMCSLock& = delete;
-  auto operator=(OMCSLock&&) -> OMCSLock& = delete;
-
-  /*##########################################################################*
-   * Public destructors
-   *##########################################################################*/
-
-  ~OMCSLock() = default;
-
-  /*##########################################################################*
-   * Public APIs
-   *##########################################################################*/
-
-  /**
-   * @return An empty guard instance with the current version value.
-   *
-   * @note This function does not give up reading a version value and continues
-   * with spinlock and back-off.
-   */
-  [[nodiscard]]
-  auto GetVersion() noexcept  //
-      -> OptGuard;
-
-  /**
-   * @brief Get a shared lock.
-   *
-   * @return A guard instance for the acquired lock.
-   * @note This function does not give up acquiring a lock and continues with
-   * spinlock and back-off.
-   */
-  [[nodiscard]]
-  auto LockS() noexcept  //
-      -> SGuard;
-
-  /**
-   * @brief Get a shared-with-intent-exclusive lock.
-   *
-   * @return A guard instance for the acquired lock.
-   * @note This function does not give up acquiring a lock and continues with
-   * spinlock and back-off.
-   */
-  [[nodiscard]]
-  auto LockSIX() noexcept  //
-      -> SIXGuard;
-
-  /**
-   * @brief Get an exclusive lock.
-   *
-   * @return A guard instance for the acquired lock.
-   * @note This function does not give up acquiring a lock and continues with
-   * spinlock and back-off.
-   */
-  [[nodiscard]]
-  auto
-  LockX() noexcept  //
-      -> XGuard
-  {
-    return LockSIX().UpgradeToX();
-  }
-
  private:
   /*##########################################################################*
    * Internal APIs
@@ -707,6 +712,14 @@ class OMCSLock
   /// @brief The current lock state.
   std::atomic_uint64_t lock_{kSFlag};
 };
+
+/*############################################################################*
+ * Static assertions
+ *############################################################################*/
+
+static_assert(Lockable<OMCSLock>);
+static_assert(PessimisticallyLockable<OMCSLock>);
+static_assert(OptimisticallyLockable<OMCSLock>);
 
 }  // namespace dbgroup::lock
 
