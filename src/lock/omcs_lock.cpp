@@ -58,35 +58,26 @@ using QNodeHolder = component::QueueNodeHolder<QNode, OMCSLock::kQNodeNum>;
 /// @brief The `uintptr_t` of nullptr.
 constexpr uint64_t kNull = 0;
 
+/// @brief A lock state representing an opportunistic lock.
+constexpr uint64_t kSFlag = OMCSLock::kSFlag;
+
 /// @brief A lock state representing no locks.
 constexpr uint64_t kNoLocks = 0b000;
 
 /// @brief A lock state representing an exclusive lock.
 constexpr uint64_t kXLock = 1UL << 62UL;
 
-/// @brief A lock state representing an opportunistic lock.
-constexpr uint64_t kSFlag = OMCSLock::kSFlag;
-
 /// @brief A lock state representing a shared lock.
 constexpr uint64_t kSLock = 1UL << 48UL;
 
-/// @brief A bit mask for extracting X and SIX states.
-constexpr uint64_t kXMask = kXLock;
-
-/// @brief A bit mask for extracting an X-lock state and opportunistic read flag.
-constexpr uint64_t kXAndOPReadMask = kXMask | kSFlag;
+/// @brief A bit shift for QNode.
+constexpr uint64_t kQIDShift = 32UL;
 
 /// @brief A bit mask for extracting a version value.
-constexpr uint64_t kVersionMask = ~(~0UL << 32UL);
-
-/// @brief A bit mask for extracting the OPR flag and a version.
-constexpr uint64_t kOPReadMask = kSFlag | kVersionMask;
+constexpr uint64_t kVersionMask = ~(~0UL << kQIDShift);
 
 /// @brief A bit mask for extracting a node pointer.
 constexpr uint64_t kQIDMask = (kSLock - 1UL) ^ kVersionMask;
-
-/// @brief A bit shift for QNode.
-constexpr uint64_t kQIDShift = 32UL;
 
 /// @brief A bit mask for extracting a lock state.
 constexpr uint64_t kLockMask = ~(kVersionMask | kQIDMask | kSFlag);
@@ -131,7 +122,7 @@ OMCSLock::LockS()  //
     -> SGuard
 {
   auto qid = tls_holder.GetQID();
-  auto* qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
+  new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto ebd_id = (static_cast<uint64_t>(qid) << kQIDShift) | kSFlag | kSLock;
 
   auto cur = lock_.load(kRelaxed);
@@ -139,7 +130,7 @@ OMCSLock::LockS()  //
     if (cur & kQIDMask) {  // there is the predecessor
       if (lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) break;
     } else {  // the initial shared lock
-      const auto new_tail =  ebd_id | (cur & kVersionMask);
+      const auto new_tail = ebd_id | (cur & kVersionMask);
       if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) goto end;
     }
     CPP_UTILITY_SPINLOCK_HINT
@@ -228,7 +219,8 @@ OMCSLock::UnlockS(  //
       const auto unlock = cur - kSLock;
       if (unlock & kLockMask) {
         if (lock_.compare_exchange_weak(cur, unlock, kRelease, kRelaxed)) return;
-      } else if (lock_.compare_exchange_weak(cur, (cur & kVersionMask) | kSFlag, kRelease, kRelaxed)) {
+      } else if (lock_.compare_exchange_weak(cur, (cur & kVersionMask) | kSFlag, kRelease,
+                                             kRelaxed)) {
         tls_holder.ReleaseQID(qid);
         return;
       }
@@ -312,12 +304,12 @@ OMCSLock::UnlockX(  //
 }
 
 auto
-OMCSLock::WaitSLock(  //
+OMCSLock::WaitSLock(        //
     uint64_t cur) noexcept  //
     -> uint64_t
 {
   auto qid = (cur & kQIDMask) >> kQIDShift;
-  auto *qnode = QNodeHolder::GetQNode(qid);
+  auto* qnode = QNodeHolder::GetQNode(qid);
   if (cur & kXLock) {  // wait for the predecessor to release the lock
     while (((cur & kQIDMask) >> kQIDShift) == qid && (cur & kXLock)) {
       std::this_thread::yield();
@@ -430,7 +422,7 @@ OMCSLock::XGuard::~XGuard()
 }
 
 auto
-OMCSLock::XGuard::DowngradeToSIX() //
+OMCSLock::XGuard::DowngradeToSIX()  //
     -> SIXGuard
 {
   const auto ver_xor = static_cast<uint64_t>(old_ver_ ^ new_ver_);
@@ -528,7 +520,7 @@ OMCSLock::OptGuard::TryLockS(  //
 {
   const auto expected = ver_;
   auto qid = tls_holder.GetQID();
-  auto* qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
+  new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto ebd_id = (static_cast<uint64_t>(qid) << kQIDShift) | kSLock | kSFlag;
 
   std::atomic_thread_fence(kAcquire);
@@ -543,7 +535,7 @@ OMCSLock::OptGuard::TryLockS(  //
     if (tail_qid) {  // there is the predecessor
       if (dest_->lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) break;
     } else {  // the initial shared lock
-      const auto new_tail =  ebd_id | (cur & kVersionMask);
+      const auto new_tail = ebd_id | (cur & kVersionMask);
       if (dest_->lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) goto end;
     }
     CPP_UTILITY_SPINLOCK_HINT
@@ -582,7 +574,7 @@ OMCSLock::OptGuard::TryLockSIX(  //
       return SIXGuard{};
     }
     qnode->lock_state.store(cur & kLockMask, kRelaxed);
-    const auto new_tail =  ebd_id | (cur & kSAndVersionMask);
+    const auto new_tail = ebd_id | (cur & kSAndVersionMask);
     if (dest_->lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
