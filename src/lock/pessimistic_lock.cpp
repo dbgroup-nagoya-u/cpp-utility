@@ -105,7 +105,7 @@ PessimisticLock::LockX()  //
 
   while (cur & kSMask) {
     CPP_UTILITY_SPINLOCK_HINT
-    cur = lock_.load(kRelaxed);
+    cur = lock_.load(kAcquire);
   }
   return XGuard{this};
 }
@@ -117,14 +117,14 @@ PessimisticLock::LockX()  //
 void
 PessimisticLock::UnlockS() noexcept
 {
-  [[maybe_unused]] const auto ret = lock_.fetch_sub(kSLock, kRelaxed);
+  [[maybe_unused]] const auto ret = lock_.fetch_sub(kSLock, kRelease);
   assert(ret & kSMask);
 }
 
 void
 PessimisticLock::UnlockSIX() noexcept
 {
-  [[maybe_unused]] const auto ret = lock_.fetch_xor(kSIXLock, kRelaxed);
+  [[maybe_unused]] const auto ret = lock_.fetch_xor(kSIXLock, kRelease);
   assert((ret & kXMask) == kSIXLock);
 }
 
@@ -191,7 +191,7 @@ PessimisticLock::SIXGuard::UpgradeToX()  //
   assert((cur & kXMask) == kSIXLock);
   while (cur & kSMask) {
     CPP_UTILITY_SPINLOCK_HINT
-    cur = dest_->lock_.load(kRelaxed);
+    cur = dest_->lock_.load(kAcquire);
   }
   return XGuard{std::exchange(dest_, nullptr)};
 }

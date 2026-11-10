@@ -272,6 +272,10 @@ class OptimisticLock
      * @brief Set a desired version after unlocking.
      *
      * @param ver A desired version after unlocking.
+     * @note If `ver` is the same as the version when acquiring this lock (i.e.,
+     * the result of `GetVersion()`), the caller must guarantee that no data
+     * protected by this lock has been modified. Optimistic readers rely on this
+     * guarantee to tolerate the ABA problem of lock words.
      */
     constexpr void
     SetVersion(  //
