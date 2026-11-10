@@ -349,6 +349,7 @@ OptimisticLock::OptGuard::TryLockS(  //
 {
   SGuard grd;
   if (has_lock_) {
+    has_lock_ = false;
     grd = SGuard{std::exchange(dest_, nullptr)};
     return grd;
   }

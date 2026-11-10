@@ -19,6 +19,7 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <cassert>
 #include <cstdint>
 #include <thread>
 #include <utility>
@@ -236,6 +237,7 @@ MCSLock::UnlockX(  //
 {
   const auto this_ptr = std::bit_cast<uint64_t>(qnode);
   auto next_ptr = qnode->lock_.load(kAcquire);
+  assert((next_ptr & kLockMask) == kNoLocks);
   if (next_ptr == kNull) {  // this is the tail node
     auto cur = lock_.load(kRelaxed);
     while ((cur & kPtrMask) == this_ptr) {
