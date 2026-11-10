@@ -306,12 +306,20 @@ OptimisticLock::OptGuard::VerifyVersion(  //
   if (((ver_ ^ expected) & mask) == 0) return true;
   if (++retry_num_ < max_retry) return false;  // continue with OCC
 
-  // try to acquire a shared lock
-  while ((cur & kSMask) == kNoLocks) {
-    has_lock_ = dest_->lock_.compare_exchange_weak(cur, cur | kSLock, kAcquire, kRelaxed);
-    if (has_lock_) break;
-    CPP_UTILITY_SPINLOCK_HINT
-  }
+  // try to acquire a shared lock (only one thread per lock word falls back)
+  SpinWithBackoff(
+      [](std::atomic_uint64_t* lock, uint64_t* cur, bool* has_lock) -> bool {
+        *cur = lock->load(kAcquire);
+        while ((*cur & kXLock) == kNoLocks) {
+          if (*cur & kSMask) return true;  // another thread has fallen back
+          *has_lock = lock->compare_exchange_weak(*cur, *cur + kSLock, kAcquire, kAcquire);
+          if (*has_lock) return true;
+        }
+        return false;  // wait for the X lock to be released
+      },
+      &(dest_->lock_), &cur, &has_lock_);
+  ver_ = static_cast<uint32_t>(cur);
+  retry_num_ = 0;
   return false;
 }
 
