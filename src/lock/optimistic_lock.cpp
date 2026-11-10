@@ -128,6 +128,7 @@ OptimisticLock::LockX()  //
     CPP_UTILITY_SPINLOCK_HINT
     cur = lock_.load(kAcquire);
   }
+  std::atomic_thread_fence(kRelease);  // make the X bit visible before writes
   return XGuard{this, static_cast<uint32_t>(cur)};
 }
 
@@ -215,6 +216,7 @@ OptimisticLock::SIXGuard::UpgradeToX()  //
     CPP_UTILITY_SPINLOCK_HINT
     cur = dest_->lock_.load(kAcquire);
   }
+  std::atomic_thread_fence(kRelease);  // make the X bit visible before writes
   return XGuard{std::exchange(dest_, nullptr), static_cast<uint32_t>(cur)};
 }
 
@@ -426,6 +428,7 @@ OptimisticLock::OptGuard::TryLockX(  //
       CPP_UTILITY_SPINLOCK_HINT
       cur = dest_->lock_.load(kAcquire);
     }
+    std::atomic_thread_fence(kRelease);  // make the X bit visible before writes
     grd = XGuard{std::exchange(dest_, nullptr), ver_};
   }
   return grd;
