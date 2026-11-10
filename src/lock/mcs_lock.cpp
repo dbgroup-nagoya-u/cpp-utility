@@ -77,7 +77,7 @@ MCSLock::LockS()  //
   while (true) {
     if (cur) {  // there is the predecessor
       if (lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) break;
-    } else if (lock_.compare_exchange_weak(cur, ptr, kAcquire, kRelaxed)) {
+    } else if (lock_.compare_exchange_weak(cur, ptr, kAcqRel, kRelaxed)) {
       goto end;  // the initial shared lock
     }
     CPP_UTILITY_SPINLOCK_HINT
@@ -170,8 +170,8 @@ MCSLock::UnlockS(  //
     while ((cur & kPtrMask) == this_ptr) {
       const auto unlock = cur - kSLock;
       if (unlock & kLockMask) {
-        if (lock_.compare_exchange_weak(cur, unlock, kRelaxed, kRelaxed)) return;
-      } else if (lock_.compare_exchange_weak(cur, kNull, kRelaxed, kRelaxed)) {
+        if (lock_.compare_exchange_weak(cur, unlock, kRelease, kRelaxed)) return;
+      } else if (lock_.compare_exchange_weak(cur, kNull, kAcqRel, kRelaxed)) {
         _tls.reset(qnode);
         return;
       }
@@ -186,7 +186,7 @@ MCSLock::UnlockS(  //
   }
 
   auto* const next = std::bit_cast<MCSLock*>(next_ptr);
-  if ((next->lock_.fetch_sub(kSLock, kRelease) & kLockMask) == kSLock) {
+  if ((next->lock_.fetch_sub(kSLock, kAcqRel) & kLockMask) == kSLock) {
     _tls.reset(qnode);
   }
 }
@@ -317,7 +317,7 @@ MCSLock::SIXGuard::UpgradeToX()  //
 
   uint64_t next_ptr;
   while (true) {  // wait for shared lock holders to release their locks
-    next_ptr = qnode_->lock_.load(kRelaxed);
+    next_ptr = qnode_->lock_.load(kAcquire);
     if ((next_ptr & kSMask) == kNoLocks) break;
     std::this_thread::yield();
   }

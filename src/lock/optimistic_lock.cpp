@@ -126,7 +126,7 @@ OptimisticLock::LockX()  //
 
   while (cur & kSMask) {
     CPP_UTILITY_SPINLOCK_HINT
-    cur = lock_.load(kRelaxed);
+    cur = lock_.load(kAcquire);
   }
   return XGuard{this, static_cast<uint32_t>(cur)};
 }
@@ -138,14 +138,14 @@ OptimisticLock::LockX()  //
 void
 OptimisticLock::UnlockS() noexcept
 {
-  [[maybe_unused]] const auto ret = lock_.fetch_sub(kSLock, kRelaxed);
+  [[maybe_unused]] const auto ret = lock_.fetch_sub(kSLock, kRelease);
   assert(ret & kSMask);
 }
 
 void
 OptimisticLock::UnlockSIX() noexcept
 {
-  [[maybe_unused]] const auto ret = lock_.fetch_xor(kSIXLock, kRelaxed);
+  [[maybe_unused]] const auto ret = lock_.fetch_xor(kSIXLock, kRelease);
   assert((ret & kXMask) == kSIXLock);
 }
 
@@ -213,7 +213,7 @@ OptimisticLock::SIXGuard::UpgradeToX()  //
   assert((cur & kXMask) == kSIXLock);
   while (cur & kSMask) {
     CPP_UTILITY_SPINLOCK_HINT
-    cur = dest_->lock_.load(kRelaxed);
+    cur = dest_->lock_.load(kAcquire);
   }
   return XGuard{std::exchange(dest_, nullptr), static_cast<uint32_t>(cur)};
 }
@@ -297,7 +297,7 @@ OptimisticLock::OptGuard::VerifyVersion(  //
   const auto expected = ver_;
   SpinWithYield(
       [](std::atomic_uint64_t* lock, uint64_t* cur) -> bool {
-        std::atomic_thread_fence(kRelease);
+        std::atomic_thread_fence(kAcquire);
         *cur = lock->load(kAcquire);
         return (*cur & kXLock) == kNoLocks;
       },
@@ -335,7 +335,7 @@ OptimisticLock::OptGuard::ImmediateVerify(  //
   }
 
   // verify using the optimistic read procedure
-  std::atomic_thread_fence(kRelease);
+  std::atomic_thread_fence(kAcquire);
   const auto expected = ver_;
   const auto cur = dest_->lock_.load(kAcquire);
   ver_ = static_cast<uint32_t>(cur);
@@ -356,7 +356,7 @@ OptimisticLock::OptGuard::TryLockS(  //
   const auto expected = ver_;
   SpinWithBackoff(
       [](std::atomic_uint64_t* lock, uint32_t* ver, uint32_t expected, uint32_t mask) -> bool {
-        std::atomic_thread_fence(kRelease);
+        std::atomic_thread_fence(kAcquire);
         auto cur = lock->load(kAcquire);
         *ver = static_cast<uint32_t>(cur);
         return ((*ver ^ expected) & mask)
@@ -375,7 +375,7 @@ OptimisticLock::OptGuard::TryLockSIX(  //
     -> SIXGuard
 {
   if (has_lock_) {
-    dest_->lock_.fetch_sub(kSLock, kRelaxed);
+    dest_->lock_.fetch_sub(kSLock, kRelease);
     has_lock_ = false;
   }
 
@@ -399,7 +399,7 @@ OptimisticLock::OptGuard::TryLockX(  //
     -> XGuard
 {
   if (has_lock_) {
-    dest_->lock_.fetch_sub(kSLock, kRelaxed);
+    dest_->lock_.fetch_sub(kSLock, kRelease);
     has_lock_ = false;
   }
 
@@ -408,11 +408,11 @@ OptimisticLock::OptGuard::TryLockX(  //
   SpinWithBackoff(
       [](std::atomic_uint64_t* lock, uint64_t* cur,  //
          const uint32_t expected, const uint32_t mask) -> bool {
-        std::atomic_thread_fence(kRelease);
+        std::atomic_thread_fence(kAcquire);
         *cur = lock->load(kAcquire);
         return ((static_cast<uint32_t>(*cur) ^ expected) & mask)
                || ((*cur & kXMask) == kNoLocks
-                   && lock->compare_exchange_weak(*cur, *cur | kXLock, kRelaxed, kRelaxed));
+                   && lock->compare_exchange_weak(*cur, *cur | kXLock, kAcquire, kRelaxed));
       },
       &(dest_->lock_), &cur, expected, mask);
 
@@ -423,7 +423,7 @@ OptimisticLock::OptGuard::TryLockX(  //
   } else {
     while (cur & kSMask) {
       CPP_UTILITY_SPINLOCK_HINT
-      cur = dest_->lock_.load(kRelaxed);
+      cur = dest_->lock_.load(kAcquire);
     }
     grd = XGuard{std::exchange(dest_, nullptr), ver_};
   }
