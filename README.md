@@ -73,3 +73,5 @@ The design summaries and examples of the developed classes are located in `desig
 ## Acknowledgments
 
 This work is based on results from project JPNP16007 commissioned by the New Energy and Industrial Technology Development Organization (NEDO), and it was supported partially by KAKENHI (JP16H01722, JP20K19804, JP21H03555, and JP22H03594).
+
+We used Claude, a generative AI model developed by Anthropic, to assist with development tasks such as debugging.
