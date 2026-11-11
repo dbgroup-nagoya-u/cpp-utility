@@ -22,6 +22,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <random>
 #include <stdexcept>
@@ -305,7 +306,7 @@ class ZipfDistributionFixture : public ::testing::Test
   VerifyExactCDF()
   {
     for (const auto alpha : kAlphas) {
-      for (const uint64_t n : {1UL, 2UL, 10UL, kExactBinNum}) {
+      for (const uint64_t n : std::initializer_list<uint64_t>{1, 2, 10, kExactBinNum}) {
         const Zipf_t zipf{0, static_cast<IntType>(n - 1), alpha};
         const auto ref = ComputeReferenceCDF(n, alpha);
         auto max_err = 0.0;
@@ -369,7 +370,7 @@ class ZipfDistributionFixture : public ::testing::Test
   VerifyExactGenerationInvertsCDF()
   {
     for (const auto alpha : kAlphas) {
-      for (const uint64_t n : {1UL, 10UL, kExactBinNum}) {
+      for (const uint64_t n : std::initializer_list<uint64_t>{1, 10, kExactBinNum}) {
         const Zipf_t zipf{kLowest, ToValue(n - 1, kLowest), alpha};
         CheckGenerationInvertsCDF(zipf, kLowest, n);
       }
