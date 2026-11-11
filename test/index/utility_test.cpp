@@ -18,9 +18,11 @@
 
 // C++ standard libraries
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <random>
 #include <type_traits>
 #include <vector>
@@ -124,6 +126,19 @@ class BinaryConverterFixture : public ::testing::Test
     }
   }
 
+  void
+  VerifyRestoreFromUnalignedData()
+  {
+    alignas(sizeof(T)) uint8_t page[sizeof(T) * 2]{};
+    for (size_t offset = 1; offset < sizeof(T); ++offset) {
+      for (const auto& v : values_) {
+        std::memcpy(&page[offset], ConvertToBinaryData(v), sizeof(T));
+        const auto restored = ConvertFromBinaryData<T>(&page[offset]);
+        ASSERT_EQ(v, restored);
+      }
+    }
+  }
+
   /*##########################################################################*
    * Internal member variables
    *##########################################################################*/
@@ -161,6 +176,116 @@ TYPED_TEST(  //
     RestoredValuesAreEquivalentWithSrcValues)
 {
   TestFixture::VerifyRestore();
+}
+
+TYPED_TEST(  //
+    BinaryConverterFixture,
+    UnalignedDataAreRestoredCorrectly)
+{
+  TestFixture::VerifyRestoreFromUnalignedData();
+}
+
+/*----------------------------------------------------------------------------*
+ * Special values of floating point numbers
+ *----------------------------------------------------------------------------*/
+
+template <class T>
+class FloatingPointConverterFixture : public ::testing::Test
+{
+ protected:
+  using Limits = std::numeric_limits<T>;
+
+  /**
+   * @return Converted binary data of a given value.
+   */
+  static auto
+  ToBytes(        //
+      const T v)  //
+      -> std::vector<uint8_t>
+  {
+    std::vector<uint8_t> bytes(sizeof(T));
+    std::memcpy(bytes.data(), ConvertToBinaryData(v), sizeof(T));
+    return bytes;
+  }
+
+  void
+  VerifySpecialValuesOrder()
+  {
+    // special values in ascending order
+    const std::vector<T> values{
+        -Limits::infinity(),  Limits::lowest(), T{-1}, -Limits::min(), -Limits::denorm_min(), T{0},
+        Limits::denorm_min(), Limits::min(),    T{1},  Limits::max(),  Limits::infinity(),
+    };
+    for (size_t i = 0; i + 1 < values.size(); ++i) {
+      EXPECT_LT(ToBytes(values[i]), ToBytes(values[i + 1])) << values[i] << " < " << values[i + 1];
+    }
+    for (const auto v : values) {
+      const auto bytes = ToBytes(v);
+      EXPECT_EQ(ConvertFromBinaryData<T>(bytes.data()), v);
+    }
+  }
+
+  void
+  VerifyZeros()
+  {
+    EXPECT_EQ(ToBytes(T{-0.0}), ToBytes(T{0.0}));
+    const auto bytes = ToBytes(T{-0.0});
+    const auto restored = ConvertFromBinaryData<T>(bytes.data());
+    EXPECT_EQ(restored, T{0});
+    EXPECT_FALSE(std::signbit(restored));
+  }
+
+  void
+  VerifyNaN()
+  {
+    for (const auto nan : {Limits::quiet_NaN(), -Limits::quiet_NaN(), Limits::signaling_NaN()}) {
+      const auto bytes = ToBytes(nan);
+      EXPECT_EQ(bytes, std::vector<uint8_t>(sizeof(T), 0));  // the minimum value
+      EXPECT_LT(bytes, ToBytes(-Limits::infinity()));
+      EXPECT_TRUE(std::isnan(ConvertFromBinaryData<T>(bytes.data())));
+    }
+  }
+};
+
+using FloatingPointTargets = ::testing::Types<float, double>;
+TYPED_TEST_SUITE(FloatingPointConverterFixture, FloatingPointTargets);
+
+TYPED_TEST(  //
+    FloatingPointConverterFixture,
+    SpecialValuesKeepTheirOrder)
+{
+  TestFixture::VerifySpecialValuesOrder();
+}
+
+TYPED_TEST(  //
+    FloatingPointConverterFixture,
+    NegativeZeroIsConvertedIntoPositiveZero)
+{
+  TestFixture::VerifyZeros();
+}
+
+TYPED_TEST(  //
+    FloatingPointConverterFixture,
+    NaNIsConvertedIntoTheMinimumValue)
+{
+  TestFixture::VerifyNaN();
+}
+
+/*----------------------------------------------------------------------------*
+ * Byte swapping
+ *----------------------------------------------------------------------------*/
+
+TEST(  //
+    ByteSwapTest,
+    SwapBytesBasedOnTypeSizes)
+{
+  EXPECT_EQ(ByteSwap(uint8_t{0x12}), uint8_t{0x12});
+  EXPECT_EQ(ByteSwap(uint16_t{0x1234}), uint16_t{0x3412});
+  EXPECT_EQ(ByteSwap(uint32_t{0x12345678U}), uint32_t{0x78563412U});
+  EXPECT_EQ(ByteSwap(uint64_t{0x0123456789ABCDEFUL}), uint64_t{0xEFCDAB8967452301UL});
+
+  // the same size as `uint64_t` but a different type
+  EXPECT_EQ(ByteSwap(0x0123456789ABCDEFULL), 0xEFCDAB8967452301ULL);
 }
 
 TEST(  //
