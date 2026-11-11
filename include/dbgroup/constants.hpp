@@ -151,6 +151,7 @@ constexpr size_t kCacheLineSize = static_cast<size_t>(DBGROUP_CACHE_LINE_SIZE);
 
 /// @brief The expected virtual page size.
 constexpr size_t kVMPageSize = static_cast<size_t>(DBGROUP_VIRTUAL_PAGE_SIZE);
+static_assert(std::has_single_bit(kVMPageSize), "The virtual page size must be a power of two.");
 
 /// @brief The number of logical cores.
 constexpr size_t kLogicalCoreNum = static_cast<size_t>(DBGROUP_LOGICAL_CORE_NUM);
@@ -165,13 +166,15 @@ constexpr size_t kMaxThreadCapacity{kVMPageSize};
 /**
  * @param size A target page size.
  * @return The alignment size that fits in virtual pages.
+ * @note The alignment is the smallest power of two that is not less than
+ * `size` (one for zero) and does not exceed the virtual page size.
  */
 constexpr auto
 GetAlignValOnVirtualPages(       //
     const size_t size) noexcept  //
     -> std::align_val_t
 {
-  return static_cast<std::align_val_t>(size < kVMPageSize ? size : kVMPageSize);
+  return static_cast<std::align_val_t>(size < kVMPageSize ? std::bit_ceil(size) : kVMPageSize);
 }
 
 /**

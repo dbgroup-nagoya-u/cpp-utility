@@ -101,6 +101,7 @@ function(ADD_DBGROUP_TEST DBGROUP_TEST_TARGET)
 endfunction()
 
 # add unit tests to build targets
+ADD_DBGROUP_TEST("constants_test")
 ADD_DBGROUP_TEST("serial_test")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/benchmark")
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/index")
