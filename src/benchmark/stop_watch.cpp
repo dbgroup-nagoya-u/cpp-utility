@@ -75,9 +75,9 @@ const double denom = std::log(kGamma);
 void
 StopWatch::Start() noexcept
 {
-  std::atomic_thread_fence(std::memory_order_acq_rel);
+  std::atomic_signal_fence(std::memory_order_seq_cst);
   st_ = Clock_t::now();
-  std::atomic_thread_fence(std::memory_order_acq_rel);
+  std::atomic_signal_fence(std::memory_order_seq_cst);
 }
 
 void
@@ -86,9 +86,9 @@ StopWatch::Stop(  //
 {
   using NS = std::chrono::nanoseconds;
 
-  std::atomic_thread_fence(std::memory_order_acq_rel);
+  std::atomic_signal_fence(std::memory_order_seq_cst);
   const auto et = Clock_t::now();
-  std::atomic_thread_fence(std::memory_order_acq_rel);
+  std::atomic_signal_fence(std::memory_order_seq_cst);
 
   // record the average latency per item with the weight of the item number
   const size_t lat = std::chrono::duration_cast<NS>(et - st_).count();
