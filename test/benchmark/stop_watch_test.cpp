@@ -17,6 +17,7 @@
 #include "dbgroup/benchmark/stop_watch.hpp"
 
 // C++ standard libraries
+#include <chrono>
 #include <cstddef>
 #include <thread>
 
@@ -52,6 +53,43 @@ TEST(  //
   }
   EXPECT_GE(sw.GetExecTime(), prev);
   // NOLINTEND
+}
+
+TEST(  //
+    StopWatchTest,
+    QuantileQueryReturnLatencyPerItem)
+{
+  constexpr size_t kLoopNum = 100;
+  constexpr size_t kItemNum = 100;
+  constexpr auto kSleepTime = std::chrono::milliseconds{1};
+  StopWatch sw{};
+  for (size_t i = 0; i < kLoopNum; ++i) {
+    sw.Start();
+    std::this_thread::sleep_for(kSleepTime);
+    sw.Stop(kItemNum);
+  }
+
+  // NOLINTBEGIN
+  constexpr size_t kSleepNS = std::chrono::nanoseconds{kSleepTime}.count();
+  EXPECT_EQ(sw.GetExecNum(), kLoopNum * kItemNum);
+  const auto median = sw.Quantile(0.5);
+  EXPECT_GE(median, kSleepNS / kItemNum * 0.99);  // allow the relative error of bins
+  EXPECT_LT(median, kSleepNS);
+  EXPECT_LE(sw.Quantile(0), median * 1.01);
+  EXPECT_GE(sw.Quantile(1.0), median * 0.99);
+  // NOLINTEND
+}
+
+TEST(  //
+    StopWatchTest,
+    ZeroItemsAreRegardedAsOne)
+{
+  StopWatch sw{};
+  sw.Start();
+  std::this_thread::sleep_for(std::chrono::microseconds{10});  // NOLINT
+  sw.Stop(0);
+  EXPECT_EQ(sw.GetExecNum(), 1);
+  EXPECT_GT(sw.Quantile(0.5), 0);  // NOLINT
 }
 
 TEST(  //

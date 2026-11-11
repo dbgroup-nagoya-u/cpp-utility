@@ -90,21 +90,29 @@ StopWatch::Stop(  //
   const auto et = Clock_t::now();
   std::atomic_thread_fence(std::memory_order_acq_rel);
 
+  // record the average latency per item with the weight of the item number
   const size_t lat = std::chrono::duration_cast<NS>(et - st_).count();
-  exec_num_ += cnt;
-  exec_time_ += lat;
-  if (lat < min_) [[unlikely]] {
-    min_ = lat;
-  }
-  if (lat > 0) [[likely]] {
-    if (lat > max_) [[unlikely]] {
-      max_ = lat;
-    }
-    const auto pos = static_cast<uint32_t>(std::ceil(std::log(lat) / denom));
-    ++bins_[std::min(pos, kBinNum - 1)];  // count extremely long latencies in the last bin
+  size_t item_num;
+  auto avg = static_cast<double>(lat);
+  if (cnt > 1) {
+    item_num = cnt;
+    avg /= static_cast<double>(item_num);
   } else {
-    ++bins_[0];
+    item_num = 1;
   }
+  exec_num_ += item_num;
+  exec_time_ += lat;
+
+  const auto avg_ns = static_cast<size_t>(avg);
+  min_ = std::min(min_, avg_ns);
+  max_ = std::max(max_, avg_ns);
+
+  uint32_t pos = 0;
+  if (avg > 1.0) [[likely]] {
+    // count extremely long latencies in the last bin
+    pos = std::min(static_cast<uint32_t>(std::ceil(std::log(avg) / denom)), kBinNum - 1);
+  }
+  bins_[pos] += item_num;
 }
 
 auto
