@@ -101,6 +101,11 @@ class EpochManager
    * @brief Create a guard instance based on the scoped locking pattern.
    *
    * @return A created epoch guard.
+   * @throw std::out_of_range if the thread ID is not less than the maximum
+   * number of threads when this manager was constructed (i.e., the maximum
+   * number was increased by `IDManager::SetMaxThreadNum` afterward).
+   * @note Each thread must not nest epoch guards of the same manager; the
+   * inner guard would remove the protection of the outer one.
    */
   [[nodiscard]]
   auto CreateEpochGuard()  //

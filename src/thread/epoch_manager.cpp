@@ -19,12 +19,14 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <cassert>
 #include <chrono>
 #include <cstddef>
 #include <exception>
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 
 // local sources
 #include "dbgroup/constants.hpp"
@@ -109,7 +111,12 @@ auto
 EpochManager<Serial>::CreateEpochGuard()  //
     -> EpochGuard
 {
-  auto& tls = tls_fields_[dbgroup::thread::IDManager::GetThreadID()];
+  const auto id = IDManager::GetThreadID();
+  if (id >= thread_num_) [[unlikely]] {
+    throw std::out_of_range{"EpochManager: The thread ID exceeded the capacity."};
+  }
+  auto& tls = tls_fields_[id];
+  assert(!tls.active.load(kRelaxed));  // nested guards are not allowed
   tls.entered.store(--GetCurrentEpoch(), kRelaxed);  // add a safety buffer
   return EpochGuard{&(tls.active)};
 }
