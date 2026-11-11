@@ -39,8 +39,11 @@ namespace
 /// @brief A bool array for managing reservation states of thread IDs.
 alignas(kVMPageSize) std::atomic_bool _id_vec[kMaxThreadCapacity] = {};  // NOLINT
 
+static_assert(DBGROUP_MAX_THREAD_NUM <= kMaxThreadCapacity,
+              "DBGROUP_MAX_THREAD_NUM must not exceed the thread capacity.");
+
 /// @brief The maximum number of worker threads.
-std::atomic_size_t _max_thread_num{2 * kLogicalCoreNum};  // NOLINT
+std::atomic_size_t _max_thread_num{static_cast<size_t>(DBGROUP_MAX_THREAD_NUM)};  // NOLINT
 
 }  // namespace
 

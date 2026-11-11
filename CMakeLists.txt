@@ -41,8 +41,8 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
 
   set(
     DBGROUP_MAX_THREAD_NUM
-    "1024" CACHE STRING
-    "The maximum number of worker threads."
+    "" CACHE STRING
+    "The maximum number of worker threads (twice the number of logical cores if not set)."
   )
 
   set(
@@ -90,6 +90,12 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
         "The number of logical cores." FORCE
       )
     endif()
+  endif()
+
+  # set the default maximum number of threads if needed
+  if("${DBGROUP_MAX_THREAD_NUM}" STREQUAL "")
+    math(EXPR DBGROUP_MAX_THREAD_NUM "2 * ${DBGROUP_LOGICAL_CORE_NUM}")
+    message(STATUS "[${PROJECT_NAME}] DBGROUP_MAX_THREAD_NUM is not set, so use twice the number of cores: ${DBGROUP_MAX_THREAD_NUM}")
   endif()
 
   #----------------------------------------------------------------------------#
