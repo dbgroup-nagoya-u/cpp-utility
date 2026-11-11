@@ -7,7 +7,7 @@ endif()
 
 # project information
 project(cpp_utility
-  VERSION "0.18.1"
+  VERSION "0.19.0"
   DESCRIPTION "An open-source C++ utility library for research use."
   LANGUAGES "CXX"
 )
@@ -144,7 +144,7 @@ if(NOT TARGET dbgroup::${PROJECT_NAME})
   # Build Unit Tests
   #----------------------------------------------------------------------------#
 
-  option(CPP_UTILITY_BUILD_TESTS, "Build unit tests" OFF)
+  option(CPP_UTILITY_BUILD_TESTS "Build unit tests" OFF)
   if(${CPP_UTILITY_BUILD_TESTS})
     enable_testing()
     # include unit tests
