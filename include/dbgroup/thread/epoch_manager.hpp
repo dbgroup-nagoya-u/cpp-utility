@@ -120,7 +120,7 @@ class EpochManager
     std::atomic_bool active{};
 
     /// @brief The last epoch when a thread has entered.
-    Serial entered{};
+    std::atomic<Serial> entered{};
   };
 
   /*##########################################################################*

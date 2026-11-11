@@ -101,7 +101,7 @@ auto
 EpochManager<Serial>::GetMinEpoch() const noexcept  //
     -> Serial
 {
-  return min_epoch_.load(kRelaxed);
+  return min_epoch_.load(kAcquire);
 }
 
 template <class Serial>
@@ -110,7 +110,7 @@ EpochManager<Serial>::CreateEpochGuard()  //
     -> EpochGuard
 {
   auto& tls = tls_fields_[dbgroup::thread::IDManager::GetThreadID()];
-  tls.entered = --GetCurrentEpoch();  // add a safety buffer
+  tls.entered.store(--GetCurrentEpoch(), kRelaxed);  // add a safety buffer
   return EpochGuard{&(tls.active)};
 }
 
@@ -127,14 +127,15 @@ EpochManager<Serial>::AdvanceEpochWorker(  //
   while (running_.load(kRelaxed)) {
     wake_time += epoch_interval_;
     auto min = --GetCurrentEpoch();  // add a safety buffer
+    std::atomic_thread_fence(kSeqCst);  // pair with the fence in EpochGuard
     for (size_t thd_id = 0; thd_id < thread_num_; ++thd_id) {
       auto& tls = tls_fields_[thd_id];
       if (!tls.active.load(kAcquire)) continue;
-      min = std::min(min, tls.entered);
+      min = std::min(min, tls.entered.load(kRelaxed));
     }
     global_epoch_.store(get_new_epoch(), kRelaxed);
-    if (GetMinEpoch() != min) {
-      min_epoch_.store(min, kRelaxed);
+    if (min_epoch_.load(kRelaxed) != min) {
+      min_epoch_.store(min, kRelease);
     }
     std::this_thread::sleep_until(wake_time);
   }
