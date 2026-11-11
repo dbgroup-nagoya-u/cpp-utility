@@ -120,6 +120,44 @@ TEST_F(IDManagerFixture, ExitedThreadsReleaseTheirIDs)
   ReserveAllThreadIDs();
 }
 
+TEST_F(IDManagerFixture, IsReservedShowsProperBoolValues)
+{
+  std::mutex mtx{};
+  std::atomic_size_t cnt{0};
+  std::vector<std::thread> threads{};
+  threads.reserve(kLogicalCoreNum);
+
+  auto f = [&] {
+    [[maybe_unused]] const auto id = IDManager::GetThreadID();
+    cnt.fetch_add(1, std::memory_order_release);
+    const std::lock_guard guard{mtx};
+  };
+
+  {
+    const std::lock_guard guard{mtx};
+    for (size_t i = 0; i < kLogicalCoreNum; ++i) {
+      threads.emplace_back(f);
+    }
+    while (cnt.load(std::memory_order_acquire) < kLogicalCoreNum) {
+      std::this_thread::sleep_for(std::chrono::microseconds{1});
+    }
+    for (size_t id = 0; id < kLogicalCoreNum; ++id) {
+      EXPECT_TRUE(IDManager::IsReserved(id));
+    }
+  }
+  for (auto&& t : threads) {
+    t.join();
+  }
+
+  for (size_t id = 0; id < kLogicalCoreNum; ++id) {
+    EXPECT_FALSE(IDManager::IsReserved(id));
+  }
+  EXPECT_FALSE(IDManager::IsReserved(kMaxThreadCapacity));
+}
+
+// keep testing the deprecated API until its removal
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 TEST_F(IDManagerFixture, ThreadHeartBeatsShowProperBoolValues)
 {
   std::mutex mtx{};
@@ -155,5 +193,6 @@ TEST_F(IDManagerFixture, ThreadHeartBeatsShowProperBoolValues)
     EXPECT_TRUE(flag.expired());
   }
 }
+#pragma GCC diagnostic pop
 
 }  // namespace dbgroup::thread::test

@@ -10,7 +10,9 @@ This class manages thread IDs in a single process and has the following APIs.
 
 The `IDManager::GetThreadID` function returns a unique thread ID in [0, `IDManager::GetMaxThreadNum()`). Since the assigned thread ID is maintained in the thread's local storage, this function always returns the same ID for the same thread, and the ID is released when the thread exits. The maximum number of threads is initialized with `DBGROUP_MAX_THREAD_NUM` (twice the number of logical cores if it is not specified), and you can change it using the `IDManager::SetMaxThreadNum` function during process initialization. If all IDs are reserved, `IDManager::GetThreadID` throws `std::range_error`.
 
-The `IDManager::GetHeartBeat` function returns a `std::weak_ptr<size_t>` instance to allow you to check the alive monitoring of a particular thread. The `expired` function returns `false` until the corresponding thread exits.
+The `IDManager::IsReserved` function checks whether a living thread reserves a given thread ID. Since any thread can call this function, it is useful for checking the aliveness of owners of thread-local resources indexed by thread IDs. Note that the result may be stale if a thread with the given ID is starting or exiting concurrently.
+
+The `IDManager::GetHeartBeat` function is deprecated and will be removed in a future release. Assigning a returned `std::weak_ptr<size_t>` instance to a shared variable while other threads check it causes data races, so use `IDManager::IsReserved` instead.
 
 ### Example of Usages
 
@@ -19,7 +21,6 @@ The `IDManager::GetHeartBeat` function returns a `std::weak_ptr<size_t>` instanc
 #include <atomic>
 #include <chrono>
 #include <iostream>
-#include <memory>
 #include <mutex>
 #include <thread>
 
@@ -33,17 +34,15 @@ main(  //
     -> int
 {
   size_t id{0};
-  std::weak_ptr<size_t> heartbeat{};
   std::atomic_bool assigned{false};
   std::mutex mtx{};
 
   // acquire a lock to prevent a worker thread
   std::unique_lock lock{mtx};
 
-  // create a thread and get its ID and heartbeat
+  // create a thread and get its ID
   std::thread t{[&] {
     id = ::dbgroup::thread::IDManager::GetThreadID();
-    heartbeat = ::dbgroup::thread::IDManager::GetHeartBeat();
     assigned = true;
     std::lock_guard block{mtx};
   }};
@@ -53,14 +52,14 @@ main(  //
 
   // check the thread ID and aliveness
   std::cout << "id: " << id << std::endl  //
-            << "thread alive: " << !heartbeat.expired() << std::endl;
+            << "thread alive: " << ::dbgroup::thread::IDManager::IsReserved(id) << std::endl;
 
   // the worker thread exits
   lock.unlock();
   t.join();
 
-  // check the heartbeat stops
-  std::cout << "thread alive: " << !heartbeat.expired() << std::endl;
+  // check the ID is released
+  std::cout << "thread alive: " << ::dbgroup::thread::IDManager::IsReserved(id) << std::endl;
 
   return 0;
 }

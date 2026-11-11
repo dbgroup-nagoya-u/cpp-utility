@@ -76,6 +76,14 @@ IDManager::GetThreadID()  //
 }
 
 auto
+IDManager::IsReserved(         //
+    const size_t id) noexcept  //
+    -> bool
+{
+  return id < kMaxThreadCapacity && _id_vec[id].load(kAcquire);
+}
+
+auto
 IDManager::GetHeartBeat()  //
     -> std::weak_ptr<size_t>
 {

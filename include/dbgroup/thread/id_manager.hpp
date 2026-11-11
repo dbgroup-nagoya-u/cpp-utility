@@ -70,9 +70,29 @@ class IDManager
       -> size_t;
 
   /**
-   * @return A weak pointer object to check heart beats of the current thread.
+   * @brief Check whether a living thread reserves a given thread ID.
+   *
+   * Since any thread can call this function, it is useful for checking the
+   * aliveness of owners of thread-local resources indexed by thread IDs.
+   *
+   * @param id A thread ID to be checked.
+   * @retval true if a living thread reserves the given ID.
+   * @retval false otherwise.
+   * @note The result may be stale if a thread with the given ID is starting or
+   * exiting concurrently.
    */
   [[nodiscard]]
+  static auto IsReserved(  //
+      size_t id) noexcept  //
+      -> bool;
+
+  /**
+   * @return A weak pointer object to check heart beats of the current thread.
+   * @deprecated Use `IDManager::IsReserved` instead. Assigning a returned
+   * object to a shared variable while other threads check it causes data
+   * races.
+   */
+  [[nodiscard, deprecated("use IDManager::IsReserved() instead")]]
   static auto GetHeartBeat()  //
       -> std::weak_ptr<size_t>;
 
