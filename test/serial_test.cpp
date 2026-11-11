@@ -157,8 +157,8 @@ class SerialFixture : public ::testing::Test
     a <<= kOne;
     EXPECT_EQ(a.v, kOne << kOne) << "<<=";
 
-    a = {kOne};
-    a <<= kMax;
+    a = {kHalf};
+    a <<= kOne;
     EXPECT_EQ(a.v, 0) << "<<=";
 
     // >>=
@@ -259,7 +259,7 @@ class SerialFixture : public ::testing::Test
     // <<
     EXPECT_EQ((Serial_t{kOne} << kOne).v, kOne << kOne) << "<<";
 
-    EXPECT_EQ((Serial_t{kOne} << kMax).v, 0) << "<<";
+    EXPECT_EQ((Serial_t{kHalf} << kOne).v, 0) << "<<";
 
     // >>
     EXPECT_EQ((Serial_t{kOne << kOne} >> kOne).v, kOne) << ">>";

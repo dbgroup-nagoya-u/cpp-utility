@@ -18,7 +18,9 @@
 #define CPP_UTILITY_DBGROUP_TYPES_HPP_
 
 // C++ standard libraries
+#include <cassert>
 #include <cstdint>
+#include <limits>
 #include <type_traits>
 
 namespace dbgroup
@@ -41,6 +43,13 @@ struct Serial {
    *##########################################################################*/
 
   using Int = std::make_signed_t<UInt>;
+
+  /*##########################################################################*
+   * Public constants
+   *##########################################################################*/
+
+  /// @brief The bit width of the internal representation.
+  static constexpr UInt kBitWidth = std::numeric_limits<UInt>::digits;
 
   /*##########################################################################*
    * Public assignment operators
@@ -141,6 +150,7 @@ struct Serial {
       const UInt n) noexcept  //
       -> Serial&
   {
+    assert(n < kBitWidth);  // shifting by the bit width or more is undefined
     v <<= n;
     return *this;
   }
@@ -150,6 +160,7 @@ struct Serial {
       const UInt n) noexcept  //
       -> Serial&
   {
+    assert(n < kBitWidth);  // shifting by the bit width or more is undefined
     v >>= n;
     return *this;
   }
@@ -300,6 +311,7 @@ struct Serial {
       const UInt n) const noexcept  //
       -> Serial
   {
+    assert(n < kBitWidth);  // shifting by the bit width or more is undefined
     return Serial{static_cast<UInt>(v << n)};
   }
 
@@ -309,6 +321,7 @@ struct Serial {
       const UInt n) const noexcept  //
       -> Serial
   {
+    assert(n < kBitWidth);  // shifting by the bit width or more is undefined
     return Serial{static_cast<UInt>(v >> n)};
   }
 
