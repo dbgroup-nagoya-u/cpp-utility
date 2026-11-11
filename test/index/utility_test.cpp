@@ -53,29 +53,35 @@ class BinaryConverterFixture : public ::testing::Test
 {
  protected:
   /*##########################################################################*
-   * Types
-   *##########################################################################*/
-
-  using Dist = std::conditional_t<std::is_integral_v<T>,
-                                  std::uniform_int_distribution<T>,
-                                  std::uniform_real_distribution<T>>;
-
-  /*##########################################################################*
    * Setup/Teardown
    *##########################################################################*/
 
   void
   SetUp() override
   {
-    constexpr auto kRange = 1E8;
-    constexpr T kMin = std::is_unsigned_v<T> ? 0 : -(kRange / 2);
-    constexpr T kMax = std::is_unsigned_v<T> ? kRange : (kRange / 2);
-
     std::mt19937_64 rand_engine{kRandomSeed};  // NOLINT
-    Dist dist{kMin, kMax};
-    values_.reserve(kSize);
-    for (size_t i = 0; i < kSize; ++i) {
-      values_.emplace_back(dist(rand_engine));
+    values_.reserve(kSize + 5);
+    if constexpr (std::is_integral_v<T>) {
+      // use boundary values and random bits to cover the whole range of types
+      values_.emplace_back(std::numeric_limits<T>::lowest());
+      values_.emplace_back(std::numeric_limits<T>::max());
+      values_.emplace_back(T{0});
+      values_.emplace_back(T{1});
+      if constexpr (std::is_signed_v<T>) {
+        values_.emplace_back(T{-1});
+      }
+      for (size_t i = 0; i < kSize; ++i) {
+        const auto bits = rand_engine();
+        T v{};
+        std::memcpy(&v, &bits, sizeof(T));
+        values_.emplace_back(v);
+      }
+    } else {
+      constexpr T kRange = 1E8;
+      std::uniform_real_distribution<T> dist{-kRange / 2, kRange / 2};
+      for (size_t i = 0; i < kSize; ++i) {
+        values_.emplace_back(dist(rand_engine));
+      }
     }
     std::sort(values_.begin(), values_.end());
     values_.erase(std::unique(values_.begin(), values_.end()), values_.end());
@@ -150,7 +156,22 @@ class BinaryConverterFixture : public ::testing::Test
  * Preparation for typed testing
  *############################################################################*/
 
-using Targets = ::testing::Types<uint64_t, uint32_t, int64_t, int32_t, float, double>;
+using Targets = ::testing::Types<uint64_t,
+                                 uint32_t,
+                                 uint16_t,
+                                 uint8_t,
+                                 int64_t,
+                                 int32_t,
+                                 int16_t,
+                                 int8_t,
+                                 unsigned long long,  // NOLINT
+                                 long long,           // NOLINT
+                                 char,
+                                 char16_t,
+                                 char32_t,
+                                 wchar_t,
+                                 float,
+                                 double>;
 TYPED_TEST_SUITE(BinaryConverterFixture, Targets);
 
 /*############################################################################*
@@ -269,6 +290,31 @@ TYPED_TEST(  //
     NaNIsConvertedIntoTheMinimumValue)
 {
   TestFixture::VerifyNaN();
+}
+
+/*----------------------------------------------------------------------------*
+ * Arrays
+ *----------------------------------------------------------------------------*/
+
+TEST(  //
+    BinaryConverterTest,
+    ArraysAreTreatedAsRawBytes)
+{
+  const char key16[16] = "abc";
+  const char key8[8] = "abcdefg";
+  const uint8_t key3[3] = {1, 2, 3};
+
+  // converted data refer to the given arrays
+  EXPECT_EQ(ConvertToBinaryData(key16), reinterpret_cast<const uint8_t*>(key16));
+  EXPECT_EQ(ConvertToBinaryData(key8), reinterpret_cast<const uint8_t*>(key8));
+  EXPECT_EQ(ConvertToBinaryData(key3), key3);
+
+  // char arrays are compared in the lexicographical order
+  const char lhs[8] = "abc";
+  const char rhs[8] = "abd";
+  uint8_t lhs_bin[8];
+  std::memcpy(lhs_bin, ConvertToBinaryData(lhs), sizeof(lhs));
+  EXPECT_LT(std::memcmp(lhs_bin, ConvertToBinaryData(rhs), sizeof(rhs)), 0);
 }
 
 /*----------------------------------------------------------------------------*
