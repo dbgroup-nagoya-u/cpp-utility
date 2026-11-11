@@ -6,14 +6,32 @@ buildType:
       short: Debug
       long: Include debugging information without optimizations
       buildType: Debug
+      settings:
+        CPP_UTILITY_TEST_SANITIZER: none
     relWithDebInfo:
       short: RelWithDebInfo
       long: Perform optimizations and include debugging informatin
       buildType: RelWithDebInfo
+      settings:
+        CPP_UTILITY_TEST_SANITIZER: none
+    tsan:
+      short: RelWithDebInfo+TSan
+      long: Perform optimizations with ThreadSanitizer
+      buildType: RelWithDebInfo
+      settings:
+        CPP_UTILITY_TEST_SANITIZER: thread
+    asan:
+      short: RelWithDebInfo+ASan/UBSan
+      long: Perform optimizations with AddressSanitizer and UndefinedBehaviorSanitizer
+      buildType: RelWithDebInfo
+      settings:
+        CPP_UTILITY_TEST_SANITIZER: address
     release:
       short: Release
       long: Perform optimizations and omit debugging informatin
       buildType: Release
+      settings:
+        CPP_UTILITY_TEST_SANITIZER: none
 
 defaltSettings:
   default: default

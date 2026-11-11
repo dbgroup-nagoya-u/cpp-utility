@@ -1,4 +1,45 @@
 #------------------------------------------------------------------------------#
+# Configure sanitizers
+#------------------------------------------------------------------------------#
+
+set(
+  CPP_UTILITY_TEST_SANITIZER
+  "none" CACHE STRING
+  "Sanitizers for unit tests and their dependencies (none, thread, or address)."
+)
+set_property(CACHE CPP_UTILITY_TEST_SANITIZER PROPERTY STRINGS none thread address)
+
+if(CPP_UTILITY_TEST_SANITIZER STREQUAL "thread")
+  set(DBGROUP_SANITIZER_FLAGS -fsanitize=thread)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    message(WARNING
+      "[${PROJECT_NAME}] GCC's ThreadSanitizer may abort with \"unexpected memory mapping\" "
+      "under address space layout randomization. Use Clang 18 or later, or run "
+      "tests via \"setarch $(uname -m) -R\".")
+  endif()
+elseif(CPP_UTILITY_TEST_SANITIZER STREQUAL "address")
+  # make UBSan errors fail unit tests
+  set(DBGROUP_SANITIZER_FLAGS
+    -fsanitize=address,undefined
+    -fno-sanitize-recover=undefined
+    -fno-omit-frame-pointer
+  )
+elseif(NOT CPP_UTILITY_TEST_SANITIZER STREQUAL "none")
+  message(FATAL_ERROR
+    "[${PROJECT_NAME}] CPP_UTILITY_TEST_SANITIZER must be none, thread, or address.")
+endif()
+
+if(DBGROUP_SANITIZER_FLAGS)
+  # instrument unit tests and GoogleTest fetched below
+  add_compile_options(${DBGROUP_SANITIZER_FLAGS})
+  string(REPLACE ";" " " DBGROUP_SANITIZER_LINK_FLAGS "${DBGROUP_SANITIZER_FLAGS}")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${DBGROUP_SANITIZER_LINK_FLAGS}")
+
+  # instrument this library built in the parent directory
+  target_compile_options(${PROJECT_NAME} PRIVATE ${DBGROUP_SANITIZER_FLAGS})
+endif()
+
+#------------------------------------------------------------------------------#
 # Configure GoogleTest
 #------------------------------------------------------------------------------#
 
