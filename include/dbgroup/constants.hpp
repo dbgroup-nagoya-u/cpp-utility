@@ -24,6 +24,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <new>
+#include <type_traits>
 
 namespace dbgroup
 {
@@ -50,49 +51,49 @@ constexpr size_t kP = 1E15;
 constexpr size_t kE = 1E18;
 
 /// @brief Ki (2^10)
-constexpr size_t kKi = 1UL << 10UL;
+constexpr size_t kKi = size_t{1} << 10U;
 
 /// @brief Mi (2^20)
-constexpr size_t kMi = 1UL << 20UL;
+constexpr size_t kMi = size_t{1} << 20U;
 
 /// @brief Gi (2^30)
-constexpr size_t kGi = 1UL << 30UL;
+constexpr size_t kGi = size_t{1} << 30U;
 
 /// @brief Ti (2^40)
-constexpr size_t kTi = 1UL << 40UL;
+constexpr size_t kTi = size_t{1} << 40U;
 
 /// @brief Pi (2^50)
-constexpr size_t kPi = 1UL << 50UL;
+constexpr size_t kPi = size_t{1} << 50U;
 
 /// @brief Ei (2^60)
-constexpr size_t kEi = 1UL << 60UL;
+constexpr size_t kEi = size_t{1} << 60U;
 
 /// @brief 2
-constexpr size_t k2 = 1UL << 1UL;
+constexpr size_t k2 = size_t{1} << 1U;
 
 /// @brief 4
-constexpr size_t k4 = 1UL << 2UL;
+constexpr size_t k4 = size_t{1} << 2U;
 
 /// @brief 8
-constexpr size_t k8 = 1UL << 3UL;
+constexpr size_t k8 = size_t{1} << 3U;
 
 /// @brief 16
-constexpr size_t k16 = 1UL << 4UL;
+constexpr size_t k16 = size_t{1} << 4U;
 
 /// @brief 32
-constexpr size_t k32 = 1UL << 5UL;
+constexpr size_t k32 = size_t{1} << 5U;
 
 /// @brief 64
-constexpr size_t k64 = 1UL << 6UL;
+constexpr size_t k64 = size_t{1} << 6U;
 
 /// @brief 128
-constexpr size_t k128 = 1UL << 7UL;
+constexpr size_t k128 = size_t{1} << 7U;
 
 /// @brief 256
-constexpr size_t k256 = 1UL << 8UL;
+constexpr size_t k256 = size_t{1} << 8U;
 
 /// @brief 512
-constexpr size_t k512 = 1UL << 9UL;
+constexpr size_t k512 = size_t{1} << 9U;
 
 /// @brief 1,024
 constexpr size_t k1Ki = kKi;
@@ -187,7 +188,7 @@ FloorOnVirtualPages(               //
     const uint64_t addr) noexcept  //
     -> uint64_t
 {
-  return addr & ~(kVMPageSize - 1UL);
+  return addr & ~(kVMPageSize - 1);
 }
 
 /**
@@ -200,7 +201,7 @@ CeilOnVirtualPages(                //
     const uint64_t addr) noexcept  //
     -> uint64_t
 {
-  constexpr auto kFillBits = kVMPageSize - 1UL;
+  constexpr auto kFillBits = kVMPageSize - 1;
   return (addr + kFillBits) & ~kFillBits;
 }
 
