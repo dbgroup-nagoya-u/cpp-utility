@@ -18,6 +18,7 @@
 #define CPP_UTILITY_DBGROUP_INDEX_UTILITY_HPP_
 
 // C++ standard libraries
+#include <array>
 #include <bit>
 #include <cmath>
 #include <cstddef>
@@ -323,18 +324,18 @@ ConvertToBinaryData(  //
     /*------------------------*
      * Unsigend integers
      *------------------------*/
-    auto* const swapped = std::bit_cast<T*>(&buf);
-    *swapped = ByteSwap(src);
-    return std::bit_cast<const Binary*>(swapped);
+    const auto swapped = ByteSwap(src);
+    std::memcpy(&buf, &swapped, sizeof(T));
+    return std::bit_cast<const Binary*>(&buf);
   } else if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, int32_t>) {
     /*------------------------*
      * Sigend integers
      *------------------------*/
     using UInt = std::make_unsigned_t<T>;
     constexpr UInt kLSB = UInt{1} << (UInt{8} * sizeof(T) - UInt{1});
-    auto* const swapped = std::bit_cast<UInt*>(&buf);
-    *swapped = ByteSwap(std::bit_cast<UInt>(src) ^ kLSB);
-    return std::bit_cast<const Binary*>(swapped);
+    const auto swapped = ByteSwap(static_cast<UInt>(std::bit_cast<UInt>(src) ^ kLSB));
+    std::memcpy(&buf, &swapped, sizeof(T));
+    return std::bit_cast<const Binary*>(&buf);
   } else if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
     /*------------------------*
      * Floating point numbers
@@ -342,15 +343,16 @@ ConvertToBinaryData(  //
     using UInt = std::conditional_t<std::is_same_v<T, float>, uint32_t, uint64_t>;
     constexpr UInt kLSB = UInt{1} << (UInt{8} * sizeof(T) - UInt{1});
     constexpr UInt kMask = ~UInt{0};
-    auto* const swapped = std::bit_cast<UInt*>(&buf);
+    UInt swapped{};
     if (std::isnan(src)) {
-      *swapped = 0;
+      swapped = 0;
     } else if (std::signbit(src)) {
-      *swapped = ByteSwap(std::bit_cast<UInt>(src) ^ kMask);
+      swapped = ByteSwap(static_cast<UInt>(std::bit_cast<UInt>(src) ^ kMask));
     } else {
-      *swapped = ByteSwap(std::bit_cast<UInt>(src) ^ kLSB);
+      swapped = ByteSwap(static_cast<UInt>(std::bit_cast<UInt>(src) ^ kLSB));
     }
-    return std::bit_cast<const Binary*>(swapped);
+    std::memcpy(&buf, &swapped, sizeof(T));
+    return std::bit_cast<const Binary*>(&buf);
   } else if constexpr (std::is_array_v<T> || std::is_pointer_v<T>) {
     /*------------------------*
      * Pointers
@@ -384,14 +386,18 @@ ConvertFromBinaryData(        //
     /*------------------------*
      * Unsigend integers
      *------------------------*/
-    return ByteSwap(*std::bit_cast<T*>(src));
+    T v{};
+    std::memcpy(&v, src, sizeof(T));
+    return ByteSwap(v);
   } else if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, int32_t>) {
     /*------------------------*
      * Sigend integers
      *------------------------*/
     using UInt = std::make_unsigned_t<T>;
     constexpr UInt kLSB = UInt{1} << (UInt{8} * sizeof(T) - UInt{1});
-    return std::bit_cast<T>(ByteSwap(*std::bit_cast<UInt*>(src)) ^ kLSB);
+    UInt v{};
+    std::memcpy(&v, src, sizeof(T));
+    return std::bit_cast<T>(static_cast<UInt>(ByteSwap(v) ^ kLSB));
   } else if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
     /*------------------------*
      * Floating point numbers
@@ -399,7 +405,9 @@ ConvertFromBinaryData(        //
     using UInt = std::conditional_t<std::is_same_v<T, float>, uint32_t, uint64_t>;
     constexpr UInt kLSB = UInt{1} << (UInt{8} * sizeof(T) - UInt{1});
     constexpr UInt kMask = ~UInt{0};
-    const auto swapped = ByteSwap(*std::bit_cast<UInt*>(src));
+    UInt v{};
+    std::memcpy(&v, src, sizeof(T));
+    const auto swapped = ByteSwap(v);
     if (swapped == 0) return NAN;
     if (swapped & kLSB) return std::bit_cast<T>(swapped ^ kLSB);
     return std::bit_cast<T>(swapped ^ kMask);
@@ -412,7 +420,9 @@ ConvertFromBinaryData(        //
     /*------------------------*
      * Others
      *------------------------*/
-    return *std::bit_cast<const T*>(src);
+    std::array<std::byte, sizeof(T)> bytes{};
+    std::memcpy(bytes.data(), src, sizeof(T));
+    return std::bit_cast<T>(bytes);
   }
 }
 
