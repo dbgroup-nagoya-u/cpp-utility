@@ -55,14 +55,8 @@ using QNodeHolder = component::QueueNodeHolder<QNode, OMCSLock::kQNodeNum>;
  * Local constants
  *############################################################################*/
 
-/// @brief The `uintptr_t` of nullptr.
-constexpr uint64_t kNull = 0;
-
 /// @brief A lock state representing an opportunistic lock.
 constexpr uint64_t kSFlag = OMCSLock::kSFlag;
-
-/// @brief A lock state representing no locks.
-constexpr uint64_t kNoLocks = 0b000;
 
 /// @brief A lock state representing an exclusive lock.
 constexpr uint64_t kXLock = 1UL << 62UL;
@@ -127,7 +121,7 @@ OMCSLock::LockS() noexcept  //
 
   auto cur = lock_.load(kRelaxed);
   while (true) {
-    if (cur & kQIDMask) {  // there is the predecessor
+    if (cur & kLockMask) {  // there is the predecessor
       if (lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) {
         tls_holder.ReleaseQID(qid);
         qid = WaitSLock(cur);
@@ -323,7 +317,7 @@ OMCSLock::OptGuard::VerifyVersion(  //
 
   // try to acquire a shared lock
   retry_num_ = 0;
-  while ((cur & kSMask) == kNoLocks && (cur & kQIDMask) != kNull) {
+  while ((cur & kLockMask) == kXLock) {  // an SIX/X lock without shared lock holders
     has_lock_ = dest_->lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed);
     if (has_lock_) {
       qid_ = dest_->WaitSLock(cur);
@@ -366,14 +360,13 @@ OMCSLock::OptGuard::TryLockS(      //
 
   std::atomic_thread_fence(kAcquire);
   auto cur = dest_->lock_.load(kRelaxed);
-  auto tail_qid = (cur & kQIDMask) >> kQIDShift;
   while (true) {
     ver_ = static_cast<uint32_t>(cur & kVersionMask);
     if ((cur ^ expected) & mask) {
       tls_holder.ReleaseQID(qid);
       return SGuard{};
     }
-    if (tail_qid) {  // there is the predecessor
+    if (cur & kLockMask) {  // there is the predecessor
       if (dest_->lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) {
         tls_holder.ReleaseQID(qid);
         qid = dest_->WaitSLock(cur);
