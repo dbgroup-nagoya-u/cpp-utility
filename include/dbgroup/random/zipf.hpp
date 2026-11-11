@@ -24,6 +24,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <random>
+#include <stdexcept>
 #include <type_traits>
 #include <vector>
 
@@ -83,16 +84,17 @@ class ZipfDistribution
    *##########################################################################*/
 
   /**
-   * @param id A target ID in [0, `bin_num`).
-   * @return A CDF value of the given ID.
+   * @param bin_id A target bin ID in [0, the number of bins).
+   * @return A CDF value of the given bin.
+   * @throw std::out_of_range if `bin_id` is not less than the number of bins.
    */
   [[nodiscard]]
   constexpr auto
-  GetCDF(                      //
-      const IntType id) const  //
+  GetCDF(                           //
+      const uint64_t bin_id) const  //
       -> double
   {
-    return zipf_cdf_.at(static_cast<size_t>(id));
+    return zipf_cdf_.at(bin_id);
   }
 
   /*##########################################################################*
@@ -222,16 +224,22 @@ class ApproxZipfDistribution
    *##########################################################################*/
 
   /**
-   * @param id A target ID in [0, `bin_num`).
-   * @return A CDF value of the given ID.
+   * @param bin_id A target bin ID in [0, the number of bins).
+   * @return A CDF value of the given bin.
+   * @throw std::out_of_range if `bin_id` is not less than the number of bins.
    */
   [[nodiscard]]
   auto
-  GetCDF(                      //
-      const IntType id) const  //
+  GetCDF(                           //
+      const uint64_t bin_id) const  //
       -> double
   {
-    return GetCDFOf(static_cast<uint64_t>(id));
+    if (bin_id >= n_) {
+      throw std::out_of_range{"The bin ID must be less than the number of bins."};
+    }
+    if (bin_id < std::min<uint64_t>(n_, kExactBinNum)) return zipf_cdf_[bin_id];
+    if (bin_id == n_ - 1) return 1.0;
+    return (exact_sum_ + Integral(static_cast<double>(bin_id) + 1.5)) / total_;  // NOLINT
   }
 
   /*##########################################################################*
@@ -267,34 +275,6 @@ class ApproxZipfDistribution
     const auto id = std::ceil(x - 1.5);  // CDF(id) = Integral(id + 1.5) / total_
     if (!(id < static_cast<double>(n_ - 1))) return ToValue(n_ - 1);
     return ToValue(std::max<uint64_t>(static_cast<uint64_t>(id), kExactBinNum));
-  }
-
-  /**
-   * @param g A random value generator.
-   * @return A random value according to Zipf's law.
-   */
-  template <class RandEngine>
-  [[nodiscard]]
-  auto
-  GetIDUsingBinarySearch(   //
-      RandEngine& g) const  //
-      -> IntType
-  {
-    std::uniform_real_distribution<double> uniform{0.0, 1.0};
-    const auto p = uniform(g);
-
-    // find the first bin whose CDF is not less than the probability
-    uint64_t begin_pos = 0;
-    uint64_t end_pos = n_ - 1;
-    while (begin_pos < end_pos) {
-      const auto pos = begin_pos + ((end_pos - begin_pos) >> 1UL);
-      if (GetCDFOf(pos) < p) {
-        begin_pos = pos + 1;
-      } else {
-        end_pos = pos;
-      }
-    }
-    return ToValue(begin_pos);
   }
 
  private:
@@ -336,21 +316,6 @@ class ApproxZipfDistribution
   {
     if (pow_ == 0.0) return std::log(x / kLowerBound);
     return lower_pow_ * std::expm1(pow_ * std::log(x / kLowerBound)) / pow_;
-  }
-
-  /**
-   * @param id A target ID in [0, `n_`).
-   * @return A CDF value of the given ID.
-   */
-  [[nodiscard]]
-  auto
-  GetCDFOf(                     //
-      const uint64_t id) const  //
-      -> double
-  {
-    if (id < std::min<uint64_t>(n_, kExactBinNum)) return zipf_cdf_[id];
-    if (id >= n_ - 1) return 1.0;
-    return (exact_sum_ + Integral(static_cast<double>(id) + 1.5)) / total_;  // NOLINT
   }
 
   /**
