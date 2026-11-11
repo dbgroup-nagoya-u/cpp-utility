@@ -18,6 +18,7 @@
 #include "dbgroup/benchmark/stop_watch.hpp"
 
 // C++ standard libraries
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -99,8 +100,8 @@ StopWatch::Stop(  //
     if (lat > max_) [[unlikely]] {
       max_ = lat;
     }
-    const uint32_t pos = std::ceil(std::log(lat) / denom);
-    ++bins_[pos];
+    const auto pos = static_cast<uint32_t>(std::ceil(std::log(lat) / denom));
+    ++bins_[std::min(pos, kBinNum - 1)];  // count extremely long latencies in the last bin
   } else {
     ++bins_[0];
   }
@@ -111,10 +112,11 @@ StopWatch::Quantile(       //
     const double q) const  //
     -> size_t
 {
+  if (exec_num_ == 0) return 0;  // no measurements
   if (q == 0) return min_;
   if (q >= 1.0) return max_;
 
-  const auto bound = static_cast<uint32_t>(q * static_cast<double>(exec_num_ - 1));
+  const auto bound = static_cast<size_t>(q * static_cast<double>(exec_num_ - 1));
   auto cnt = bins_[0];
   auto i = 0U;
   while (i < kBinNum - 1 && cnt <= bound) {

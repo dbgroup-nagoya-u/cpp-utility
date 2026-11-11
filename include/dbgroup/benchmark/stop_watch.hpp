@@ -42,7 +42,7 @@ class StopWatch
    * Type aliases
    *##########################################################################*/
 
-  using Clock_t = ::std::chrono::high_resolution_clock;
+  using Clock_t = ::std::chrono::steady_clock;
 
  public:
   /*##########################################################################*
@@ -128,7 +128,7 @@ class StopWatch
 
   /**
    * @param q A target quantile value.
-   * @return The latency of given quantile.
+   * @return The latency of given quantile (zero if nothing has been measured).
    */
   [[nodiscard]]
   auto Quantile(       //
@@ -166,7 +166,7 @@ class StopWatch
   Clock_t::time_point st_{};
 
   /// @brief The number of executed operations.
-  uint32_t exec_num_{};
+  size_t exec_num_{};
 
   /// @brief Total execution time [ns].
   size_t exec_time_{};
@@ -178,7 +178,7 @@ class StopWatch
   size_t max_{};
 
   /// @brief Execution time for each operation [ns].
-  std::array<uint32_t, kBinNum> bins_{};
+  std::array<uint64_t, kBinNum> bins_{};
 };
 
 }  // namespace dbgroup::benchmark

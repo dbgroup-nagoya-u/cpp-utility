@@ -54,4 +54,15 @@ TEST(  //
   // NOLINTEND
 }
 
+TEST(  //
+    StopWatchTest,
+    QuantileQueryReturnZeroWithoutMeasurements)
+{
+  const StopWatch sw{};
+  EXPECT_FALSE(sw);
+  EXPECT_EQ(sw.Quantile(0), 0);
+  EXPECT_EQ(sw.Quantile(0.5), 0);  // NOLINT
+  EXPECT_EQ(sw.Quantile(1.0), 0);
+}
+
 }  // namespace dbgroup::benchmark::test
