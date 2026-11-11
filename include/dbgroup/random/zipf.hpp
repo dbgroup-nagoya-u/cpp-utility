@@ -112,6 +112,7 @@ class ZipfDistribution
       RandEngine& g) const  //
       -> IntType
   {
+    // NOLINTNEXTLINE(misc-const-correctness): operator() is non-const
     std::uniform_real_distribution<double> uniform{0.0, 1.0};
     const auto p = uniform(g);
 
@@ -257,6 +258,7 @@ class ApproxZipfDistribution
       RandEngine& g) const  //
       -> IntType
   {
+    // NOLINTNEXTLINE(misc-const-correctness): operator() is non-const
     std::uniform_real_distribution<double> uniform{0.0, 1.0};
     const auto p = uniform(g);
     const auto exact_num = std::min<uint64_t>(n_, kExactBinNum);

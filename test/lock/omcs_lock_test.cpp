@@ -18,8 +18,11 @@
 
 // C++ standard libraries
 #include <chrono>
+#include <cstddef>
 #include <future>
 #include <thread>
+#include <utility>
+#include <variant>
 #include <vector>
 
 // external libraries
@@ -27,6 +30,7 @@
 
 // local sources
 #include "common.hpp"
+#include "dbgroup/lock/utility.hpp"
 
 namespace dbgroup::lock::test
 {
@@ -180,7 +184,7 @@ class OMCSLockFixture : public ::testing::Test
     ASSERT_EQ(counter_, kThreadNum * kWriteNumPerThread);
   }
 
-  void
+  static void
   VerifyImmediateVerifyReleasesFallbackSLock()
   {
     auto* lock = new OMCSLock{};  // leaked if the following procedure is blocked

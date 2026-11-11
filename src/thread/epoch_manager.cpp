@@ -27,9 +27,11 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <thread>
 
 // local sources
 #include "dbgroup/constants.hpp"
+#include "dbgroup/thread/epoch_guard.hpp"
 #include "dbgroup/thread/id_manager.hpp"
 #include "dbgroup/types.hpp"
 
@@ -116,7 +118,7 @@ EpochManager<Serial>::CreateEpochGuard()  //
     throw std::out_of_range{"EpochManager: The thread ID exceeded the capacity."};
   }
   auto& tls = tls_fields_[id];
-  assert(!tls.active.load(kRelaxed));  // nested guards are not allowed
+  assert(!tls.active.load(kRelaxed));                // nested guards are not allowed
   tls.entered.store(--GetCurrentEpoch(), kRelaxed);  // add a safety buffer
   return EpochGuard{&(tls.active)};
 }
@@ -133,7 +135,7 @@ EpochManager<Serial>::AdvanceEpochWorker(  //
   auto wake_time = std::chrono::steady_clock::now();
   while (running_.load(kRelaxed)) {
     wake_time += epoch_interval_;
-    auto min = --GetCurrentEpoch();  // add a safety buffer
+    auto min = --GetCurrentEpoch();     // add a safety buffer
     std::atomic_thread_fence(kSeqCst);  // pair with the fence in EpochGuard
     for (size_t thd_id = 0; thd_id < thread_num_; ++thd_id) {
       auto& tls = tls_fields_[thd_id];

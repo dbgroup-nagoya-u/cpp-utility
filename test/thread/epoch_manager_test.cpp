@@ -26,6 +26,9 @@
 // external libraries
 #include "gtest/gtest.h"
 
+// local sources
+#include "dbgroup/types.hpp"
+
 namespace dbgroup::thread::test
 {
 /*############################################################################*

@@ -18,9 +18,14 @@
 #include "dbgroup/thread/id_manager.hpp"
 
 // C++ standard libraries
+#include <array>
+#include <atomic>
 #include <chrono>
+#include <cstddef>
+#include <memory>
 #include <mutex>
 #include <thread>
+#include <vector>
 
 // external sources
 #include "gtest/gtest.h"
@@ -78,11 +83,11 @@ class IDManagerFixture : public ::testing::Test
       const auto id = IDManager::GetThreadID();
       reserved.at(id) = true;
       cnt.fetch_add(1, std::memory_order_release);
-      std::lock_guard guard{mtx};
+      const std::lock_guard guard{mtx};
     };
 
     {
-      std::lock_guard guard{mtx};
+      const std::lock_guard guard{mtx};
       for (size_t i = 0; i < kLogicalCoreNum; ++i) {
         threads.emplace_back(f);
       }
@@ -127,11 +132,11 @@ TEST_F(IDManagerFixture, ThreadHeartBeatsShowProperBoolValues)
     const auto id = IDManager::GetThreadID();
     hbs.at(id) = IDManager::GetHeartBeat();
     cnt.fetch_add(1, std::memory_order_release);
-    std::lock_guard guard{mtx};
+    const std::lock_guard guard{mtx};
   };
 
   {
-    std::lock_guard guard{mtx};
+    const std::lock_guard guard{mtx};
     for (size_t i = 0; i < kLogicalCoreNum; ++i) {
       threads.emplace_back(f);
     }

@@ -19,6 +19,7 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <thread>
 #include <utility>

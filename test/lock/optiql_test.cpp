@@ -19,9 +19,12 @@
 // C++ standard libraries
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <future>
+#include <mutex>
 #include <shared_mutex>
 #include <thread>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -123,7 +126,7 @@ class OptiQLFixture : public ::testing::Test
       const std::lock_guard guard{mtx_};
       for (size_t i = 0; i < kThreadNum; ++i) {
         threads.emplace_back([this]() {
-          std::shared_lock<std::shared_mutex> lock(mtx_);
+          const std::shared_lock<std::shared_mutex> lock(mtx_);
           for (size_t i = 0; i < kWriteNumPerThread; i++) {
             auto&& x_guard = lock_.LockX();
             ++counter_;

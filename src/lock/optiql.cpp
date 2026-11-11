@@ -19,12 +19,9 @@
 
 // C++ standard libraries
 #include <atomic>
-#include <bit>
 #include <cstdint>
-#include <functional>
 #include <thread>
 #include <utility>
-#include <vector>
 
 // local sources
 #include "dbgroup/constants.hpp"

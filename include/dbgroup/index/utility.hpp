@@ -351,6 +351,7 @@ ConvertToBinaryData(  //
     const T& src)     //
     -> const Binary*
 {
+  // NOLINTNEXTLINE(misc-const-correctness): written in integer/floating-point branches
   thread_local uint64_t buf{};  // zero filled for sources less than 64 bits
 
   if constexpr (IsConvertibleInteger<T>()) {

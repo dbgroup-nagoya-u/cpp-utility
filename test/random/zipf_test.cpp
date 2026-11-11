@@ -26,6 +26,7 @@
 #include <random>
 #include <stdexcept>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -343,11 +344,11 @@ class ZipfDistributionFixture : public ::testing::Test
   void
   VerifyExactSamples()
   {
-    constexpr auto n = kExactBinNum;
+    constexpr auto kN = kExactBinNum;
     for (const auto alpha : kAlphas) {
-      for (const auto min : {kLowest, static_cast<IntType>(kHighest - (n - 1))}) {
-        const Zipf_t zipf{min, ToValue(n - 1, min), alpha};
-        CheckSamplesFollowCDF(zipf, min, n);
+      for (const auto min : {kLowest, static_cast<IntType>(kHighest - (kN - 1))}) {
+        const Zipf_t zipf{min, ToValue(kN - 1, min), alpha};
+        CheckSamplesFollowCDF(zipf, min, kN);
       }
     }
   }
@@ -355,11 +356,11 @@ class ZipfDistributionFixture : public ::testing::Test
   void
   VerifyApproxSamples()
   {
-    constexpr uint64_t n = 1'000'000;
+    constexpr uint64_t kN = 1'000'000;
     for (const auto alpha : kAlphas) {
-      for (const auto min : {kLowest, static_cast<IntType>(kHighest - (n - 1))}) {
-        const ApproxZipf_t approx{min, ToValue(n - 1, min), alpha};
-        CheckSamplesFollowCDF(approx, min, n);
+      for (const auto min : {kLowest, static_cast<IntType>(kHighest - (kN - 1))}) {
+        const ApproxZipf_t approx{min, ToValue(kN - 1, min), alpha};
+        CheckSamplesFollowCDF(approx, min, kN);
       }
     }
   }

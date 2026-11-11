@@ -18,8 +18,11 @@
 
 // C++ standard libraries
 #include <chrono>
+#include <cstddef>
 #include <future>
 #include <thread>
+#include <utility>
+#include <variant>
 #include <vector>
 
 // external libraries
