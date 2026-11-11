@@ -130,7 +130,7 @@ void
 EpochManager<Serial>::AdvanceEpochWorker(  //
     const std::function<Serial(void)>& get_new_epoch)
 {
-  auto wake_time = std::chrono::system_clock::now();
+  auto wake_time = std::chrono::steady_clock::now();
   while (running_.load(kRelaxed)) {
     wake_time += epoch_interval_;
     auto min = --GetCurrentEpoch();  // add a safety buffer
