@@ -339,7 +339,7 @@ OMCSLock::OptGuard::ImmediateVerify(  //
     -> bool
 {
   if (has_lock_) {
-    dest_->UnlockS(ver_);
+    dest_->UnlockS(qid_);
     has_lock_ = false;
     return true;
   }

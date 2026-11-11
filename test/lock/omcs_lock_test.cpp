@@ -180,6 +180,40 @@ class OMCSLockFixture : public ::testing::Test
     ASSERT_EQ(counter_, kThreadNum * kWriteNumPerThread);
   }
 
+  void
+  VerifyImmediateVerifyReleasesFallbackSLock()
+  {
+    auto* lock = new OMCSLock{};  // leaked if the following procedure is blocked
+    std::promise<bool> p{};
+    auto f = p.get_future();
+    std::thread{[lock, p = std::move(p)]() mutable {
+      auto&& opt_guard = lock->GetVersion();
+      {  // change the version
+        auto&& x_guard = lock->LockX();
+      }
+
+      // fall back to an S lock queued behind an SIX lock
+      std::thread holder{[lock] {
+        auto&& six_guard = lock->LockSIX();
+        std::this_thread::sleep_for(kWaitTimeMill);
+      }};
+      std::this_thread::sleep_for(kWaitTimeMill / 5);
+      const auto verified = opt_guard.VerifyVersion(kNoMask, 1);
+      holder.join();
+
+      // the S lock must be released by ImmediateVerify
+      const auto immediate = opt_guard.ImmediateVerify();
+      {
+        auto&& x_guard = lock->LockX();
+      }
+      p.set_value(!verified && immediate);
+    }}.detach();
+
+    ASSERT_EQ(f.wait_for(kWaitTimeMill * 10), std::future_status::ready);
+    EXPECT_TRUE(f.get());
+    delete lock;
+  }
+
   /*##########################################################################*
    * Public utility functions
    *##########################################################################*/
@@ -554,6 +588,17 @@ TEST_F(  //
     UpgradeToXWithSLockNeedWait)
 {
   VerifyUpgradeToXWith(kSLock, kExpectFail);
+}
+
+/*----------------------------------------------------------------------------*
+ * Optimistic read tests
+ *----------------------------------------------------------------------------*/
+
+TEST_F(  //
+    OMCSLockFixture,
+    ImmediateVerifyReleasesFallbackSLock)
+{
+  VerifyImmediateVerifyReleasesFallbackSLock();
 }
 
 /*----------------------------------------------------------------------------*
