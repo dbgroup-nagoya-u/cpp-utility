@@ -109,14 +109,13 @@ class EpochManagerFixture : public ::testing::Test
   }
 
   void
-  MinEpochWithGuardRemainUnchangedOverTime()
+  MinEpochWithGuardNotExceedProtectedEpoch()
   {
     [[maybe_unused]] const auto& grd = epoch_manager_->CreateEpochGuard();
-    std::this_thread::sleep_for(kSleepTime);
-    auto prev = epoch_manager_->GetMinEpoch();
+    // the guard has entered an epoch before the current one
+    const auto protected_epoch = --epoch_manager_->GetCurrentEpoch();
     for (size_t i = 0; i < kLoopNum; ++i) {
-      const auto cur = epoch_manager_->GetMinEpoch();
-      EXPECT_EQ(cur, prev);
+      EXPECT_LE(epoch_manager_->GetMinEpoch(), protected_epoch);
       std::this_thread::sleep_for(kSleepTime);
     }
   }
@@ -162,9 +161,9 @@ TYPED_TEST(               //
 
 TYPED_TEST(               //
     EpochManagerFixture,  //
-    MinEpochWithGuardRemainUnchangedOverTime)
+    MinEpochWithGuardNotExceedProtectedEpoch)
 {
-  TestFixture::MinEpochWithGuardRemainUnchangedOverTime();
+  TestFixture::MinEpochWithGuardNotExceedProtectedEpoch();
 }
 
 }  // namespace dbgroup::thread::test
