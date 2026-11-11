@@ -691,7 +691,7 @@ class OMCSLock
       uint64_t old_ver,
       uint64_t new_ver) noexcept
   {
-    lock_.fetch_xor(kSFlag | static_cast<uint64_t>(old_ver ^ new_ver), kRelease);
+    lock_.fetch_xor(kSFlag | (old_ver ^ new_ver), kRelease);
     UnlockSIX(qid);
   }
 

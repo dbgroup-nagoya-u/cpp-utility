@@ -20,6 +20,7 @@
 // C++ standard libraries
 #include <atomic>
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <utility>
 

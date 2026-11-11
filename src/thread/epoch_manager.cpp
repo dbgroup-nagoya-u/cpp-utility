@@ -19,15 +19,19 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <cassert>
 #include <chrono>
 #include <cstddef>
 #include <exception>
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
+#include <thread>
 
 // local sources
 #include "dbgroup/constants.hpp"
+#include "dbgroup/thread/epoch_guard.hpp"
 #include "dbgroup/thread/id_manager.hpp"
 #include "dbgroup/types.hpp"
 
@@ -101,7 +105,7 @@ auto
 EpochManager<Serial>::GetMinEpoch() const noexcept  //
     -> Serial
 {
-  return min_epoch_.load(kRelaxed);
+  return min_epoch_.load(kAcquire);
 }
 
 template <class Serial>
@@ -109,8 +113,13 @@ auto
 EpochManager<Serial>::CreateEpochGuard()  //
     -> EpochGuard
 {
-  auto& tls = tls_fields_[dbgroup::thread::IDManager::GetThreadID()];
-  tls.entered = --GetCurrentEpoch();  // add a safety buffer
+  const auto id = IDManager::GetThreadID();
+  if (id >= thread_num_) [[unlikely]] {
+    throw std::out_of_range{"EpochManager: The thread ID exceeded the capacity."};
+  }
+  auto& tls = tls_fields_[id];
+  assert(!tls.active.load(kRelaxed));                // nested guards are not allowed
+  tls.entered.store(--GetCurrentEpoch(), kRelaxed);  // add a safety buffer
   return EpochGuard{&(tls.active)};
 }
 
@@ -123,18 +132,19 @@ void
 EpochManager<Serial>::AdvanceEpochWorker(  //
     const std::function<Serial(void)>& get_new_epoch)
 {
-  auto wake_time = std::chrono::system_clock::now();
+  auto wake_time = std::chrono::steady_clock::now();
   while (running_.load(kRelaxed)) {
     wake_time += epoch_interval_;
-    auto min = --GetCurrentEpoch();  // add a safety buffer
+    auto min = --GetCurrentEpoch();     // add a safety buffer
+    std::atomic_thread_fence(kSeqCst);  // pair with the fence in EpochGuard
     for (size_t thd_id = 0; thd_id < thread_num_; ++thd_id) {
       auto& tls = tls_fields_[thd_id];
       if (!tls.active.load(kAcquire)) continue;
-      min = std::min(min, tls.entered);
+      min = std::min(min, tls.entered.load(kRelaxed));
     }
     global_epoch_.store(get_new_epoch(), kRelaxed);
-    if (GetMinEpoch() != min) {
-      min_epoch_.store(min, kRelaxed);
+    if (min_epoch_.load(kRelaxed) != min) {
+      min_epoch_.store(min, kRelease);
     }
     std::this_thread::sleep_until(wake_time);
   }

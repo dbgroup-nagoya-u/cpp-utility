@@ -42,7 +42,7 @@ class StopWatch
    * Type aliases
    *##########################################################################*/
 
-  using Clock_t = ::std::chrono::high_resolution_clock;
+  using Clock_t = ::std::chrono::steady_clock;
 
  public:
   /*##########################################################################*
@@ -118,7 +118,12 @@ class StopWatch
   /**
    * @brief Stop this stopwatch.
    *
-   * @param cnt The number of executed operations for computing throughput.
+   * @param cnt The number of items processed by the measured operation (e.g.,
+   * records read by a scan operation in indexes).
+   * @note The average latency per item (i.e., the measured time divided by
+   * `cnt`) is recorded with the weight of `cnt`, so that operations processing
+   * different numbers of items can be compared intuitively. Zero is regarded as
+   * one item.
    * @note The `Start` function must precede this every time. If calling this
    * function multiple times without the corresponding` Start`, the logged
    * execution time will be doubly counted.
@@ -128,7 +133,7 @@ class StopWatch
 
   /**
    * @param q A target quantile value.
-   * @return The latency of given quantile.
+   * @return The latency of given quantile (zero if nothing has been measured).
    */
   [[nodiscard]]
   auto Quantile(       //
@@ -166,7 +171,7 @@ class StopWatch
   Clock_t::time_point st_{};
 
   /// @brief The number of executed operations.
-  uint32_t exec_num_{};
+  size_t exec_num_{};
 
   /// @brief Total execution time [ns].
   size_t exec_time_{};
@@ -178,7 +183,7 @@ class StopWatch
   size_t max_{};
 
   /// @brief Execution time for each operation [ns].
-  std::array<uint32_t, kBinNum> bins_{};
+  std::array<uint64_t, kBinNum> bins_{};
 };
 
 }  // namespace dbgroup::benchmark

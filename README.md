@@ -1,6 +1,6 @@
 # C++ Utility Library
 
-[![Ubuntu 24.04](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/ubuntu_24.yaml/badge.svg)](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/ubuntu_24.yaml) [![Ubuntu 22.04](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/ubuntu_22.yaml/badge.svg)](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/ubuntu_22.yaml) [![macOS](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/mac.yaml/badge.svg)](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/mac.yaml)
+[![Ubuntu 24.04](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/ubuntu_24.yaml/badge.svg?branch=main)](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/ubuntu_24.yaml?query=branch%3Amain) [![Ubuntu 22.04](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/ubuntu_22.yaml/badge.svg?branch=main)](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/ubuntu_22.yaml?query=branch%3Amain) [![macOS](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/mac.yaml/badge.svg?branch=main)](https://github.com/dbgroup-nagoya-u/cpp-utility/actions/workflows/mac.yaml?query=branch%3Amain)
 
 - [Build](#build)
     - [Prerequisites](#prerequisites)

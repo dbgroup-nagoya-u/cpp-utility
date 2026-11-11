@@ -289,14 +289,16 @@ class OptiQL
   /**
    * @brief Release an exclusive lock.
    *
-   * @param qnode The queue node corresponding to this lock.
-   * @param ver A desired version after unlocking.
+   * @param qid The ID of the queue node corresponding to this lock.
+   * @param old_ver A version when acquiring this lock.
+   * @param new_ver A desired version after unlocking.
    * @note If a thread calls this function without acquiring an X lock, it will
    * corrupt an internal lock state.
    */
   void UnlockX(  //
       uint64_t qid,
-      uint64_t ver);
+      uint64_t old_ver,
+      uint64_t new_ver);
 
   /*##########################################################################*
    * Internal member variables

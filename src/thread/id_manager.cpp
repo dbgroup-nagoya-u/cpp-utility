@@ -22,6 +22,7 @@
 #include <cstddef>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 #include <thread>
 
 // local sources
@@ -38,8 +39,11 @@ namespace
 /// @brief A bool array for managing reservation states of thread IDs.
 alignas(kVMPageSize) std::atomic_bool _id_vec[kMaxThreadCapacity] = {};  // NOLINT
 
+static_assert(DBGROUP_MAX_THREAD_NUM <= kMaxThreadCapacity,
+              "DBGROUP_MAX_THREAD_NUM must not exceed the thread capacity.");
+
 /// @brief The maximum number of worker threads.
-std::atomic_size_t _max_thread_num{2 * kLogicalCoreNum};  // NOLINT
+std::atomic_size_t _max_thread_num{static_cast<size_t>(DBGROUP_MAX_THREAD_NUM)};  // NOLINT
 
 }  // namespace
 
@@ -96,7 +100,7 @@ IDManager::GetHeartBeater()  //
       if (++loop_num > retry_limit) {
         std::cerr << "[WARN] IDManager failed to assign a thread ID. To resolve "
                      "this issue, increase the thread pool capacity by calling "
-                     "`IDManager::SetThreadID()` during process initialization.\n";
+                     "`IDManager::SetMaxThreadNum()` during process initialization.\n";
         throw std::range_error{"IDManager: Too many threads was assigned."};
       }
       if (++id >= n) [[unlikely]] {
@@ -113,8 +117,13 @@ IDManager::GetHeartBeater()  //
  *############################################################################*/
 
 IDManager::HeartBeater::~HeartBeater()
-{  //
-  _id_vec[*id_].store(false, kRelease);
+{
+  if (!id_) return;  // failed to assign a thread ID
+
+  // stop the heart beat before releasing the ID for other threads
+  const auto id = *id_;
+  id_.reset();
+  _id_vec[id].store(false, kRelease);
 }
 
 auto

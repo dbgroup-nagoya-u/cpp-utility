@@ -31,6 +31,7 @@ EpochGuard::EpochGuard(  //
     : active_{active}
 {
   active_->store(true, kRelease);
+  std::atomic_thread_fence(kSeqCst);  // prevent protected loads from preceding
 }
 
 auto
@@ -39,7 +40,7 @@ EpochGuard::operator=(          //
     -> EpochGuard&
 {
   if (active_) {
-    active_->store(false, kRelaxed);
+    active_->store(false, kRelease);
   }
   active_ = std::exchange(rhs.active_, nullptr);
   return *this;
@@ -48,7 +49,7 @@ EpochGuard::operator=(          //
 EpochGuard::~EpochGuard()
 {
   if (active_) {
-    active_->store(false, kRelaxed);
+    active_->store(false, kRelease);
   }
 }
 

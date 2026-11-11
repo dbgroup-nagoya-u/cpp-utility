@@ -8,22 +8,15 @@
 
 This class generates random values according to Zipf's law. This class can accurately simulate the Zipf distribution, but it may take some time to construct an accurate cumulative distribution function.
 
-Note that a template `IntType` must be 32/64-bit integers, such as `size_t` and `int64_t`.
+Note that a template `IntType` must be 32/64-bit integers, such as `size_t` and `int64_t`. The constructor throws `std::runtime_error` if the maximum value is less than the minimum one or the range covers all the 64-bit integers.
 
 ## class ApproxZipfDistribution
 
-This class approximates the Zipf distribution using Chlebus's approximation formula for a partial sum of the divergent p-series[^1]. Note that this approximation works well when the following conditions are satisfied:
+This class approximates the Zipf distribution in constant time and space regardless of the number of bins. We compute exact CDFs for the first 100 bins and use them for both CDF queries and random generation. For the remaining bins, we approximate the partial sum of $k^{-\alpha}$ by integrating $x^{-\alpha}$ with the midpoint rule, which also gives a closed-form inverse for random generation. In our measurements with $\alpha \in [0, 3]$ and up to $10^7$ bins, the maximum absolute error of approximate CDFs was less than $3 \times 10^{-7}$.
 
-1. a distribution has sufficient bins (100,000 or more recommended) and
-2. a skewness parameter is in [0, 1].
+Note that CDFs are represented by double-precision floating-point numbers, so adjacent bins may not be distinguished when a distribution has an extremely large number of bins (e.g., $10^{12}$ or more).
 
-Thus, we compute exact CDFs with $k < 100$ and use them for the corresponding queries. If the condition $k \geq 100$ is satisfied, we use Chlebus's approximation formula.
-
-The following figure shows the comparison between approximate and exact CDFs.
-
-<img src="figures/comparison_exact_approx_zipf.svg" width="540px">
-
-Note that a template `IntType` must be 32/64-bit integers, such as `size_t` and `int64_t`.
+Note that a template `IntType` must be 32/64-bit integers, such as `size_t` and `int64_t`, and the same exceptions as `ZipfDistribution` are thrown for invalid ranges.
 
 ### Example of Usages
 
@@ -91,5 +84,3 @@ The above example outputs thirty random values according to the Zipf distributio
 6
 0
 ```
-
-[^1]: [Edward Chlebus, "An approximate formula for a partial sum of the divergent p-series," Applied Mathematics Letters, Vol. 22, No. 5, pp. 732-737, 2009.](https://doi.org/10.1016/j.aml.2008.07.007)

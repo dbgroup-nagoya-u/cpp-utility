@@ -17,10 +17,14 @@
 #include "dbgroup/lock/optiql.hpp"
 
 // C++ standard libraries
+#include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <future>
+#include <mutex>
 #include <shared_mutex>
 #include <thread>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -122,7 +126,7 @@ class OptiQLFixture : public ::testing::Test
       const std::lock_guard guard{mtx_};
       for (size_t i = 0; i < kThreadNum; ++i) {
         threads.emplace_back([this]() {
-          std::shared_lock<std::shared_mutex> lock(mtx_);
+          const std::shared_lock<std::shared_mutex> lock(mtx_);
           for (size_t i = 0; i < kWriteNumPerThread; i++) {
             auto&& x_guard = lock_.LockX();
             ++counter_;
@@ -142,6 +146,53 @@ class OptiQLFixture : public ::testing::Test
 
     // check the counter
     ASSERT_EQ(counter_, kThreadNum * kWriteNumPerThread);
+  }
+
+  void
+  VerifyOptimisticReadsWithMultiThread()
+  {
+    constexpr size_t kWriterNum = kThreadNum < 2 ? 2 : kThreadNum;  // queued writers are needed
+    constexpr size_t kReaderNum = 2;
+    std::atomic_uint64_t first{0};  // `first` and `second` must be equal under the lock
+    std::atomic_uint64_t second{0};
+    std::atomic_bool running{true};
+    std::atomic_size_t inconsistent{0};
+
+    std::vector<std::thread> readers{};
+    for (size_t i = 0; i < kReaderNum; ++i) {
+      readers.emplace_back([&] {
+        while (running.load(kRelaxed)) {
+          auto&& opt_guard = lock_.GetVersion();
+          const auto lhs = first.load(kRelaxed);
+          const auto rhs = second.load(kRelaxed);
+          if (opt_guard.VerifyVersion() && lhs != rhs) {
+            inconsistent.fetch_add(1, kRelaxed);
+          }
+        }
+      });
+    }
+
+    std::vector<std::thread> writers{};
+    for (size_t i = 0; i < kWriterNum; ++i) {
+      writers.emplace_back([&] {
+        for (size_t j = 0; j < kWriteNumPerThread; ++j) {
+          auto&& x_guard = lock_.LockX();
+          const auto val = first.load(kRelaxed) + 1;
+          first.store(val, kRelaxed);
+          second.store(val, kRelaxed);
+        }
+      });
+    }
+    for (auto&& t : writers) {
+      t.join();
+    }
+    running = false;
+    for (auto&& t : readers) {
+      t.join();
+    }
+
+    EXPECT_EQ(inconsistent.load(), 0);
+    EXPECT_EQ(first.load(), kWriterNum * kWriteNumPerThread);
   }
 
   /*##########################################################################*
@@ -239,6 +290,13 @@ TEST_F(  //
     IncrementWithLockXKeepConsistentCounter)
 {
   VerifyLockXWithMultiThread();
+}
+
+TEST_F(  //
+    OptiQLFixture,
+    OptimisticReadsWithMultiThreadNeverAcceptInconsistentData)
+{
+  VerifyOptimisticReadsWithMultiThread();
 }
 
 }  // namespace dbgroup::lock::test

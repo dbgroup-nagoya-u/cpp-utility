@@ -18,11 +18,13 @@
 #define CPP_UTILITY_DBGROUP_INDEX_UTILITY_HPP_
 
 // C++ standard libraries
+#include <array>
 #include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <tuple>
 #include <type_traits>
 
@@ -275,27 +277,54 @@ ByteSwap(    //
   static_assert(                                             //
       std::is_integral_v<UInt> && std::is_unsigned_v<UInt>,  //
       "An unexpected type has been given.");
+  static_assert(                                                                         //
+      sizeof(UInt) == 1 || sizeof(UInt) == 2 || sizeof(UInt) == 4 || sizeof(UInt) == 8,  //
+      "An unexpected size of integers has been given.");
 
+  if constexpr (sizeof(UInt) == 1) {
+    return v;
+  }
 #ifdef CPP_UTILITY_HAS_BYTESWAP
-  if constexpr (std::is_same_v<UInt, uint64_t>) {
-    return bswap_64(v);
-  } else if constexpr (std::is_same_v<UInt, uint32_t>) {
-    return bswap_32(v);
-  } else {  // if constexpr (std::is_same_v<UInt, uint16_t>)
-    return bswap_16(v);
+  else if constexpr (sizeof(UInt) == 2) {
+    return static_cast<UInt>(bswap_16(v));
+  } else if constexpr (sizeof(UInt) == 4) {
+    return static_cast<UInt>(bswap_32(v));
+  } else {
+    return static_cast<UInt>(bswap_64(v));
   }
 #else   // NOLINTBEGIN
-  if constexpr (std::is_same_v<UInt, uint64_t>) {
+  else if constexpr (sizeof(UInt) == 2) {
+    return static_cast<UInt>((v << 8U) | (v >> 8U));
+  } else if constexpr (sizeof(UInt) == 4) {
+    v = ((v & 0xff00ff00UL) >> 8U) | ((v & 0x00ff00ffUL) << 8U);
+    return (v >> 16U) | (v << 16U);
+  } else {
     v = ((v & 0xff00ff00ff00ff00ULL) >> 8UL) | ((v & 0x00ff00ff00ff00ffULL) << 8UL);
     v = ((v & 0xffff0000ffff0000ULL) >> 16UL) | ((v & 0x0000ffff0000ffffULL) << 16UL);
     return (v >> 32UL) | (v << 32UL);
-  } else if constexpr (std::is_same_v<UInt, uint32_t>) {
-    v = ((v & 0xff00ff00UL) >> 8U) | ((v & 0x00ff00ffUL) << 8U);
-    return (v >> 16U) | (v << 16U);
-  } else {  // if constexpr (std::is_same_v<UInt, uint16_t>)
-    return (v << 8) | (v >> 8);
   }
 #endif  // NOLINTEND
+}
+
+/**
+ * @tparam UInt Unsigned integer types.
+ * @brief A value with only the most significant bit set.
+ */
+template <class UInt>
+constexpr UInt kSignBit = static_cast<UInt>(UInt{1} << (8U * sizeof(UInt) - 1U));
+
+/**
+ * @tparam T A target type.
+ * @retval true if a target type is an integer converted by
+ * `ConvertToBinaryData` (i.e., integers up to 64 bits except for `bool`).
+ * @retval false otherwise.
+ */
+template <class T>
+constexpr auto
+IsConvertibleInteger() noexcept  //
+    -> bool
+{
+  return std::is_integral_v<T> && !std::is_same_v<T, bool> && sizeof(T) <= sizeof(uint64_t);
 }
 
 /**
@@ -305,9 +334,14 @@ ByteSwap(    //
  * @tparam Binary A destination binary type.
  * @param src A source instance.
  * @return The address of a converted data.
+ * @note This function converts integers (up to 64 bits) and floating point
+ * numbers into big-endian representations whose byte order follows the order
+ * of source values. Every NaN is converted into the minimum value, and -0.0 is
+ * converted into the same value as +0.0.
  * @note This function returns the address of a given instance for pointers and
- * unspecialized types, so the converted data's consistency depends on the
- * source instance.
+ * other types including arrays, so the converted data's consistency depends on
+ * the source instance. Note that such data are compared as raw bytes, so the
+ * order of arrays with multi-byte elements does not follow their values.
  * @note This function stores converted data in a thread-local variable, so you
  * must copy the converted data before calling this again.
  */
@@ -317,48 +351,43 @@ ConvertToBinaryData(  //
     const T& src)     //
     -> const Binary*
 {
-  thread_local uint64_t buf{};  // zero filled for 32 bit sources
+  // NOLINTNEXTLINE(misc-const-correctness): written in integer/floating-point branches
+  thread_local uint64_t buf{};  // zero filled for sources less than 64 bits
 
-  if constexpr (std::is_same_v<T, uint64_t> || std::is_same_v<T, uint32_t>) {
+  if constexpr (IsConvertibleInteger<T>()) {
     /*------------------------*
-     * Unsigend integers
-     *------------------------*/
-    auto* const swapped = std::bit_cast<T*>(&buf);
-    *swapped = ByteSwap(src);
-    return std::bit_cast<const Binary*>(swapped);
-  } else if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, int32_t>) {
-    /*------------------------*
-     * Sigend integers
+     * Integers
      *------------------------*/
     using UInt = std::make_unsigned_t<T>;
-    constexpr UInt kLSB = UInt{1} << (UInt{8} * sizeof(T) - UInt{1});
-    auto* const swapped = std::bit_cast<UInt*>(&buf);
-    *swapped = ByteSwap(std::bit_cast<UInt>(src) ^ kLSB);
-    return std::bit_cast<const Binary*>(swapped);
+    auto v = std::bit_cast<UInt>(src);
+    if constexpr (std::is_signed_v<T>) {
+      v ^= kSignBit<UInt>;  // keep the order of negative and positive values
+    }
+    const auto swapped = ByteSwap(v);
+    std::memcpy(&buf, &swapped, sizeof(T));
+    return std::bit_cast<const Binary*>(&buf);
   } else if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
     /*------------------------*
      * Floating point numbers
      *------------------------*/
     using UInt = std::conditional_t<std::is_same_v<T, float>, uint32_t, uint64_t>;
-    constexpr UInt kLSB = UInt{1} << (UInt{8} * sizeof(T) - UInt{1});
-    constexpr UInt kMask = ~UInt{0};
-    auto* const swapped = std::bit_cast<UInt*>(&buf);
-    if (std::isnan(src)) {
-      *swapped = 0;
-    } else if (std::signbit(src)) {
-      *swapped = ByteSwap(std::bit_cast<UInt>(src) ^ kMask);
-    } else {
-      *swapped = ByteSwap(std::bit_cast<UInt>(src) ^ kLSB);
+    UInt v{};
+    if (!std::isnan(src)) {                    // NaN is converted into zero
+      const auto val = src == 0 ? T{0} : src;  // treat -0.0 as +0.0
+      v = std::bit_cast<UInt>(val);
+      v = std::signbit(val) ? static_cast<UInt>(~v) : static_cast<UInt>(v ^ kSignBit<UInt>);
     }
-    return std::bit_cast<const Binary*>(swapped);
-  } else if constexpr (std::is_array_v<T> || std::is_pointer_v<T>) {
+    const auto swapped = ByteSwap(v);
+    std::memcpy(&buf, &swapped, sizeof(T));
+    return std::bit_cast<const Binary*>(&buf);
+  } else if constexpr (std::is_pointer_v<T>) {
     /*------------------------*
      * Pointers
      *------------------------*/
     return std::bit_cast<const Binary*>(src);
   } else {
     /*------------------------*
-     * Others
+     * Others (including arrays)
      *------------------------*/
     return std::bit_cast<const Binary*>(&src);
   }
@@ -380,30 +409,30 @@ ConvertFromBinaryData(        //
     const Binary* const src)  //
     -> T
 {
-  if constexpr (std::is_same_v<T, uint64_t> || std::is_same_v<T, uint32_t>) {
+  if constexpr (IsConvertibleInteger<T>()) {
     /*------------------------*
-     * Unsigend integers
-     *------------------------*/
-    return ByteSwap(*std::bit_cast<T*>(src));
-  } else if constexpr (std::is_same_v<T, int64_t> || std::is_same_v<T, int32_t>) {
-    /*------------------------*
-     * Sigend integers
+     * Integers
      *------------------------*/
     using UInt = std::make_unsigned_t<T>;
-    constexpr UInt kLSB = UInt{1} << (UInt{8} * sizeof(T) - UInt{1});
-    return std::bit_cast<T>(ByteSwap(*std::bit_cast<UInt*>(src)) ^ kLSB);
+    UInt v{};
+    std::memcpy(&v, src, sizeof(T));
+    v = ByteSwap(v);
+    if constexpr (std::is_signed_v<T>) {
+      v ^= kSignBit<UInt>;
+    }
+    return std::bit_cast<T>(v);
   } else if constexpr (std::is_same_v<T, float> || std::is_same_v<T, double>) {
     /*------------------------*
      * Floating point numbers
      *------------------------*/
     using UInt = std::conditional_t<std::is_same_v<T, float>, uint32_t, uint64_t>;
-    constexpr UInt kLSB = UInt{1} << (UInt{8} * sizeof(T) - UInt{1});
-    constexpr UInt kMask = ~UInt{0};
-    const auto swapped = ByteSwap(*std::bit_cast<UInt*>(src));
-    if (swapped == 0) return NAN;
-    if (swapped & kLSB) return std::bit_cast<T>(swapped ^ kLSB);
-    return std::bit_cast<T>(swapped ^ kMask);
-  } else if constexpr (std::is_array_v<T> || std::is_pointer_v<T>) {
+    UInt v{};
+    std::memcpy(&v, src, sizeof(T));
+    v = ByteSwap(v);
+    if (v == 0) return std::numeric_limits<T>::quiet_NaN();
+    if (v & kSignBit<UInt>) return std::bit_cast<T>(static_cast<UInt>(v ^ kSignBit<UInt>));
+    return std::bit_cast<T>(static_cast<UInt>(~v));
+  } else if constexpr (std::is_pointer_v<T>) {
     /*------------------------*
      * Pointers
      *------------------------*/
@@ -412,7 +441,9 @@ ConvertFromBinaryData(        //
     /*------------------------*
      * Others
      *------------------------*/
-    return *std::bit_cast<const T*>(src);
+    std::array<std::byte, sizeof(T)> bytes{};
+    std::memcpy(bytes.data(), src, sizeof(T));
+    return std::bit_cast<T>(bytes);
   }
 }
 

@@ -19,6 +19,7 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <thread>
 #include <utility>
@@ -55,14 +56,8 @@ using QNodeHolder = component::QueueNodeHolder<QNode, OMCSLock::kQNodeNum>;
  * Local constants
  *############################################################################*/
 
-/// @brief The `uintptr_t` of nullptr.
-constexpr uint64_t kNull = 0;
-
 /// @brief A lock state representing an opportunistic lock.
 constexpr uint64_t kSFlag = OMCSLock::kSFlag;
-
-/// @brief A lock state representing no locks.
-constexpr uint64_t kNoLocks = 0b000;
 
 /// @brief A lock state representing an exclusive lock.
 constexpr uint64_t kXLock = 1UL << 62UL;
@@ -127,7 +122,7 @@ OMCSLock::LockS() noexcept  //
 
   auto cur = lock_.load(kRelaxed);
   while (true) {
-    if (cur & kQIDMask) {  // there is the predecessor
+    if (cur & kLockMask) {  // there is the predecessor
       if (lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) {
         tls_holder.ReleaseQID(qid);
         qid = WaitSLock(cur);
@@ -135,7 +130,7 @@ OMCSLock::LockS() noexcept  //
       }
     } else {  // the initial shared lock
       const auto new_tail = ebd_id | (cur & kVersionMask);
-      if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
+      if (lock_.compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
     }
     CPP_UTILITY_SPINLOCK_HINT
   }
@@ -155,15 +150,16 @@ OMCSLock::LockSIX() noexcept  //
   while (true) {
     qnode->lock_state.store(cur & kLockMask, kRelaxed);
     const auto new_tail = ebd_id | (cur & kSAndVersionMask);
-    if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
+    if (lock_.compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
 
   if (cur & kLockMask) {
     // wait until predecessor gives up the lock
     auto* pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
-    pred_qnode->next.store(qnode, kRelaxed);
-    while (qnode->lock_state.load(kRelaxed) & kXLock) {
+    pred_qnode->next.store(qnode, kRelease);
+    // the acquire load also makes the following load read the latest version
+    while (qnode->lock_state.load(kAcquire) & kXLock) {
       std::this_thread::yield();
     }
     cur = lock_.load(kAcquire);
@@ -182,7 +178,7 @@ OMCSLock::UnlockS(  //
 {
   auto* qnode = QNodeHolder::GetQNode(qid);
 
-  auto* next_node = qnode->next.load(kRelaxed);
+  auto* next_node = qnode->next.load(kAcquire);
   if (next_node == nullptr) {  // this is the tail node
     auto cur = lock_.load(kRelaxed);
     while (((cur & kQIDMask) >> kQIDShift) == qid) {
@@ -190,7 +186,7 @@ OMCSLock::UnlockS(  //
       if (unlock & kLockMask) {
         if (lock_.compare_exchange_weak(cur, unlock, kRelease, kRelaxed)) return;
       } else if (lock_.compare_exchange_weak(cur, (cur & kVersionMask) | kSFlag,  //
-                                             kRelease, kRelaxed)) {
+                                             kAcqRel, kRelaxed)) {
         tls_holder.ReleaseQID(qid);
         return;
       }
@@ -198,13 +194,13 @@ OMCSLock::UnlockS(  //
     }
 
     while (true) {  // wait until successor fills in its next field
-      next_node = qnode->next.load(kRelaxed);
+      next_node = qnode->next.load(kAcquire);
       if (next_node) break;
       CPP_UTILITY_SPINLOCK_HINT
     }
   }
 
-  if ((next_node->lock_state.fetch_sub(kSLock, kRelease) & kLockMask) == kSLock) {
+  if ((next_node->lock_state.fetch_sub(kSLock, kAcqRel) & kLockMask) == kSLock) {
     tls_holder.ReleaseQID(qid);
   }
 }
@@ -215,14 +211,14 @@ OMCSLock::UnlockSIX(  //
 {
   auto* qnode = QNodeHolder::GetQNode(qid);
 
-  auto* next_ptr = qnode->next.load(kRelaxed);
+  auto* next_ptr = qnode->next.load(kAcquire);
   if (next_ptr == nullptr) {  // this is the tail node
     auto cur = lock_.load(kRelaxed);
     while (((cur & kQIDMask) >> kQIDShift) == qid) {
-      if (lock_.compare_exchange_weak(cur, cur ^ kXLock, kRelease, kRelaxed)) {
-        if ((cur & kSMask) == kNoLocks) {
-          tls_holder.ReleaseQID(qid);
-        }
+      if (cur & kSMask) {  // the shared lock holders take over this node
+        if (lock_.compare_exchange_weak(cur, cur ^ kXLock, kRelease, kRelaxed)) return;
+      } else if (lock_.compare_exchange_weak(cur, cur & kSAndVersionMask, kRelease, kRelaxed)) {
+        tls_holder.ReleaseQID(qid);
         return;
       }
       CPP_UTILITY_SPINLOCK_HINT
@@ -230,7 +226,7 @@ OMCSLock::UnlockSIX(  //
   }
 
   while (true) {  // wait until successor fills in its next field
-    next_ptr = qnode->next.load(kRelaxed);
+    next_ptr = qnode->next.load(kAcquire);
     if (next_ptr) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
@@ -255,12 +251,12 @@ OMCSLock::WaitSLock(         //
     if (((cur & kQIDMask) >> kQIDShift) != qid) {
       QNode* next_ptr;
       while (true) {  // wait until successor fills in its next field
-        next_ptr = qnode->next.load(kRelaxed);
+        next_ptr = qnode->next.load(kAcquire);
         if (next_ptr) break;
         CPP_UTILITY_SPINLOCK_HINT
       }
 
-      while (next_ptr->lock_state.load(kRelaxed) & kXLock) {
+      while (next_ptr->lock_state.load(kAcquire) & kXLock) {
         std::this_thread::yield();
       }
       cur = lock_.load(kAcquire);
@@ -280,11 +276,12 @@ OMCSLock::SIXGuard::UpgradeToX() noexcept  //
   if (dest_ == nullptr) return XGuard{};
 
   auto* qnode = QNodeHolder::GetQNode(qid_);
-  while (qnode->lock_state.load(kRelaxed) & kSMask) {
+  while (qnode->lock_state.load(kAcquire) & kSMask) {
     // wait for shared lock holders to release their locks
     CPP_UTILITY_SPINLOCK_HINT
   }
   dest_->lock_.fetch_xor(kSFlag, kAcquire);
+  std::atomic_thread_fence(kRelease);  // make the X bit visible before writes
 
   return XGuard{std::exchange(dest_, nullptr), qid_, ver_};
 }
@@ -321,7 +318,7 @@ OMCSLock::OptGuard::VerifyVersion(  //
 
   // try to acquire a shared lock
   retry_num_ = 0;
-  while ((cur & kSMask) == kNoLocks && (cur & kQIDMask) != kNull) {
+  while ((cur & kLockMask) == kXLock) {  // an SIX/X lock without shared lock holders
     has_lock_ = dest_->lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed);
     if (has_lock_) {
       qid_ = dest_->WaitSLock(cur);
@@ -339,7 +336,7 @@ OMCSLock::OptGuard::ImmediateVerify(  //
     -> bool
 {
   if (has_lock_) {
-    dest_->UnlockS(ver_);
+    dest_->UnlockS(qid_);
     has_lock_ = false;
     return true;
   }
@@ -364,14 +361,13 @@ OMCSLock::OptGuard::TryLockS(      //
 
   std::atomic_thread_fence(kAcquire);
   auto cur = dest_->lock_.load(kRelaxed);
-  auto tail_qid = (cur & kQIDMask) >> kQIDShift;
   while (true) {
     ver_ = static_cast<uint32_t>(cur & kVersionMask);
     if ((cur ^ expected) & mask) {
       tls_holder.ReleaseQID(qid);
       return SGuard{};
     }
-    if (tail_qid) {  // there is the predecessor
+    if (cur & kLockMask) {  // there is the predecessor
       if (dest_->lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) {
         tls_holder.ReleaseQID(qid);
         qid = dest_->WaitSLock(cur);
@@ -380,7 +376,7 @@ OMCSLock::OptGuard::TryLockS(      //
       }
     } else {  // the initial shared lock
       const auto new_tail = ebd_id | (cur & kVersionMask);
-      if (dest_->lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
+      if (dest_->lock_.compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
     }
     CPP_UTILITY_SPINLOCK_HINT
   }
@@ -412,15 +408,16 @@ OMCSLock::OptGuard::TryLockSIX(    //
     }
     qnode->lock_state.store(cur & kLockMask, kRelaxed);
     const auto new_tail = ebd_id | (cur & kSAndVersionMask);
-    if (dest_->lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
+    if (dest_->lock_.compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
 
   if (cur & kLockMask) {
     // wait until predecessor gives up the lock
     auto* pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
-    pred_qnode->next.store(qnode, kRelaxed);
-    while (qnode->lock_state.load(kRelaxed) & kXLock) {
+    pred_qnode->next.store(qnode, kRelease);
+    // the acquire load also makes the following load read the latest version
+    while (qnode->lock_state.load(kAcquire) & kXLock) {
       std::this_thread::yield();
     }
     cur = dest_->lock_.load(kAcquire);

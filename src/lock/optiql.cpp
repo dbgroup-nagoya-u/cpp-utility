@@ -19,12 +19,9 @@
 
 // C++ standard libraries
 #include <atomic>
-#include <bit>
 #include <cstdint>
-#include <functional>
 #include <thread>
 #include <utility>
-#include <vector>
 
 // local sources
 #include "dbgroup/constants.hpp"
@@ -117,25 +114,28 @@ OptiQL::LockX()  //
 {
   const auto qid = tls_holder.GetQID();
   auto* qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
-  const auto new_tail = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
+  const auto qid_bits = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
   auto cur = lock_.load(kRelaxed);
   while (true) {
-    if (lock_.compare_exchange_weak(cur, new_tail, kAcquire, kRelaxed)) break;
+    // replace the tail and clear the opportunistic read flag, keeping the version
+    const auto new_tail = (cur & kVersionMask) | qid_bits;
+    if (lock_.compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
 
   if ((cur & kLockMask) != kNoLocks) {
     // wait until predecessor gives up the lock
     auto* pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
-    pred_qnode->next.store(qnode, kRelaxed);
-    while (!qnode->hold_lock.load(kRelaxed)) {
+    pred_qnode->next.store(qnode, kRelease);
+    while (!qnode->hold_lock.load(kAcquire)) {
       std::this_thread::yield();
     }
-    // disable opportunistic read
-    cur = lock_.fetch_xor(kOPReadFlag, kAcquire);
+    // disable opportunistic read (the flag may have been cleared by successors)
+    cur = lock_.fetch_and(~kOPReadFlag, kAcquire);
   }
 
+  std::atomic_thread_fence(kRelease);  // make the X bit visible before writes
   return XGuard{this, qid, static_cast<uint32_t>(cur & kVersionMask)};
 }
 
@@ -146,7 +146,8 @@ OptiQL::LockX()  //
 void
 OptiQL::UnlockX(  //
     const uint64_t qid,
-    const uint64_t ver)
+    const uint64_t old_ver,
+    const uint64_t new_ver)
 {
   auto* qnode = QNodeHolder::GetQNode(qid);
 
@@ -154,7 +155,7 @@ OptiQL::UnlockX(  //
   if (next_ptr == nullptr) {  // this is the tail node
     auto cur = lock_.load(kRelaxed);
     while (((cur & kQIDMask) >> kQIDShift) == qid) {
-      if (lock_.compare_exchange_weak(cur, ver, kRelease, kRelaxed)) {
+      if (lock_.compare_exchange_weak(cur, new_ver, kRelease, kRelaxed)) {
         tls_holder.ReleaseQID(qid);
         return;
       }
@@ -162,14 +163,14 @@ OptiQL::UnlockX(  //
     }
   }
 
-  // enable opportunistic read
-  lock_.fetch_or(kOPReadFlag | ver, kRelease);
+  // enable opportunistic read and replace the version (`old_ver` -> `new_ver`)
+  lock_.fetch_xor(kOPReadFlag | (old_ver ^ new_ver), kRelease);
   while (true) {  // wait until successor fills in its next field
-    next_ptr = qnode->next.load(kRelaxed);
+    next_ptr = qnode->next.load(kAcquire);
     if (next_ptr) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
-  next_ptr->hold_lock.store(true, kRelaxed);
+  next_ptr->hold_lock.store(true, kRelease);
   tls_holder.ReleaseQID(qid);
 }
 
@@ -183,7 +184,7 @@ OptiQL::XGuard::operator=(  //
     -> XGuard&
 {
   if (dest_) {
-    dest_->UnlockX(qid_, new_ver_);
+    dest_->UnlockX(qid_, old_ver_, new_ver_);
   }
   dest_ = std::exchange(rhs.dest_, nullptr);
   qid_ = rhs.qid_;
@@ -195,7 +196,7 @@ OptiQL::XGuard::operator=(  //
 OptiQL::XGuard::~XGuard()
 {
   if (dest_) {
-    dest_->UnlockX(qid_, new_ver_);
+    dest_->UnlockX(qid_, old_ver_, new_ver_);
   }
 }
 
@@ -209,7 +210,7 @@ OptiQL::OptGuard::VerifyVersion() noexcept  //
 {
   uint64_t cur{};
   while (true) {
-    std::atomic_thread_fence(kRelease);
+    std::atomic_thread_fence(kAcquire);
     cur = dest_->lock_.load(kRelaxed);
     if ((cur & kXAndOPReadMask) != kXLock) break;  // lock released or opportunistically readable
     std::this_thread::yield();

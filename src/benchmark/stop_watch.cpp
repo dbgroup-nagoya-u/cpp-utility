@@ -18,6 +18,7 @@
 #include "dbgroup/benchmark/stop_watch.hpp"
 
 // C++ standard libraries
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
@@ -74,9 +75,9 @@ const double denom = std::log(kGamma);
 void
 StopWatch::Start() noexcept
 {
-  std::atomic_thread_fence(std::memory_order_acq_rel);
+  std::atomic_signal_fence(std::memory_order_seq_cst);
   st_ = Clock_t::now();
-  std::atomic_thread_fence(std::memory_order_acq_rel);
+  std::atomic_signal_fence(std::memory_order_seq_cst);
 }
 
 void
@@ -85,25 +86,33 @@ StopWatch::Stop(  //
 {
   using NS = std::chrono::nanoseconds;
 
-  std::atomic_thread_fence(std::memory_order_acq_rel);
+  std::atomic_signal_fence(std::memory_order_seq_cst);
   const auto et = Clock_t::now();
-  std::atomic_thread_fence(std::memory_order_acq_rel);
+  std::atomic_signal_fence(std::memory_order_seq_cst);
 
+  // record the average latency per item with the weight of the item number
   const size_t lat = std::chrono::duration_cast<NS>(et - st_).count();
-  exec_num_ += cnt;
-  exec_time_ += lat;
-  if (lat < min_) [[unlikely]] {
-    min_ = lat;
-  }
-  if (lat > 0) [[likely]] {
-    if (lat > max_) [[unlikely]] {
-      max_ = lat;
-    }
-    const uint32_t pos = std::ceil(std::log(lat) / denom);
-    ++bins_[pos];
+  size_t item_num;
+  auto avg = static_cast<double>(lat);
+  if (cnt > 1) {
+    item_num = cnt;
+    avg /= static_cast<double>(item_num);
   } else {
-    ++bins_[0];
+    item_num = 1;
   }
+  exec_num_ += item_num;
+  exec_time_ += lat;
+
+  const auto avg_ns = static_cast<size_t>(avg);
+  min_ = std::min(min_, avg_ns);
+  max_ = std::max(max_, avg_ns);
+
+  uint32_t pos = 0;
+  if (avg > 1.0) [[likely]] {
+    // count extremely long latencies in the last bin
+    pos = std::min(static_cast<uint32_t>(std::ceil(std::log(avg) / denom)), kBinNum - 1);
+  }
+  bins_[pos] += item_num;
 }
 
 auto
@@ -111,10 +120,11 @@ StopWatch::Quantile(       //
     const double q) const  //
     -> size_t
 {
+  if (exec_num_ == 0) return 0;  // no measurements
   if (q == 0) return min_;
   if (q >= 1.0) return max_;
 
-  const auto bound = static_cast<uint32_t>(q * static_cast<double>(exec_num_ - 1));
+  const auto bound = static_cast<size_t>(q * static_cast<double>(exec_num_ - 1));
   auto cnt = bins_[0];
   auto i = 0U;
   while (i < kBinNum - 1 && cnt <= bound) {
