@@ -216,11 +216,29 @@ CeilOnVirtualPages(                //
 template <std::integral T>
 constexpr auto
 ShiftAddr(  //
-    const void* const addr,
+    void* const addr,
     const T offset) noexcept  //
     -> void*
 {
-  return std::bit_cast<std::byte*>(addr) + offset;
+  return static_cast<std::byte*>(addr) + offset;
+}
+
+/**
+ * @brief Shift a read-only memory address by a byte offset.
+ *
+ * @tparam T An integral type.
+ * @param addr An original address.
+ * @param offset An offset in bytes.
+ * @return A shifted read-only address.
+ */
+template <std::integral T>
+constexpr auto
+ShiftAddr(  //
+    const void* const addr,
+    const T offset) noexcept  //
+    -> const void*
+{
+  return static_cast<const std::byte*>(addr) + offset;
 }
 
 /**

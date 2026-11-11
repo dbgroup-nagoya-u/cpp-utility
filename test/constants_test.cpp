@@ -22,6 +22,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <new>
+#include <type_traits>
+#include <utility>
 
 // external libraries
 #include "gtest/gtest.h"
@@ -51,6 +53,26 @@ TEST(  //
     EXPECT_EQ(std::bit_cast<uintptr_t>(ptr) % align, 0) << "size=" << size;
     ::operator delete(ptr, GetAlignValOnVirtualPages(size));
   }
+}
+
+TEST(  //
+    ConstantsTest,
+    ShiftAddrKeepsConstness)
+{
+  // the constness of addresses is kept
+  static_assert(std::is_same_v<decltype(ShiftAddr(std::declval<void*>(), 1)), void*>);
+  static_assert(std::is_same_v<decltype(ShiftAddr(std::declval<const void*>(), 1)), const void*>);
+  static_assert(std::is_same_v<decltype(ShiftAddr(std::declval<uint64_t*>(), 1)), void*>);
+  static_assert(
+      std::is_same_v<decltype(ShiftAddr(std::declval<const uint64_t*>(), 1)), const void*>);
+
+  // addresses are shifted in bytes with signed/unsigned offsets
+  uint64_t buf[4]{};
+  const auto* const cbuf = buf;
+  EXPECT_EQ(ShiftAddr(buf, sizeof(uint64_t)), &buf[1]);
+  EXPECT_EQ(ShiftAddr(cbuf, 2 * sizeof(uint64_t)), &cbuf[2]);
+  EXPECT_EQ(ShiftAddr(&buf[3], -static_cast<int64_t>(sizeof(uint64_t))), &buf[2]);
+  EXPECT_EQ(GetOffsetBetween(&buf[0], &buf[3]), 3 * static_cast<int64_t>(sizeof(uint64_t)));
 }
 
 }  // namespace dbgroup::test
