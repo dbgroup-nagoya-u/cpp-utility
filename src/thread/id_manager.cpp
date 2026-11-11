@@ -22,6 +22,7 @@
 #include <cstddef>
 #include <iostream>
 #include <memory>
+#include <stdexcept>
 #include <thread>
 
 // local sources
@@ -96,7 +97,7 @@ IDManager::GetHeartBeater()  //
       if (++loop_num > retry_limit) {
         std::cerr << "[WARN] IDManager failed to assign a thread ID. To resolve "
                      "this issue, increase the thread pool capacity by calling "
-                     "`IDManager::SetThreadID()` during process initialization.\n";
+                     "`IDManager::SetMaxThreadNum()` during process initialization.\n";
         throw std::range_error{"IDManager: Too many threads was assigned."};
       }
       if (++id >= n) [[unlikely]] {
@@ -113,8 +114,13 @@ IDManager::GetHeartBeater()  //
  *############################################################################*/
 
 IDManager::HeartBeater::~HeartBeater()
-{  //
-  _id_vec[*id_].store(false, kRelease);
+{
+  if (!id_) return;  // failed to assign a thread ID
+
+  // stop the heart beat before releasing the ID for other threads
+  const auto id = *id_;
+  id_.reset();
+  _id_vec[id].store(false, kRelease);
 }
 
 auto
