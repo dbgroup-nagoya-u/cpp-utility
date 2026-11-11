@@ -166,6 +166,9 @@ class ZipfDistribution
 /**
  * @brief A class to generate random values according to Zipf's law approximately.
  *
+ * This class computes the first `kExactBinNum` bins exactly and approximates
+ * the remaining ones by integrating `x^(-alpha)` with the midpoint rule.
+ *
  * @tparam IntType A class of generated random values.
  */
 template <class IntType = size_t>
@@ -228,9 +231,7 @@ class ApproxZipfDistribution
       const IntType id) const  //
       -> double
   {
-    const auto pos = static_cast<uint64_t>(id);
-    if (pos < kExactBinNum) return zipf_cdf_[pos];
-    return GetHarmonicNum(static_cast<double>(pos) + 1.0) / (c_ / 2.0);  // NOLINT
+    return GetCDFOf(static_cast<uint64_t>(id));
   }
 
   /*##########################################################################*
@@ -248,15 +249,24 @@ class ApproxZipfDistribution
       RandEngine& g) const  //
       -> IntType
   {
-    std::uniform_real_distribution<double> uniform{0.0, kMaxP};
+    std::uniform_real_distribution<double> uniform{0.0, 1.0};
     const auto p = uniform(g);
+    const auto exact_num = std::min<uint64_t>(n_, kExactBinNum);
+    if (p <= zipf_cdf_[exact_num - 1]) {  // use the exact CDF
+      uint64_t id = 0;
+      while (zipf_cdf_[id] < p) {
+        ++id;  // the last entry is not less than p
+      }
+      return ToValue(id);
+    }
 
-    // NOLINTBEGIN
-    const auto bin =
-        pow_ == 0 ? (-3.0 + std::sqrt(9.0 - 4.0 * (2.0 - std::exp(c_ * p - 1.0)))) / 2.0 + kBase
-                  : std::pow((c_ * pow_ * p - pow_ + 2.0) / 2.0, 1.0 / pow_) - 1.0 + base_;
-    // NOLINTEND
-    return ToValue(static_cast<uint64_t>(bin));
+    // solve `kLowerBound <= x` s.t. `Integral(x) = p * total_ - exact_sum_`
+    const auto y = p * total_ - exact_sum_;
+    const auto x = pow_ == 0.0 ? kLowerBound * std::exp(y)
+                               : kLowerBound * std::exp(std::log1p(pow_ * y / lower_pow_) / pow_);
+    const auto id = std::ceil(x - 1.5);  // CDF(id) = Integral(id + 1.5) / total_
+    if (!(id < static_cast<double>(n_ - 1))) return ToValue(n_ - 1);
+    return ToValue(std::max<uint64_t>(static_cast<uint64_t>(id), kExactBinNum));
   }
 
   /**
@@ -270,29 +280,21 @@ class ApproxZipfDistribution
       RandEngine& g) const  //
       -> IntType
   {
-    std::uniform_real_distribution<double> uniform{0.0, kMaxP};
+    std::uniform_real_distribution<double> uniform{0.0, 1.0};
     const auto p = uniform(g);
 
-    // find a target bin by using a binary search
-    int64_t begin_pos = 0;
-    auto end_pos = static_cast<int64_t>(n_ - 1);
+    // find the first bin whose CDF is not less than the probability
+    uint64_t begin_pos = 0;
+    uint64_t end_pos = n_ - 1;
     while (begin_pos < end_pos) {
-      auto pos = (begin_pos + end_pos) >> 1UL;  // NOLINT
-      const auto cdf_val = GetCDF(static_cast<IntType>(pos));
-      if (p < cdf_val) {
-        end_pos = pos - 1;
-      } else if (p > cdf_val) {
+      const auto pos = begin_pos + ((end_pos - begin_pos) >> 1UL);
+      if (GetCDFOf(pos) < p) {
         begin_pos = pos + 1;
-      } else {  // target_prob == cdf_val
-        begin_pos = pos;
-        break;
+      } else {
+        end_pos = pos;
       }
     }
-    if (p > GetCDF(static_cast<IntType>(begin_pos))) {
-      ++begin_pos;
-    }
-
-    return ToValue(static_cast<uint64_t>(begin_pos));
+    return ToValue(begin_pos);
   }
 
  private:
@@ -307,14 +309,11 @@ class ApproxZipfDistribution
    * Internal constants
    *##########################################################################*/
 
-  /// @brief The number of bins for approximation.
+  /// @brief The number of bins to compute exactly.
   static constexpr size_t kExactBinNum = 100;
 
-  /// @brief The maximum value of random probabilities.
-  static constexpr double kMaxP = 0.9999999999999999;
-
-  /// @brief An offset for ensuring positive IDs.
-  static constexpr double kBase = 0.71394692216654844;
+  /// @brief The lower bound of the integral for approximate bins.
+  static constexpr double kLowerBound = kExactBinNum + 0.5;
 
   /*##########################################################################*
    * Internal utility functions
@@ -326,19 +325,32 @@ class ApproxZipfDistribution
   void UpdateCDF();
 
   /**
-   * @param n The number of partial elements in the p-series.
-   * @return An approximate partial sum of the p-series.
+   * @param x The upper bound of the integral.
+   * @return The integral of `t^(-alpha)` over [`kLowerBound`, `x`].
    */
   [[nodiscard]]
   auto
-  GetHarmonicNum(            //
-      const double n) const  //
+  Integral(                  //
+      const double x) const  //
       -> double
   {
-    // NOLINTBEGIN
-    return pow_ == 0 ? (1 + std::log(n) + std::log(n + 1)) * 0.5
-                     : (std::pow(n + 1, pow_) + std::pow(n, pow_) - 2) / (2 * pow_) + 0.5;
-    // NOLINTEND
+    if (pow_ == 0.0) return std::log(x / kLowerBound);
+    return lower_pow_ * std::expm1(pow_ * std::log(x / kLowerBound)) / pow_;
+  }
+
+  /**
+   * @param id A target ID in [0, `n_`).
+   * @return A CDF value of the given ID.
+   */
+  [[nodiscard]]
+  auto
+  GetCDFOf(                     //
+      const uint64_t id) const  //
+      -> double
+  {
+    if (id < std::min<uint64_t>(n_, kExactBinNum)) return zipf_cdf_[id];
+    if (id >= n_ - 1) return 1.0;
+    return (exact_sum_ + Integral(static_cast<double>(id) + 1.5)) / total_;  // NOLINT
   }
 
   /**
@@ -383,13 +395,16 @@ class ApproxZipfDistribution
   /// @brief Equal to `1 - alpha_`.
   double pow_{1.0};
 
-  /// @brief Equal to `2 * GetHarmonicNum(n_)`.
-  double c_{};
+  /// @brief Equal to `kLowerBound^pow_`.
+  double lower_pow_{kLowerBound};
 
-  /// @brief An offset for ensuring positive IDs.
-  double base_{};
+  /// @brief The sum of `i^(-alpha)` for exactly computed bins.
+  double exact_sum_{1.0};
 
-  /// @brief A cumulative distribution function according to Zipf's law.
+  /// @brief The (approximate) sum of `i^(-alpha)` for all the bins.
+  double total_{1.0};
+
+  /// @brief CDF values of exactly computed bins.
   std::array<double, kExactBinNum> zipf_cdf_{};
 };
 
