@@ -6,9 +6,9 @@
 
 ## class IDManager
 
-This class manages thread IDs in a single process and has two APIs.
+This class manages thread IDs in a single process and has the following APIs.
 
-The `IDManager::GetThreadID` function returns a unique thread ID in [0, `DBGROUP_MAX_THREAD_NUM`). Since the assigned thread ID is maintained in the thread's local storage, this function always returns the same ID for the same thread. Note that the capacity of IDs is static (i.e., `DBGROUP_MAX_THREAD_NUM`), so some threads may be blocked if all IDs are reserved. In this case, the threads must wait for the previous threads to exit.
+The `IDManager::GetThreadID` function returns a unique thread ID in [0, `IDManager::GetMaxThreadNum()`). Since the assigned thread ID is maintained in the thread's local storage, this function always returns the same ID for the same thread, and the ID is released when the thread exits. The maximum number of threads is initialized with `DBGROUP_MAX_THREAD_NUM` (twice the number of logical cores if it is not specified), and you can change it using the `IDManager::SetMaxThreadNum` function during process initialization. If all IDs are reserved, `IDManager::GetThreadID` throws `std::range_error`.
 
 The `IDManager::GetHeartBeat` function returns a `std::weak_ptr<size_t>` instance to allow you to check the alive monitoring of a particular thread. The `expired` function returns `false` until the corresponding thread exits.
 
@@ -16,9 +16,12 @@ The `IDManager::GetHeartBeat` function returns a `std::weak_ptr<size_t>` instanc
 
 ```cpp
 // C++ standard libraries
+#include <atomic>
 #include <chrono>
 #include <iostream>
+#include <memory>
 #include <mutex>
+#include <thread>
 
 // our libraries
 #include "dbgroup/thread/id_manager.hpp"
@@ -66,7 +69,7 @@ main(  //
 This snippet returns the following result (the ID changes each time it is run).
 
 ```txt
-id: 462
+id: 5
 thread alive: 1
 thread alive: 0
 ```
@@ -75,6 +78,6 @@ thread alive: 0
 
 This class supports epoch management for multithreaded software.
 
-A class object has a unique global epoch, and a coordinator thread can advance it using the `ForwardGlobalEpoch` function. Worker threads can obtain the current epoch using the `GetCurrentEpoch` functions.
+A class object has a unique global epoch, and an internal thread advances it at a fixed interval given to the constructor. You can also give a callback function to compute a new global epoch. Worker threads can obtain the current epoch using the `GetCurrentEpoch` function.
 
-The `CreateEpochGuard` function provides epoch protection for each thread with the scoped locking pattern. Worker threads can obtain the oldest protected epoch with the `GetMinEpoch` function, and the `GetProtectedEpochs` function provides all protected epochs for finer epoch management.
+The `CreateEpochGuard` function provides epoch protection for each thread with the scoped locking pattern. Worker threads can obtain the oldest protected epoch with the `GetMinEpoch` function. Note that each thread must not nest epoch guards of the same manager. Since an epoch manager allocates thread-local fields based on `IDManager::GetMaxThreadNum()` at its construction, set the maximum number of threads before constructing epoch managers; otherwise, `CreateEpochGuard` may throw `std::out_of_range`.
