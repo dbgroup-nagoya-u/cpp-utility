@@ -235,6 +235,11 @@ class SerialFixture : public ::testing::Test
 
     EXPECT_EQ((~Serial_t{kMax}).v, 0) << "~";
 
+    const Serial_t orig{kOne};
+    const auto inverted = ~orig;
+    EXPECT_EQ(inverted.v, static_cast<UInt>(~kOne)) << "~";
+    EXPECT_EQ(orig.v, kOne) << "~ (operand must be unchanged)";
+
     // &
     EXPECT_EQ((Serial_t{} & kMax).v, 0) << "&";
     EXPECT_EQ((Serial_t{} & Serial_t{kMax}).v, 0) << "&";

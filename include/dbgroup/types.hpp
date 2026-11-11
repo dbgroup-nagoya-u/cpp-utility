@@ -243,12 +243,12 @@ struct Serial {
     return Serial{static_cast<UInt>(v - rhs.v)};
   }
 
+  [[nodiscard]]
   constexpr auto
-  operator~() noexcept  //
-      -> Serial&
+  operator~() const noexcept  //
+      -> Serial
   {
-    v = ~v;
-    return *this;
+    return Serial{static_cast<UInt>(~v)};
   }
 
   [[nodiscard]]
