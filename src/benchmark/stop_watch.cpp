@@ -130,7 +130,7 @@ StopWatch::Quantile(       //
   while (i < kBinNum - 1 && cnt <= bound) {
     cnt += bins_[++i];
   }
-  return kLatArr[i];
+  return std::clamp(kLatArr[i], min_, max_);
 }
 
 }  // namespace dbgroup::benchmark
