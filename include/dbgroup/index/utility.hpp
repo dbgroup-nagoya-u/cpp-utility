@@ -447,6 +447,78 @@ ConvertFromBinaryData(        //
   }
 }
 
+/*############################################################################*
+ * Global types for the standard index APIs
+ *############################################################################*/
+
+/// @brief A data class without a pointer for variable-length data.
+template <class T>
+using WOPtr = std::conditional_t<IsVarLenData<T>(), std::remove_pointer_t<T>, T>;
+
+/**
+ * @brief A function for merging a payload with a given payload or delta.
+ *
+ * The arguments are the current payload and its length, a given payload or
+ * delta and its length, and a destination buffer that has the same capacity as
+ * `PayloadBuf`. The return value is the length of a merged payload. The current
+ * payload and the destination buffer are aligned for the payload class. Since
+ * this function may be called multiple times due to retries, it must not have
+ * side effects.
+ *
+ * @tparam Payload A payload class.
+ * @tparam T A class of given payloads or deltas.
+ */
+template <class Payload, class T>
+using Merger = size_t (*)(const WOPtr<Payload>* old_pay,
+                          size_t old_len,
+                          const WOPtr<T>* delta,
+                          size_t delta_len,
+                          WOPtr<Payload>* out_pay);
+
+/**
+ * @brief A buffer for receiving payloads from indexes.
+ *
+ * @tparam Payload A payload class.
+ * @tparam kMaxVarSize The maximum size of variable-length payloads.
+ * @note `data` is not initialized by default to avoid unnecessary zeroing.
+ */
+template <class Payload, size_t kMaxVarSize>
+struct PayloadBuf {  // NOLINT(cppcoreguidelines-pro-type-member-init,hicpp-member-init)
+  /*##########################################################################*
+   * Public APIs
+   *##########################################################################*/
+
+  /**
+   * @return A stored payload.
+   * @note For variable-length payloads, this function returns the pointer to
+   * this buffer.
+   */
+  [[nodiscard]]
+  constexpr auto
+  Get() const noexcept  //
+      -> Payload
+  {
+    auto* addr = std::bit_cast<void*>(&data[0]);
+    if constexpr (IsVarLenData<Payload>()) {
+      return std::bit_cast<Payload>(addr);
+    } else {
+      return *std::bit_cast<Payload*>(addr);
+    }
+  }
+
+  /*##########################################################################*
+   * Public member variables
+   *##########################################################################*/
+
+  /// @brief A region for storing a payload.
+  /// @note This region is not initialized to avoid unnecessary zeroing.
+  alignas(alignof(
+      WOPtr<Payload>)) std::byte data[IsVarLenData<Payload>() ? kMaxVarSize : sizeof(Payload)];
+
+  /// @brief The length of a stored payload.
+  uint32_t len{};
+};
+
 }  // namespace dbgroup::index
 
 #endif  // CPP_UTILITY_DBGROUP_INDEX_UTILITY_HPP_
