@@ -264,6 +264,29 @@ VerIncrement(  //
 }
 
 /**
+ * @tparam kMask A bitmask for extracting a target version.
+ * @tparam VerGuard1 A class for representing an versioned guard.
+ * @tparam VerGuard2 A class for representing an versioned guard.
+ * @param rhs A versioned guard.
+ * @param lhs A versioned guard.
+ * @retval true if the given guards have different version bits in the mask.
+ * @retval false otherwise.
+ */
+template <uint32_t kMask, class VerGuard1, class VerGuard2>
+constexpr auto
+VerNE(  //
+    const VerGuard1& rhs,
+    const VerGuard2& lhs) noexcept  //
+    -> bool
+{
+  static_assert(                 //
+      kMask + ~kMask + 1U == 0,  //
+      "A bit mask must be a contiguous sequence of leftmost bits.");
+
+  return (rhs.GetVersion() ^ lhs.GetVersion()) & kMask;
+}
+
+/**
  * @tparam UInt Unsigned integer types.
  * @param v An unsigned integer value.
  * @return A byte swapped value.
