@@ -59,8 +59,10 @@ class OptimisticLock
      * @param dest The address of a target lock.
      */
     constexpr explicit SGuard(  //
-        OptimisticLock* const dest) noexcept
+        OptimisticLock* const dest,
+        const uint32_t ver) noexcept
         : dest_{dest}
+        , ver_{ver}
     {
     }
 
@@ -69,6 +71,7 @@ class OptimisticLock
     constexpr SGuard(  //
         SGuard&& obj) noexcept
         : dest_{std::exchange(obj.dest_, nullptr)}
+        , ver_{obj.ver_}
     {
     }
 
@@ -102,6 +105,17 @@ class OptimisticLock
       return dest_;
     }
 
+    /**
+     * @return The version when this guard was created.
+     */
+    [[nodiscard]]
+    constexpr auto
+    GetVersion() const noexcept  //
+        -> uint32_t
+    {
+      return ver_;
+    }
+
    private:
     /*########################################################################*
      * Internal member variables
@@ -109,6 +123,9 @@ class OptimisticLock
 
     /// @brief The address of a target lock.
     OptimisticLock* dest_{};
+
+    /// @brief A version when creating this guard.
+    uint32_t ver_{};
   };
 
   /**
@@ -128,8 +145,10 @@ class OptimisticLock
      * @param dest The address of a target lock.
      */
     constexpr explicit SIXGuard(  //
-        OptimisticLock* const dest) noexcept
+        OptimisticLock* const dest,
+        const uint32_t ver) noexcept
         : dest_{dest}
+        , ver_{ver}
     {
     }
 
@@ -138,6 +157,7 @@ class OptimisticLock
     constexpr SIXGuard(  //
         SIXGuard&& obj) noexcept
         : dest_{std::exchange(obj.dest_, nullptr)}
+        , ver_{obj.ver_}
     {
     }
 
@@ -172,6 +192,17 @@ class OptimisticLock
     }
 
     /**
+     * @return The version when this guard was created.
+     */
+    [[nodiscard]]
+    constexpr auto
+    GetVersion() const noexcept  //
+        -> uint32_t
+    {
+      return ver_;
+    }
+
+    /**
      * @brief Upgrade this lock to an X lock.
      *
      * @return The lock guard for an X lock.
@@ -189,6 +220,9 @@ class OptimisticLock
 
     /// @brief The address of a target lock.
     OptimisticLock* dest_{};
+
+    /// @brief A version when creating this guard.
+    uint32_t ver_{};
   };
 
   /**

@@ -221,6 +221,17 @@ class OMCSLock
       return dest_;
     }
 
+    /**
+     * @return The version when this guard was created.
+     */
+    [[nodiscard]]
+    constexpr auto
+    GetVersion() const noexcept  //
+        -> uint32_t
+    {
+      return ver_;
+    }
+
    private:
     /*########################################################################*
      * Internal member variables
@@ -309,6 +320,17 @@ class OMCSLock
     operator bool() const noexcept
     {
       return dest_;
+    }
+
+    /**
+     * @return The version when this guard was created.
+     */
+    [[nodiscard]]
+    constexpr auto
+    GetVersion() const noexcept  //
+        -> uint32_t
+    {
+      return ver_;
     }
 
     /**

@@ -88,28 +88,30 @@ auto
 OptimisticLock::LockS()  //
     -> SGuard
 {
+  uint64_t cur{};
   SpinWithYield(
-      [](std::atomic_uint64_t* lock) -> bool {
-        auto cur = lock->load(kRelaxed);
-        return (cur & kXLock) == kNoLocks
-               && lock->compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed);
+      [](std::atomic_uint64_t* lock, uint64_t* cur) -> bool {
+        *cur = lock->load(kRelaxed);
+        return (*cur & kXLock) == kNoLocks
+               && lock->compare_exchange_weak(*cur, *cur + kSLock, kAcquire, kRelaxed);
       },
-      &lock_);
-  return SGuard{this};
+      &lock_, &cur);
+  return SGuard{this, static_cast<uint32_t>(cur)};
 }
 
 auto
 OptimisticLock::LockSIX()  //
     -> SIXGuard
 {
+  uint64_t cur{};
   SpinWithBackoff(
-      [](std::atomic_uint64_t* lock) -> bool {
-        auto cur = lock->load(kRelaxed);
-        return (cur & kXMask) == kNoLocks
-               && lock->compare_exchange_weak(cur, cur | kSIXLock, kAcquire, kRelaxed);
+      [](std::atomic_uint64_t* lock, uint64_t* cur) -> bool {
+        *cur = lock->load(kRelaxed);
+        return (*cur & kXMask) == kNoLocks
+               && lock->compare_exchange_weak(*cur, *cur | kSIXLock, kAcquire, kRelaxed);
       },
-      &lock_);
-  return SIXGuard{this};
+      &lock_, &cur);
+  return SIXGuard{this, static_cast<uint32_t>(cur)};
 }
 
 auto
@@ -172,6 +174,7 @@ OptimisticLock::SGuard::operator=(  //
     dest_->UnlockS();
   }
   dest_ = std::exchange(rhs.dest_, nullptr);
+  ver_ = rhs.ver_;
   return *this;
 }
 
@@ -195,6 +198,7 @@ OptimisticLock::SIXGuard::operator=(  //
     dest_->UnlockSIX();
   }
   dest_ = std::exchange(rhs.dest_, nullptr);
+  ver_ = rhs.ver_;
   return *this;
 }
 
@@ -218,7 +222,8 @@ OptimisticLock::SIXGuard::UpgradeToX()  //
     cur = dest_->lock_.load(kAcquire);
   }
   std::atomic_thread_fence(kRelease);  // make the X bit visible before writes
-  return XGuard{std::exchange(dest_, nullptr), static_cast<uint32_t>(cur)};
+  assert(static_cast<uint32_t>(cur) == ver_);
+  return XGuard{std::exchange(dest_, nullptr), ver_};
 }
 
 /*############################################################################*
@@ -254,7 +259,7 @@ OptimisticLock::XGuard::DowngradeToSIX() noexcept  //
 
   assert((dest_->lock_.load(kRelaxed) & kAllLockMask) == kXLock);
   dest_->lock_.store(kSIXLock | new_ver_, kRelease);
-  return SIXGuard{std::exchange(dest_, nullptr)};
+  return SIXGuard{std::exchange(dest_, nullptr), new_ver_};
 }
 
 /*############################################################################*
@@ -350,14 +355,12 @@ OptimisticLock::OptGuard::TryLockS(  //
     const uint32_t mask)             //
     -> SGuard
 {
-  SGuard grd;
   if (has_lock_) {
     has_lock_ = false;
-    grd = SGuard{std::exchange(dest_, nullptr)};
-    return grd;
+    return SGuard{std::exchange(dest_, nullptr), ver_};
   }
 
-  const auto expected = ver_;
+  uint32_t cur_ver;
   SpinWithBackoff(
       [](std::atomic_uint64_t* lock, uint32_t* ver, uint32_t expected, uint32_t mask) -> bool {
         std::atomic_thread_fence(kAcquire);
@@ -367,10 +370,13 @@ OptimisticLock::OptGuard::TryLockS(  //
                || ((cur & kXLock) == kNoLocks
                    && lock->compare_exchange_weak(cur, cur + kSLock, kRelaxed, kRelaxed));
       },
-      &(dest_->lock_), &ver_, ver_, mask);
+      &(dest_->lock_), &cur_ver, ver_, mask);
 
-  grd = ((ver_ ^ expected) & mask) ? SGuard{} : SGuard{std::exchange(dest_, nullptr)};
-  return grd;
+  if ((ver_ ^ cur_ver) & mask) {
+    ver_ = cur_ver;
+    return SGuard{};
+  }
+  return SGuard{std::exchange(dest_, nullptr), cur_ver};
 }
 
 auto
@@ -383,7 +389,7 @@ OptimisticLock::OptGuard::TryLockSIX(  //
     has_lock_ = false;
   }
 
-  const auto expected = ver_;
+  uint32_t cur_ver;
   SpinWithBackoff(
       [](std::atomic_uint64_t* lock, uint32_t* ver, uint32_t expected, uint32_t mask) -> bool {
         auto cur = lock->load(kAcquire);
@@ -392,9 +398,13 @@ OptimisticLock::OptGuard::TryLockSIX(  //
                || ((cur & kXMask) == kNoLocks
                    && lock->compare_exchange_weak(cur, cur | kSIXLock, kRelaxed, kRelaxed));
       },
-      &(dest_->lock_), &ver_, ver_, mask);
+      &(dest_->lock_), &cur_ver, ver_, mask);
 
-  return ((ver_ ^ expected) & mask) ? SIXGuard{} : SIXGuard{std::exchange(dest_, nullptr)};
+  if ((ver_ ^ cur_ver) & mask) {
+    ver_ = cur_ver;
+    return SIXGuard{};
+  }
+  return SIXGuard{std::exchange(dest_, nullptr), cur_ver};
 }
 
 auto
@@ -408,7 +418,6 @@ OptimisticLock::OptGuard::TryLockX(  //
   }
 
   uint64_t cur{};
-  const auto expected = ver_;
   SpinWithBackoff(
       [](std::atomic_uint64_t* lock, uint64_t* cur,  //
          const uint32_t expected, const uint32_t mask) -> bool {
@@ -418,21 +427,19 @@ OptimisticLock::OptGuard::TryLockX(  //
                || ((*cur & kXMask) == kNoLocks
                    && lock->compare_exchange_weak(*cur, *cur | kXLock, kAcquire, kRelaxed));
       },
-      &(dest_->lock_), &cur, expected, mask);
+      &(dest_->lock_), &cur, ver_, mask);
 
-  XGuard grd;
-  ver_ = static_cast<uint32_t>(cur);
-  if ((ver_ ^ expected) & mask) {
-    grd = {};
-  } else {
-    while (cur & kSMask) {
-      CPP_UTILITY_SPINLOCK_HINT
-      cur = dest_->lock_.load(kAcquire);
-    }
-    std::atomic_thread_fence(kRelease);  // make the X bit visible before writes
-    grd = XGuard{std::exchange(dest_, nullptr), ver_};
+  const auto cur_ver = static_cast<uint32_t>(cur);
+  if ((ver_ ^ cur_ver) & mask) {
+    ver_ = cur_ver;
+    return XGuard{};
   }
-  return grd;
+  while (cur & kSMask) {
+    CPP_UTILITY_SPINLOCK_HINT
+    cur = dest_->lock_.load(kAcquire);
+  }
+  std::atomic_thread_fence(kRelease);  // make the X bit visible before writes
+  return XGuard{std::exchange(dest_, nullptr), cur_ver};
 }
 
 }  // namespace dbgroup::lock
