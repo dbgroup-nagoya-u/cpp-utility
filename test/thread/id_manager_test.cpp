@@ -27,8 +27,8 @@
 #include <thread>
 #include <vector>
 
-// external sources
-#include "gtest/gtest.h"
+// external libraries
+#include <gtest/gtest.h>
 
 // local sources
 #include "dbgroup/constants.hpp"

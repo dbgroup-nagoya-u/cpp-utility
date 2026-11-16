@@ -21,6 +21,9 @@
 #include <atomic>
 #include <utility>
 
+// local sources
+#include "dbgroup/constants.hpp"
+
 namespace dbgroup::thread
 {
 /**
@@ -42,7 +45,12 @@ class EpochGuard
    * @param active An actual address for managing a guard status.
    */
   explicit EpochGuard(  //
-      std::atomic_bool* active) noexcept;
+      std::atomic_bool* const active) noexcept
+      : active_{active}
+  {
+    active_->store(true, kRelease);
+    std::atomic_thread_fence(kSeqCst);  // prevent protected loads from preceding
+  }
 
   constexpr EpochGuard(  //
       EpochGuard&& obj) noexcept
@@ -50,9 +58,17 @@ class EpochGuard
   {
   }
 
-  auto operator=(                 //
+  auto
+  operator=(                      //
       EpochGuard&& rhs) noexcept  //
-      -> EpochGuard&;
+      -> EpochGuard&
+  {
+    if (active_) {
+      active_->store(false, kRelease);
+    }
+    active_ = std::exchange(rhs.active_, nullptr);
+    return *this;
+  }
 
   // delete the copy constructor/assignment
   EpochGuard(const EpochGuard&) = delete;
@@ -66,7 +82,12 @@ class EpochGuard
    * @brief Destroy the instance and release a protected epoch.
    *
    */
-  ~EpochGuard();
+  ~EpochGuard()
+  {
+    if (active_) {
+      active_->store(false, kRelease);
+    }
+  }
 
  private:
   /*##########################################################################*

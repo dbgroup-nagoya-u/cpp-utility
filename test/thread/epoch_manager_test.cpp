@@ -24,7 +24,7 @@
 #include <thread>
 
 // external libraries
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 // local sources
 #include "dbgroup/types.hpp"

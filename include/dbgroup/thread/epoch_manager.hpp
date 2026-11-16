@@ -19,15 +19,18 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <cassert>
 #include <chrono>
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <stdexcept>
 #include <thread>
 
 // local sources
 #include "dbgroup/constants.hpp"
 #include "dbgroup/thread/epoch_guard.hpp"
+#include "dbgroup/thread/id_manager.hpp"
 #include "dbgroup/types.hpp"
 
 namespace dbgroup::thread
@@ -87,15 +90,23 @@ class EpochManager
    * @return The current epoch.
    */
   [[nodiscard]]
-  auto GetCurrentEpoch() const noexcept  //
-      -> Serial;
+  auto
+  GetCurrentEpoch() const noexcept  //
+      -> Serial
+  {
+    return global_epoch_.load(kRelaxed);
+  }
 
   /**
    * @return The current minimum (i.e., protected) epoch.
    */
   [[nodiscard]]
-  auto GetMinEpoch() const noexcept  //
-      -> Serial;
+  auto
+  GetMinEpoch() const noexcept  //
+      -> Serial
+  {
+    return min_epoch_.load(kAcquire);
+  }
 
   /**
    * @brief Create a guard instance based on the scoped locking pattern.
@@ -108,8 +119,19 @@ class EpochManager
    * inner guard would remove the protection of the outer one.
    */
   [[nodiscard]]
-  auto CreateEpochGuard()  //
-      -> EpochGuard;
+  auto
+  CreateEpochGuard()  //
+      -> EpochGuard
+  {
+    const auto id = IDManager::GetThreadID();
+    if (id >= thread_num_) [[unlikely]] {
+      throw std::out_of_range{"EpochManager: The thread ID exceeded the capacity."};
+    }
+    auto& tls = tls_fields_[id];
+    assert(!tls.active.load(kRelaxed));                // nested guards are not allowed
+    tls.entered.store(--GetCurrentEpoch(), kRelaxed);  // add a safety buffer
+    return EpochGuard{&(tls.active)};
+  }
 
  private:
   /*##########################################################################*
@@ -135,6 +157,7 @@ class EpochManager
   /**
    * @brief Advance a global epoch while running.
    *
+   * @param get_new_epoch Callback function for updating the global epoch value.
    */
   void AdvanceEpochWorker(  //
       const std::function<Serial(void)>& get_new_epoch);

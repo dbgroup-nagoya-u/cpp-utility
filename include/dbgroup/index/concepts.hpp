@@ -211,6 +211,106 @@ HasBarrier() noexcept  //
   return HasBarrierMethod<Index>;
 }
 
+/*############################################################################*
+ * Concepts to detect the standard APIs (receiving payloads via `PayloadBuf`)
+ *############################################################################*/
+
+/**
+ * @brief An index exposing classes for the standard APIs.
+ *
+ * @tparam Index A target index class.
+ */
+template <class Index>
+concept StandardIndex = requires {
+  typename Index::KeyType;
+  typename Index::PayloadType;
+  typename Index::PayloadBuf;
+};
+
+template <class Index, class Key, class Payload>
+concept HasReadWithBufMethod =
+    requires(Index& idx, Key key, size_t key_len, typename Index::PayloadBuf* out) {
+      { idx.Read(key, key_len, out) } -> std::same_as<bool>;
+    };
+
+template <class Index, class Key, class Payload>
+constexpr auto
+HasReadWithBuf() noexcept  //
+    -> bool
+{
+  return HasReadWithBufMethod<Index, Key, Payload>;
+}
+
+template <class Index, class Key, class Payload>
+concept HasWriteWithBufMethod =
+    requires(Index& idx, Key key, size_t key_len, Payload payload, size_t pay_len) {
+      { idx.Write(key, key_len, payload, pay_len) };
+    };
+
+template <class Index, class Key, class Payload>
+constexpr auto
+HasWriteWithBuf() noexcept  //
+    -> bool
+{
+  return HasWriteWithBufMethod<Index, Key, Payload>;
+}
+
+template <class Index, class Key, class Payload>
+concept HasUpsertWithBufMethod =
+    requires(Index& idx, Key key, size_t key_len, Payload payload, size_t pay_len) {
+      { idx.Upsert(key, key_len, payload, pay_len) } -> std::same_as<bool>;
+    };
+
+template <class Index, class Key, class Payload>
+constexpr auto
+HasUpsertWithBuf() noexcept  //
+    -> bool
+{
+  return HasUpsertWithBufMethod<Index, Key, Payload>;
+}
+
+template <class Index, class Key, class Payload>
+concept HasInsertWithBufMethod =
+    requires(Index& idx, Key key, size_t key_len, Payload payload, size_t pay_len) {
+      { idx.Insert(key, key_len, payload, pay_len) } -> std::same_as<bool>;
+    };
+
+template <class Index, class Key, class Payload>
+constexpr auto
+HasInsertWithBuf() noexcept  //
+    -> bool
+{
+  return HasInsertWithBufMethod<Index, Key, Payload>;
+}
+
+template <class Index, class Key, class Payload>
+concept HasUpdateWithBufMethod =
+    requires(Index& idx, Key key, size_t key_len, Payload payload, size_t pay_len) {
+      { idx.Update(key, key_len, payload, pay_len) } -> std::same_as<bool>;
+    };
+
+template <class Index, class Key, class Payload>
+constexpr auto
+HasUpdateWithBuf() noexcept  //
+    -> bool
+{
+  return HasUpdateWithBufMethod<Index, Key, Payload>;
+}
+
+template <class Index, class Key, class Payload>
+concept HasDeleteWithBufMethod =
+    requires(Index& idx, Key key, size_t key_len, typename Index::PayloadBuf* old) {
+      { idx.Delete(key, key_len, old) } -> std::same_as<bool>;
+    };
+
+template <class Index, class Key, class Payload>
+constexpr auto
+HasDeleteWithBuf() noexcept  //
+    -> bool
+{
+  return HasDeleteWithBufMethod<Index, Key, Payload>;
+}
+
 }  // namespace dbgroup::index
 
 #endif  // CPP_UTILITY_DBGROUP_INDEX_CONCEPTS_HPP_

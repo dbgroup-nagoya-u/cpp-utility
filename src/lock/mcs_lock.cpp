@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// corresponding header
+// the corresponding header
 #include "dbgroup/lock/mcs_lock.hpp"
 
 // C++ standard libraries
@@ -124,7 +124,7 @@ MCSLock::LockSIX()  //
   }
 
   auto* const tail = std::bit_cast<MCSLock*>(cur & kPtrMask);
-  if (tail != nullptr) {  // wait for the predecessor to release the lock
+  if (tail) {  // wait for the predecessor to release the lock
     tail->lock_.fetch_add(new_tail & kPtrMask, kRelease);
     while (qnode->lock_.load(kAcquire) & kXLock) {
       std::this_thread::yield();
@@ -148,7 +148,7 @@ MCSLock::LockX()  //
   }
 
   auto* const tail = std::bit_cast<MCSLock*>(cur & kPtrMask);
-  if (tail != nullptr) {  // wait for the predecessor to release the lock
+  if (tail) {  // wait for the predecessor to release the lock
     tail->lock_.fetch_add(new_tail & kPtrMask, kRelease);
     while (qnode->lock_.load(kAcquire) & kLockMask) {
       std::this_thread::yield();
@@ -316,7 +316,7 @@ auto
 MCSLock::SIXGuard::UpgradeToX()  //
     -> XGuard
 {
-  if (dest_ == nullptr) return XGuard{};
+  if (!dest_) return XGuard{};
 
   uint64_t next_ptr;
   while (true) {  // wait for shared lock holders to release their locks

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+// the corresponding header
 #include "dbgroup/index/utility.hpp"
 
 // C++ standard libraries
@@ -28,13 +29,11 @@
 #include <vector>
 
 // external libraries
-#include "gtest/gtest.h"
-
-// library sources
-#include "dbgroup/lock/optimistic_lock.hpp"
+#include <gtest/gtest.h>
 
 // local sources
 #include "common.hpp"
+#include "dbgroup/lock/optimistic_lock.hpp"
 
 namespace dbgroup::index::test
 {
@@ -126,7 +125,7 @@ class BinaryConverterFixture : public ::testing::Test
   VerifyRestore()
   {
     for (const auto& v : values_) {
-      const auto* bin_data = ConvertToBinaryData(v);
+      const auto* const bin_data = ConvertToBinaryData(v);
       const auto restored = ConvertFromBinaryData<T>(bin_data);
       ASSERT_EQ(v, restored);
     }
@@ -217,6 +216,7 @@ class FloatingPointConverterFixture : public ::testing::Test
   using Limits = std::numeric_limits<T>;
 
   /**
+   * @param v A target value.
    * @return Converted binary data of a given value.
    */
   static auto

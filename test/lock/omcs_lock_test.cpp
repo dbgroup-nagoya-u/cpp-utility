@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+// the corresponding header
 #include "dbgroup/lock/omcs_lock.hpp"
 
 // C++ standard libraries
@@ -187,7 +188,7 @@ class OMCSLockFixture : public ::testing::Test
   static void
   VerifyImmediateVerifyReleasesFallbackSLock()
   {
-    auto* lock = new OMCSLock{};  // leaked if the following procedure is blocked
+    auto* const lock = new OMCSLock{};  // leaked if the following procedure is blocked
     std::promise<bool> p{};
     auto f = p.get_future();
     std::thread{[lock, p = std::move(p)]() mutable {

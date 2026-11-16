@@ -8,12 +8,6 @@ buildType:
       buildType: Debug
       settings:
         CPP_UTILITY_TEST_SANITIZER: none
-    relWithDebInfo:
-      short: RelWithDebInfo
-      long: Perform optimizations and include debugging informatin
-      buildType: RelWithDebInfo
-      settings:
-        CPP_UTILITY_TEST_SANITIZER: none
     tsan:
       short: RelWithDebInfo+TSan
       long: Perform optimizations with ThreadSanitizer
