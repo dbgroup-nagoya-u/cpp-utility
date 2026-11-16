@@ -26,12 +26,10 @@
 #include <functional>
 #include <iostream>
 #include <memory>
-#include <stdexcept>
 #include <thread>
 
 // local sources
 #include "dbgroup/constants.hpp"
-#include "dbgroup/thread/epoch_guard.hpp"
 #include "dbgroup/thread/id_manager.hpp"
 #include "dbgroup/types.hpp"
 
@@ -86,41 +84,6 @@ EpochManager<Serial>::~EpochManager()
       std::cerr << "The epoch manager could not be joined: " << e.what() << "\n";
     }
   }
-}
-
-/*############################################################################*
- * Public APIs
- *############################################################################*/
-
-template <class Serial>
-auto
-EpochManager<Serial>::GetCurrentEpoch() const noexcept  //
-    -> Serial
-{
-  return global_epoch_.load(kRelaxed);
-}
-
-template <class Serial>
-auto
-EpochManager<Serial>::GetMinEpoch() const noexcept  //
-    -> Serial
-{
-  return min_epoch_.load(kAcquire);
-}
-
-template <class Serial>
-auto
-EpochManager<Serial>::CreateEpochGuard()  //
-    -> EpochGuard
-{
-  const auto id = IDManager::GetThreadID();
-  if (id >= thread_num_) [[unlikely]] {
-    throw std::out_of_range{"EpochManager: The thread ID exceeded the capacity."};
-  }
-  auto& tls = tls_fields_[id];
-  assert(!tls.active.load(kRelaxed));                // nested guards are not allowed
-  tls.entered.store(--GetCurrentEpoch(), kRelaxed);  // add a safety buffer
-  return EpochGuard{&(tls.active)};
 }
 
 /*############################################################################*

@@ -19,9 +19,12 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <cassert>
+#include <cstdint>
 #include <utility>
 
 // local sources
+#include "dbgroup/constants.hpp"
 #include "dbgroup/lock/utility.hpp"
 
 namespace dbgroup::lock
@@ -72,15 +75,32 @@ class PessimisticLock
 
     auto operator=(const SGuard&) -> SGuard& = delete;
 
-    auto operator=(             //
+    auto
+    operator=(                  //
         SGuard&& rhs) noexcept  //
-        -> SGuard&;
+        -> SGuard&
+    {
+      if (dest_) {
+        dest_->UnlockS();
+      }
+      dest_ = std::exchange(rhs.dest_, nullptr);
+      return *this;
+    }
 
     /*########################################################################*
      * Public destructors
      *########################################################################*/
 
-    ~SGuard();
+    /**
+     * @brief Destroy this instance and release a lock if holding.
+     *
+     */
+    ~SGuard()
+    {
+      if (dest_) {
+        dest_->UnlockS();
+      }
+    }
 
     /*########################################################################*
      * Public APIs
@@ -137,15 +157,32 @@ class PessimisticLock
 
     auto operator=(const SIXGuard&) -> SIXGuard& = delete;
 
-    auto operator=(               //
+    auto
+    operator=(                    //
         SIXGuard&& rhs) noexcept  //
-        -> SIXGuard&;
+        -> SIXGuard&
+    {
+      if (dest_) {
+        dest_->UnlockSIX();
+      }
+      dest_ = std::exchange(rhs.dest_, nullptr);
+      return *this;
+    }
 
     /*########################################################################*
      * Public destructors
      *########################################################################*/
 
-    ~SIXGuard();
+    /**
+     * @brief Destroy this instance and release a lock if holding.
+     *
+     */
+    ~SIXGuard()
+    {
+      if (dest_) {
+        dest_->UnlockSIX();
+      }
+    }
 
     /*########################################################################*
      * Public APIs
@@ -169,8 +206,20 @@ class PessimisticLock
      * ownership.
      */
     [[nodiscard]]
-    auto UpgradeToX()  //
-        -> XGuard;
+    auto
+    UpgradeToX()  //
+        -> XGuard
+    {
+      if (!dest_) return XGuard{};
+
+      auto cur = dest_->lock_.fetch_xor(kXMask, kRelaxed);
+      assert((cur & kXMask) == kSIXLock);
+      while (cur & kSMask) {
+        CPP_UTILITY_SPINLOCK_HINT
+        cur = dest_->lock_.load(kAcquire);
+      }
+      return XGuard{std::exchange(dest_, nullptr)};
+    }
 
    private:
     /*########################################################################*
@@ -213,15 +262,32 @@ class PessimisticLock
 
     auto operator=(const XGuard&) -> XGuard& = delete;
 
-    auto operator=(             //
+    auto
+    operator=(                  //
         XGuard&& rhs) noexcept  //
-        -> XGuard&;
+        -> XGuard&
+    {
+      if (dest_) {
+        dest_->UnlockX();
+      }
+      dest_ = std::exchange(rhs.dest_, nullptr);
+      return *this;
+    }
 
     /*########################################################################*
      * Public destructors
      *########################################################################*/
 
-    ~XGuard();
+    /**
+     * @brief Destroy this instance and release a lock if holding.
+     *
+     */
+    ~XGuard()
+    {
+      if (dest_) {
+        dest_->UnlockX();
+      }
+    }
 
     /*########################################################################*
      * Public APIs
@@ -245,8 +311,16 @@ class PessimisticLock
      * ownership.
      */
     [[nodiscard]]
-    auto DowngradeToSIX() noexcept  //
-        -> SIXGuard;
+    auto
+    DowngradeToSIX() noexcept  //
+        -> SIXGuard
+    {
+      if (!dest_) return SIXGuard{};
+
+      [[maybe_unused]] const auto ret = dest_->lock_.fetch_xor(kXMask, kRelease);
+      assert((ret & kXMask) == kXLock);
+      return SIXGuard{std::exchange(dest_, nullptr)};
+    }
 
    private:
     /*########################################################################*
@@ -323,7 +397,12 @@ class PessimisticLock
    * @note If a thread calls this function without acquiring an S lock, it will
    * corrupt an internal lock state.
    */
-  void UnlockS() noexcept;
+  void
+  UnlockS() noexcept
+  {
+    [[maybe_unused]] const auto ret = lock_.fetch_sub(kSLock, kRelease);
+    assert(ret & kSMask);
+  }
 
   /**
    * @brief Release a shared-with-intent-exclusive lock.
@@ -331,7 +410,12 @@ class PessimisticLock
    * @note If a thread calls this function without acquiring an SIX lock, it
    * will corrupt an internal lock state.
    */
-  void UnlockSIX() noexcept;
+  void
+  UnlockSIX() noexcept
+  {
+    [[maybe_unused]] const auto ret = lock_.fetch_xor(kSIXLock, kRelease);
+    assert((ret & kXMask) == kSIXLock);
+  }
 
   /**
    * @brief Release an exclusive lock.
@@ -339,7 +423,34 @@ class PessimisticLock
    * @note If a thread calls this function without acquiring an X lock, it will
    * corrupt an internal lock state.
    */
-  void UnlockX() noexcept;
+  void
+  UnlockX() noexcept
+  {
+    [[maybe_unused]] const auto ret = lock_.fetch_xor(kXLock, kRelease);
+    assert((ret & kXMask) == kXLock);
+  }
+
+  /*##########################################################################*
+   * Internal constants
+   *##########################################################################*/
+
+  /// @brief A lock state representing no locks.
+  static constexpr uint64_t kNoLocks = 0UL;
+
+  /// @brief A lock state representing a shared lock.
+  static constexpr uint64_t kSLock = 1UL;
+
+  /// @brief A lock state representing a shared-with-intent-exclusive lock.
+  static constexpr uint64_t kSIXLock = 1UL << 62UL;
+
+  /// @brief A lock state representing an exclusive lock.
+  static constexpr uint64_t kXLock = 1UL << 63UL;
+
+  /// @brief A bit mask for extracting an SIX/X-lock state.
+  static constexpr uint64_t kXMask = kSIXLock | kXLock;
+
+  /// @brief A bit mask for extracting an S-lock state.
+  static constexpr uint64_t kSMask = ~kXMask;
 
   /*##########################################################################*
    * Internal member variables

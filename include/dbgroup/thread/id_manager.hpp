@@ -66,8 +66,12 @@ class IDManager
    * @return The unique thread ID in [0, `IDManager::GetMaxThreadNum()`).
    */
   [[nodiscard]]
-  static auto GetThreadID()  //
-      -> size_t;
+  static auto
+  GetThreadID()  //
+      -> size_t
+  {
+    return GetHeartBeater().GetID();
+  }
 
   /**
    * @brief Check whether a living thread reserves a given thread ID.
@@ -142,15 +146,23 @@ class IDManager
      * @retval false otherwise.
      */
     [[nodiscard]]
-    auto HasID() const noexcept  //
-        -> bool;
+    auto
+    HasID() const noexcept  //
+        -> bool
+    {
+      return id_.use_count() > 0;
+    }
 
     /**
      * @return The assigned ID for this object.
      */
     [[nodiscard]]
-    auto GetID() const  //
-        -> size_t;
+    auto
+    GetID() const  //
+        -> size_t
+    {
+      return *id_;
+    }
 
     /**
      * @return A weak pointer object to check heart beats of this object.
@@ -193,8 +205,25 @@ class IDManager
    * @return The reference to a heart beater.
    */
   [[nodiscard]]
-  static auto GetHeartBeater()  //
-      -> const HeartBeater&;
+  static auto
+  GetHeartBeater()  //
+      -> const HeartBeater&
+  {
+    thread_local HeartBeater hb{};
+    if (!hb.HasID()) [[unlikely]] {
+      AssignID(hb);
+    }
+    return hb;
+  }
+
+  /**
+   * @brief Assign a unique thread ID to a given heart beater.
+   *
+   * @param hb The heart beater of the current thread.
+   * @throw std::range_error if all the thread IDs are reserved.
+   */
+  static void AssignID(  //
+      HeartBeater& hb);
 };
 
 }  // namespace dbgroup::thread

@@ -19,11 +19,14 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <utility>
 
 // local sources
+#include "dbgroup/constants.hpp"
 #include "dbgroup/lock/utility.hpp"
 
 namespace dbgroup::lock
@@ -78,9 +81,18 @@ class OptimisticLock
 
     auto operator=(const SGuard&) -> SGuard& = delete;
 
-    auto operator=(             //
+    auto
+    operator=(                  //
         SGuard&& rhs) noexcept  //
-        -> SGuard&;
+        -> SGuard&
+    {
+      if (dest_) {
+        dest_->UnlockS();
+      }
+      dest_ = std::exchange(rhs.dest_, nullptr);
+      ver_ = rhs.ver_;
+      return *this;
+    }
 
     /*########################################################################*
      * Public destructors
@@ -90,7 +102,12 @@ class OptimisticLock
      * @brief Destroy this instance and release a lock if holding.
      *
      */
-    ~SGuard();
+    ~SGuard()
+    {
+      if (dest_) {
+        dest_->UnlockS();
+      }
+    }
 
     /*########################################################################*
      * Public APIs
@@ -165,9 +182,18 @@ class OptimisticLock
 
     auto operator=(const SIXGuard&) -> SIXGuard& = delete;
 
-    auto operator=(               //
+    auto
+    operator=(                    //
         SIXGuard&& rhs) noexcept  //
-        -> SIXGuard&;
+        -> SIXGuard&
+    {
+      if (dest_) {
+        dest_->UnlockSIX();
+      }
+      dest_ = std::exchange(rhs.dest_, nullptr);
+      ver_ = rhs.ver_;
+      return *this;
+    }
 
     /*########################################################################*
      * Public destructors
@@ -177,7 +203,12 @@ class OptimisticLock
      * @brief Destroy this instance and release a lock if holding.
      *
      */
-    ~SIXGuard();
+    ~SIXGuard()
+    {
+      if (dest_) {
+        dest_->UnlockSIX();
+      }
+    }
 
     /*########################################################################*
      * Public APIs
@@ -212,8 +243,22 @@ class OptimisticLock
      * ownership.
      */
     [[nodiscard]]
-    auto UpgradeToX()  //
-        -> XGuard;
+    auto
+    UpgradeToX()  //
+        -> XGuard
+    {
+      if (!dest_) return XGuard{};
+
+      auto cur = dest_->lock_.fetch_xor(kXMask, kRelaxed);
+      assert((cur & kXMask) == kSIXLock);
+      while (cur & kSMask) {
+        CPP_UTILITY_SPINLOCK_HINT
+        cur = dest_->lock_.load(kAcquire);
+      }
+      std::atomic_thread_fence(kRelease);  // make the X bit visible before writes
+      assert(static_cast<uint32_t>(cur) == ver_);
+      return XGuard{std::exchange(dest_, nullptr), ver_};
+    }
 
    private:
     /*########################################################################*
@@ -265,9 +310,19 @@ class OptimisticLock
 
     auto operator=(const XGuard&) -> XGuard& = delete;
 
-    auto operator=(             //
+    auto
+    operator=(                  //
         XGuard&& rhs) noexcept  //
-        -> XGuard&;
+        -> XGuard&
+    {
+      if (dest_) {
+        dest_->UnlockX(new_ver_);
+      }
+      dest_ = std::exchange(rhs.dest_, nullptr);
+      old_ver_ = rhs.old_ver_;
+      new_ver_ = rhs.new_ver_;
+      return *this;
+    }
 
     /*########################################################################*
      * Public destructors
@@ -277,7 +332,12 @@ class OptimisticLock
      * @brief Destroy this instance and release a lock if holding.
      *
      */
-    ~XGuard();
+    ~XGuard()
+    {
+      if (dest_) {
+        dest_->UnlockX(new_ver_);
+      }
+    }
 
     /*########################################################################*
      * Public APIs
@@ -328,8 +388,16 @@ class OptimisticLock
      * ownership.
      */
     [[nodiscard]]
-    auto DowngradeToSIX() noexcept  //
-        -> SIXGuard;
+    auto
+    DowngradeToSIX() noexcept  //
+        -> SIXGuard
+    {
+      if (!dest_) return SIXGuard{};
+
+      assert((dest_->lock_.load(kRelaxed) & kAllLockMask) == kXLock);
+      dest_->lock_.store(kSIXLock | new_ver_, kRelease);
+      return SIXGuard{std::exchange(dest_, nullptr), new_ver_};
+    }
 
    private:
     /*########################################################################*
@@ -384,15 +452,35 @@ class OptimisticLock
 
     auto operator=(const OptGuard&) -> OptGuard& = delete;
 
-    auto operator=(               //
+    auto
+    operator=(                    //
         OptGuard&& rhs) noexcept  //
-        -> OptGuard&;
+        -> OptGuard&
+    {
+      if (dest_ && has_lock_) {
+        dest_->UnlockS();
+      }
+      dest_ = std::exchange(rhs.dest_, nullptr);
+      ver_ = rhs.ver_;
+      retry_num_ = rhs.retry_num_;
+      has_lock_ = std::exchange(rhs.has_lock_, false);
+      return *this;
+    }
 
     /*########################################################################*
      * Public destructors
      *########################################################################*/
 
-    ~OptGuard();
+    /**
+     * @brief Destroy this instance and release a lock if holding.
+     *
+     */
+    ~OptGuard()
+    {
+      if (dest_ && has_lock_) {
+        dest_->UnlockS();
+      }
+    }
 
     /*########################################################################*
      * Public getters
@@ -432,10 +520,35 @@ class OptimisticLock
      * update internal fields.
      */
     [[nodiscard]]
-    auto VerifyVersion(  //
-        uint32_t mask = kNoMask,
-        size_t max_retry = std::numeric_limits<size_t>::max()) noexcept  //
-        -> bool;
+    auto
+    VerifyVersion(  //
+        const uint32_t mask = kNoMask,
+        const size_t max_retry = std::numeric_limits<size_t>::max()) noexcept  //
+        -> bool
+    {
+      if (has_lock_) {
+        dest_->UnlockS();
+        has_lock_ = false;
+        return true;
+      }
+
+      // verify using the optimistic read procedure
+      uint64_t cur;
+      const auto expected = ver_;
+      SpinWithYield(
+          [](std::atomic_uint64_t* lock, uint64_t* cur) -> bool {
+            std::atomic_thread_fence(kAcquire);
+            *cur = lock->load(kAcquire);
+            return (*cur & kXLock) == kNoLocks;
+          },
+          &dest_->lock_, &cur);
+      ver_ = static_cast<uint32_t>(cur);
+      if (((ver_ ^ expected) & mask) == 0) return true;
+      if (++retry_num_ < max_retry) return false;  // continue with OCC
+
+      FallBackToSLock();
+      return false;
+    }
 
     /**
      * @param mask A bitmask for representing bits to be verified.
@@ -443,9 +556,24 @@ class OptimisticLock
      * @retval false otherwise.
      */
     [[nodiscard]]
-    auto ImmediateVerify(                  //
-        uint32_t mask = kNoMask) noexcept  //
-        -> bool;
+    auto
+    ImmediateVerify(                             //
+        const uint32_t mask = kNoMask) noexcept  //
+        -> bool
+    {
+      if (has_lock_) {
+        dest_->UnlockS();
+        has_lock_ = false;
+        return true;
+      }
+
+      // verify using the optimistic read procedure
+      std::atomic_thread_fence(kAcquire);
+      const auto expected = ver_;
+      const auto cur = dest_->lock_.load(kAcquire);
+      ver_ = static_cast<uint32_t>(cur);
+      return ((ver_ ^ expected) & mask) == 0 && (cur & kXLock) == kNoLocks;
+    }
 
     /**
      * @brief Get a shared lock if a given version is the same as the current one.
@@ -486,6 +614,18 @@ class OptimisticLock
         -> XGuard;
 
    private:
+    /*########################################################################*
+     * Internal utilities
+     *########################################################################*/
+
+    /**
+     * @brief Acquire a shared lock or wait for another thread to acquire it.
+     *
+     * @note Only one thread per lock word acquires a shared lock, and the other
+     * threads continue with optimistic reads after the shared lock is acquired.
+     */
+    void FallBackToSLock() noexcept;
+
     /*########################################################################*
      * Internal member variables
      *########################################################################*/
@@ -532,8 +672,19 @@ class OptimisticLock
    * with spinlock and back-off.
    */
   [[nodiscard]]
-  auto GetVersion() noexcept  //
-      -> OptGuard;
+  auto
+  GetVersion() noexcept  //
+      -> OptGuard
+  {
+    uint64_t cur{};
+    SpinWithYield(
+        [](std::atomic_uint64_t* lock, uint64_t* cur) -> bool {
+          *cur = lock->load(kAcquire);
+          return (*cur & kXLock) == kNoLocks;
+        },
+        &lock_, &cur);
+    return OptGuard{this, static_cast<uint32_t>(cur)};
+  }
 
   /*##########################################################################*
    * Pessimistic lock APIs
@@ -583,7 +734,12 @@ class OptimisticLock
    * @note If a thread calls this function without acquiring an S lock, it will
    * corrupt an internal lock state.
    */
-  void UnlockS() noexcept;
+  void
+  UnlockS() noexcept
+  {
+    [[maybe_unused]] const auto ret = lock_.fetch_sub(kSLock, kRelease);
+    assert(ret & kSMask);
+  }
 
   /**
    * @brief Release a shared-with-intent-exclusive lock.
@@ -591,7 +747,12 @@ class OptimisticLock
    * @note If a thread calls this function without acquiring an SIX lock, it
    * will corrupt an internal lock state.
    */
-  void UnlockSIX() noexcept;
+  void
+  UnlockSIX() noexcept
+  {
+    [[maybe_unused]] const auto ret = lock_.fetch_xor(kSIXLock, kRelease);
+    assert((ret & kXMask) == kSIXLock);
+  }
 
   /**
    * @brief Release an exclusive lock.
@@ -600,8 +761,41 @@ class OptimisticLock
    * @note If a thread calls this function without acquiring an X lock, it will
    * corrupt an internal lock state.
    */
-  void UnlockX(  //
-      uint64_t ver) noexcept;
+  void
+  UnlockX(  //
+      const uint64_t ver) noexcept
+  {
+    assert((lock_.load(kRelaxed) & kAllLockMask) == kXLock);
+    lock_.store(ver, kRelease);
+  }
+
+  /*##########################################################################*
+   * Internal constants
+   *##########################################################################*/
+
+  /// @brief A lock state representing no locks.
+  static constexpr uint64_t kNoLocks = 0b000UL;
+
+  /// @brief A lock state representing a shared lock.
+  static constexpr uint64_t kSLock = 1UL << 32UL;
+
+  /// @brief A lock state representing a shared-with-intent-exclusive lock.
+  static constexpr uint64_t kSIXLock = 1UL << 62UL;
+
+  /// @brief A lock state representing an exclusive lock.
+  static constexpr uint64_t kXLock = 1UL << 63UL;
+
+  /// @brief A bit mask for extracting version values.
+  static constexpr uint64_t kVersionMask = kSLock - 1UL;
+
+  /// @brief A bit mask for extracting an SIX/X-lock state and the S-lock counter.
+  static constexpr uint64_t kAllLockMask = ~0UL ^ kVersionMask;
+
+  /// @brief A bit mask for extracting X and SIX states.
+  static constexpr uint64_t kXMask = kXLock | kSIXLock;
+
+  /// @brief A bit mask for extracting an S-lock state.
+  static constexpr uint64_t kSMask = kAllLockMask ^ kXMask;
 
   /*##########################################################################*
    * Internal member variables

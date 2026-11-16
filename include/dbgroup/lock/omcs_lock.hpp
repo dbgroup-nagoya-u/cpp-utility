@@ -19,7 +19,10 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <thread>
 #include <utility>
 
 // local sources
@@ -102,8 +105,19 @@ class OMCSLock
    * with spinlock and back-off.
    */
   [[nodiscard]]
-  auto GetVersion() noexcept  //
-      -> OptGuard;
+  auto
+  GetVersion() noexcept  //
+      -> OptGuard
+  {
+    uint64_t cur{};
+    while (true) {
+      cur = lock_.load(kAcquire);
+      if (cur & kSFlag) break;
+      std::this_thread::yield();
+    }
+
+    return OptGuard{this, static_cast<uint32_t>(cur)};
+  }
 
   /**
    * @brief Get a shared lock.
@@ -595,10 +609,35 @@ class OMCSLock
      * @retval false otherwise.
      */
     [[nodiscard]]
-    auto VerifyVersion(  //
-        uint32_t mask = kNoMask,
-        size_t max_retry = std::numeric_limits<size_t>::max()) noexcept  //
-        -> bool;
+    auto
+    VerifyVersion(  //
+        const uint32_t mask = kNoMask,
+        const size_t max_retry = std::numeric_limits<size_t>::max()) noexcept  //
+        -> bool
+    {
+      if (has_lock_) {
+        dest_->UnlockS(qid_);
+        has_lock_ = false;
+        return true;
+      }
+
+      // verify using the optimistic read procedure
+      std::atomic_thread_fence(kAcquire);
+      uint64_t cur;
+      while (true) {
+        cur = dest_->lock_.load(kRelaxed);
+        if (cur & kSFlag) break;
+        std::this_thread::yield();
+      }
+
+      const auto expected = ver_;
+      ver_ = static_cast<uint32_t>(cur);
+      if (((ver_ ^ expected) & mask) == 0) return true;
+      if (++retry_num_ < max_retry) return false;  // continue with OCC
+
+      FallBackToSLock(cur);
+      return false;
+    }
 
     /**
      * @param mask A bitmask for representing bits to be verified.
@@ -606,9 +645,24 @@ class OMCSLock
      * @retval false otherwise.
      */
     [[nodiscard]]
-    auto ImmediateVerify(                  //
-        uint32_t mask = kNoMask) noexcept  //
-        -> bool;
+    auto
+    ImmediateVerify(                             //
+        const uint32_t mask = kNoMask) noexcept  //
+        -> bool
+    {
+      if (has_lock_) {
+        dest_->UnlockS(qid_);
+        has_lock_ = false;
+        return true;
+      }
+
+      // verify using the optimistic read procedure
+      const auto expected = ver_;
+      std::atomic_thread_fence(kAcquire);
+      const auto cur = dest_->lock_.load(kRelaxed);
+      ver_ = static_cast<uint32_t>(cur);
+      return ((ver_ ^ expected) & mask) == 0 && (cur & kSFlag) > 0;
+    }
 
     /**
      * @brief Get a shared lock if a given version is the same as the current one.
@@ -653,6 +707,18 @@ class OMCSLock
     }
 
    private:
+    /*########################################################################*
+     * Internal utilities
+     *########################################################################*/
+
+    /**
+     * @brief Try to acquire a shared lock if the lock is held without readers.
+     *
+     * @param cur The lock state observed in the last verification.
+     */
+    void FallBackToSLock(  //
+        uint64_t cur) noexcept;
+
     /*########################################################################*
      * Internal member variables
      *########################################################################*/

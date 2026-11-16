@@ -52,34 +52,6 @@ struct QNode {
 using QNodeHolder = component::QueueNodeHolder<QNode, OptiQL::kQNodeNum>;
 
 /*############################################################################*
- * Local constants
- *############################################################################*/
-
-/// @brief A lock state representing no locks.
-constexpr uint64_t kNoLocks = 0b000;
-
-/// @brief A lock state representing an exclusive lock.
-constexpr uint64_t kXLock = 1UL << 63UL;
-
-/// @brief A lock state representing an opportunistic lock.
-constexpr uint64_t kOPReadFlag = 1UL << 62UL;
-
-/// @brief A bit mask for extracting an X-lock state and opportunistic read flag.
-constexpr uint64_t kXAndOPReadMask = kXLock | kOPReadFlag;
-
-/// @brief A bit mask for extracting a version value.
-constexpr uint64_t kVersionMask = ~(~0UL << 32UL);
-
-/// @brief A bit mask for extracting a node pointer.
-constexpr uint64_t kQIDMask = (kOPReadFlag - 1UL) ^ kVersionMask;
-
-/// @brief A bit shift for QNode.
-constexpr uint64_t kQIDShift = 32UL;
-
-/// @brief A bit mask for extracting a lock state.
-constexpr uint64_t kLockMask = ~(kVersionMask | kQIDMask);
-
-/*############################################################################*
  * Static variables
  *############################################################################*/
 // NOLINTBEGIN
@@ -93,20 +65,6 @@ thread_local QNodeHolder tls_holder{};
 /*############################################################################*
  * Public APIs
  *############################################################################*/
-
-auto
-OptiQL::GetVersion() const noexcept  //
-    -> OptGuard
-{
-  uint64_t cur{};
-  while (true) {
-    cur = lock_.load(kAcquire);
-    if ((cur & kXAndOPReadMask) != kXLock) break;  // lock released or opportunistically readable
-    std::this_thread::yield();
-  }
-
-  return OptGuard{this, static_cast<uint32_t>(cur & kVersionMask)};
-}
 
 auto
 OptiQL::LockX()  //
@@ -198,27 +156,6 @@ OptiQL::XGuard::~XGuard()
   if (dest_) {
     dest_->UnlockX(qid_, old_ver_, new_ver_);
   }
-}
-
-/*############################################################################*
- * Optimistic lock guards
- *############################################################################*/
-
-auto
-OptiQL::OptGuard::VerifyVersion() noexcept  //
-    -> bool
-{
-  uint64_t cur{};
-  while (true) {
-    std::atomic_thread_fence(kAcquire);
-    cur = dest_->lock_.load(kRelaxed);
-    if ((cur & kXAndOPReadMask) != kXLock) break;  // lock released or opportunistically readable
-    std::this_thread::yield();
-  }
-
-  const auto expected = ver_;
-  ver_ = static_cast<uint32_t>(cur & kVersionMask);
-  return ver_ == expected;
 }
 
 }  // namespace dbgroup::lock

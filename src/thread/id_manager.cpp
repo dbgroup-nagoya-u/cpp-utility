@@ -69,13 +69,6 @@ IDManager::SetMaxThreadNum(  //
 }
 
 auto
-IDManager::GetThreadID()  //
-    -> size_t
-{
-  return GetHeartBeater().GetID();
-}
-
-auto
 IDManager::IsReserved(         //
     const size_t id) noexcept  //
     -> bool
@@ -94,30 +87,26 @@ IDManager::GetHeartBeat()  //
  * Internal APIs
  *############################################################################*/
 
-auto
-IDManager::GetHeartBeater()  //
-    -> const HeartBeater&
+void
+IDManager::AssignID(  //
+    HeartBeater& hb)
 {
-  thread_local HeartBeater hb{};
-  if (!hb.HasID()) [[unlikely]] {
-    const auto n = GetMaxThreadNum();
-    const auto retry_limit = 2 * n;
-    auto id = std::hash<std::thread::id>{}(std::this_thread::get_id()) % n;
-    auto loop_num = 0U;
-    do {
-      if (++loop_num > retry_limit) {
-        std::cerr << "[WARN] IDManager failed to assign a thread ID. To resolve "
-                     "this issue, increase the thread pool capacity by calling "
-                     "`IDManager::SetMaxThreadNum()` during process initialization.\n";
-        throw std::range_error{"IDManager: Too many threads was assigned."};
-      }
-      if (++id >= n) [[unlikely]] {
-        id = 0;
-      }
-    } while (_id_vec[id].load(kRelaxed) || _id_vec[id].exchange(true, kAcquire));
-    hb.SetID(id);
-  }
-  return hb;
+  const auto n = GetMaxThreadNum();
+  const auto retry_limit = 2 * n;
+  auto id = std::hash<std::thread::id>{}(std::this_thread::get_id()) % n;
+  auto loop_num = 0U;
+  do {
+    if (++loop_num > retry_limit) {
+      std::cerr << "[WARN] IDManager failed to assign a thread ID. To resolve "
+                   "this issue, increase the thread pool capacity by calling "
+                   "`IDManager::SetMaxThreadNum()` during process initialization.\n";
+      throw std::range_error{"IDManager: Too many threads was assigned."};
+    }
+    if (++id >= n) [[unlikely]] {
+      id = 0;
+    }
+  } while (_id_vec[id].load(kRelaxed) || _id_vec[id].exchange(true, kAcquire));
+  hb.SetID(id);
 }
 
 /*############################################################################*
@@ -132,20 +121,6 @@ IDManager::HeartBeater::~HeartBeater()
   const auto id = *id_;
   id_.reset();
   _id_vec[id].store(false, kRelease);
-}
-
-auto
-IDManager::HeartBeater::HasID() const noexcept  //
-    -> bool
-{
-  return id_.use_count() > 0;
-}
-
-auto
-IDManager::HeartBeater::GetID() const  //
-    -> size_t
-{
-  return *id_;
 }
 
 auto

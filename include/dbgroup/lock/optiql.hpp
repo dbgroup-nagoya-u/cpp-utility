@@ -20,7 +20,11 @@
 // C++ standard libraries
 #include <atomic>
 #include <cstdint>
+#include <thread>
 #include <utility>
+
+// local sources
+#include "dbgroup/constants.hpp"
 
 namespace dbgroup::lock
 {
@@ -224,8 +228,22 @@ class OptiQL
      * @retval false otherwise.
      */
     [[nodiscard]]
-    auto VerifyVersion() noexcept  //
-        -> bool;
+    auto
+    VerifyVersion() noexcept  //
+        -> bool
+    {
+      uint64_t cur{};
+      while (true) {
+        std::atomic_thread_fence(kAcquire);
+        cur = dest_->lock_.load(kRelaxed);
+        if ((cur & kXAndOPReadMask) != kXLock) break;  // released or opportunistically readable
+        std::this_thread::yield();
+      }
+
+      const auto expected = ver_;
+      ver_ = static_cast<uint32_t>(cur & kVersionMask);
+      return ver_ == expected;
+    }
 
    private:
     /*########################################################################*
@@ -268,8 +286,19 @@ class OptiQL
    * with spinlock and back-off.
    */
   [[nodiscard]]
-  auto GetVersion() const noexcept  //
-      -> OptGuard;
+  auto
+  GetVersion() const noexcept  //
+      -> OptGuard
+  {
+    uint64_t cur{};
+    while (true) {
+      cur = lock_.load(kAcquire);
+      if ((cur & kXAndOPReadMask) != kXLock) break;  // released or opportunistically readable
+      std::this_thread::yield();
+    }
+
+    return OptGuard{this, static_cast<uint32_t>(cur & kVersionMask)};
+  }
 
   /**
    * @brief Get an exclusive lock.
@@ -300,6 +329,34 @@ class OptiQL
       uint64_t qid,
       uint64_t old_ver,
       uint64_t new_ver);
+
+  /*##########################################################################*
+   * Internal constants
+   *##########################################################################*/
+
+  /// @brief A lock state representing no locks.
+  static constexpr uint64_t kNoLocks = 0b000;
+
+  /// @brief A lock state representing an exclusive lock.
+  static constexpr uint64_t kXLock = 1UL << 63UL;
+
+  /// @brief A lock state representing an opportunistic lock.
+  static constexpr uint64_t kOPReadFlag = 1UL << 62UL;
+
+  /// @brief A bit mask for extracting an X-lock state and opportunistic read flag.
+  static constexpr uint64_t kXAndOPReadMask = kXLock | kOPReadFlag;
+
+  /// @brief A bit mask for extracting a version value.
+  static constexpr uint64_t kVersionMask = ~(~0UL << 32UL);
+
+  /// @brief A bit mask for extracting a node pointer.
+  static constexpr uint64_t kQIDMask = (kOPReadFlag - 1UL) ^ kVersionMask;
+
+  /// @brief A bit shift for QNode.
+  static constexpr uint64_t kQIDShift = 32UL;
+
+  /// @brief A bit mask for extracting a lock state.
+  static constexpr uint64_t kLockMask = ~(kVersionMask | kQIDMask);
 
   /*##########################################################################*
    * Internal member variables

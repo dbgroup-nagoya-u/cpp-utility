@@ -19,7 +19,6 @@
 
 // C++ standard libraries
 #include <atomic>
-#include <cstddef>
 #include <cstdint>
 #include <thread>
 #include <utility>
@@ -97,20 +96,6 @@ thread_local QNodeHolder tls_holder{};
 /*############################################################################*
  * Public APIs
  *############################################################################*/
-
-auto
-OMCSLock::GetVersion() noexcept  //
-    -> OptGuard
-{
-  uint64_t cur{};
-  while (true) {
-    cur = lock_.load(kAcquire);
-    if (cur & kSFlag) break;
-    std::this_thread::yield();
-  }
-
-  return OptGuard{this, static_cast<uint32_t>(cur)};
-}
 
 auto
 OMCSLock::LockS() noexcept  //
@@ -290,33 +275,10 @@ OMCSLock::SIXGuard::UpgradeToX() noexcept  //
  * Optimistic lock guards
  *############################################################################*/
 
-auto
-OMCSLock::OptGuard::VerifyVersion(  //
-    const uint32_t mask,
-    const size_t max_retry) noexcept  //
-    -> bool
+void
+OMCSLock::OptGuard::FallBackToSLock(  //
+    uint64_t cur) noexcept
 {
-  if (has_lock_) {
-    dest_->UnlockS(qid_);
-    has_lock_ = false;
-    return true;
-  }
-
-  // verify using the optimistic read procedure
-  std::atomic_thread_fence(kAcquire);
-  uint64_t cur;
-  while (true) {
-    cur = dest_->lock_.load(kRelaxed);
-    if (cur & kSFlag) break;
-    std::this_thread::yield();
-  }
-
-  const auto expected = ver_;
-  ver_ = static_cast<uint32_t>(cur);
-  if (((ver_ ^ expected) & mask) == 0) return true;
-  if (++retry_num_ < max_retry) return false;  // continue with OCC
-
-  // try to acquire a shared lock
   retry_num_ = 0;
   while ((cur & kLockMask) == kXLock) {  // an SIX/X lock without shared lock holders
     has_lock_ = dest_->lock_.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed);
@@ -327,26 +289,6 @@ OMCSLock::OptGuard::VerifyVersion(  //
     CPP_UTILITY_SPINLOCK_HINT
   }
   ver_ = static_cast<uint32_t>(cur);
-  return false;
-}
-
-auto
-OMCSLock::OptGuard::ImmediateVerify(  //
-    const uint32_t mask) noexcept     //
-    -> bool
-{
-  if (has_lock_) {
-    dest_->UnlockS(qid_);
-    has_lock_ = false;
-    return true;
-  }
-
-  // verify using the optimistic read procedure
-  const auto expected = ver_;
-  std::atomic_thread_fence(kAcquire);
-  const auto cur = dest_->lock_.load(kRelaxed);
-  ver_ = static_cast<uint32_t>(cur);
-  return ((ver_ ^ expected) & mask) == 0 && (cur & kSFlag) > 0;
 }
 
 auto
