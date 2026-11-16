@@ -316,7 +316,9 @@ auto
 MCSLock::SIXGuard::UpgradeToX()  //
     -> XGuard
 {
-  if (!dest_) return XGuard{};
+  if (!dest_) [[unlikely]] {
+    return XGuard{};
+  }
 
   uint64_t next_ptr;
   while (true) {  // wait for shared lock holders to release their locks

@@ -211,7 +211,9 @@ class PessimisticLock
     UpgradeToX()  //
         -> XGuard
     {
-      if (!dest_) return XGuard{};
+      if (!dest_) [[unlikely]] {
+        return XGuard{};
+      }
 
       auto cur = dest_->LockWord().fetch_xor(kXMask, kRelaxed);
       assert((cur & kXMask) == kSIXLock);
@@ -316,7 +318,9 @@ class PessimisticLock
     DowngradeToSIX() noexcept  //
         -> SIXGuard
     {
-      if (!dest_) return SIXGuard{};
+      if (!dest_) [[unlikely]] {
+        return SIXGuard{};
+      }
 
       [[maybe_unused]] const auto ret = dest_->LockWord().fetch_xor(kXMask, kRelease);
       assert((ret & kXMask) == kXLock);

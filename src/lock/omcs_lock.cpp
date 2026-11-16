@@ -305,7 +305,9 @@ auto
 OMCSLock::SIXGuard::UpgradeToX() noexcept  //
     -> XGuard
 {
-  if (!dest_) return XGuard{};
+  if (!dest_) [[unlikely]] {
+    return XGuard{};
+  }
 
   auto* const qnode = QNodeHolder::GetQNode(qid_);
   while (qnode->lock_state.load(kAcquire) & kSMask) {

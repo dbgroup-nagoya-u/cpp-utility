@@ -489,7 +489,9 @@ class OMCSLock
     DowngradeToSIX() noexcept  //
         -> SIXGuard
     {
-      if (!dest_) return SIXGuard{};
+      if (!dest_) [[unlikely]] {
+        return SIXGuard{};
+      }
 
       const auto ver_xor = static_cast<uint64_t>(old_ver_ ^ new_ver_);
       dest_->LockWord().fetch_xor(kXLock | ver_xor, kRelease);
@@ -550,7 +552,7 @@ class OMCSLock
         OptGuard&& rhs) noexcept  //
         -> OptGuard&
     {
-      if (dest_ && has_lock_) {
+      if (dest_ && has_lock_) [[unlikely]] {
         dest_->UnlockS(qid_);
       }
       dest_ = std::exchange(rhs.dest_, nullptr);
@@ -571,7 +573,7 @@ class OMCSLock
 
     ~OptGuard()
     {
-      if (dest_ && has_lock_) {
+      if (dest_ && has_lock_) [[unlikely]] {
         dest_->UnlockS(qid_);
       }
     }
@@ -618,7 +620,7 @@ class OMCSLock
         const size_t max_retry = std::numeric_limits<size_t>::max()) noexcept  //
         -> bool
     {
-      if (has_lock_) {
+      if (has_lock_) [[unlikely]] {
         dest_->UnlockS(qid_);
         has_lock_ = false;
         return true;
@@ -653,7 +655,7 @@ class OMCSLock
         const uint32_t mask = kNoMask) noexcept  //
         -> bool
     {
-      if (has_lock_) {
+      if (has_lock_) [[unlikely]] {
         dest_->UnlockS(qid_);
         has_lock_ = false;
         return true;

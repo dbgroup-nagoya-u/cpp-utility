@@ -248,7 +248,9 @@ class OptimisticLock
     UpgradeToX()  //
         -> XGuard
     {
-      if (!dest_) return XGuard{};
+      if (!dest_) [[unlikely]] {
+        return XGuard{};
+      }
 
       auto cur = dest_->LockWord().fetch_xor(kXMask, kRelaxed);
       assert((cur & kXMask) == kSIXLock);
@@ -393,7 +395,9 @@ class OptimisticLock
     DowngradeToSIX() noexcept  //
         -> SIXGuard
     {
-      if (!dest_) return SIXGuard{};
+      if (!dest_) [[unlikely]] {
+        return SIXGuard{};
+      }
 
       assert((dest_->LockWord().load(kRelaxed) & kAllLockMask) == kXLock);
       dest_->LockWord().store(kSIXLock | new_ver_, kRelease);
@@ -458,7 +462,7 @@ class OptimisticLock
         OptGuard&& rhs) noexcept  //
         -> OptGuard&
     {
-      if (dest_ && has_lock_) {
+      if (dest_ && has_lock_) [[unlikely]] {
         dest_->UnlockS();
       }
       dest_ = std::exchange(rhs.dest_, nullptr);
@@ -478,7 +482,7 @@ class OptimisticLock
      */
     ~OptGuard()
     {
-      if (dest_ && has_lock_) {
+      if (dest_ && has_lock_) [[unlikely]] {
         dest_->UnlockS();
       }
     }
@@ -527,7 +531,7 @@ class OptimisticLock
         const size_t max_retry = std::numeric_limits<size_t>::max()) noexcept  //
         -> bool
     {
-      if (has_lock_) {
+      if (has_lock_) [[unlikely]] {
         dest_->UnlockS();
         has_lock_ = false;
         return true;
@@ -562,7 +566,7 @@ class OptimisticLock
         const uint32_t mask = kNoMask) noexcept  //
         -> bool
     {
-      if (has_lock_) {
+      if (has_lock_) [[unlikely]] {
         dest_->UnlockS();
         has_lock_ = false;
         return true;

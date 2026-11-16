@@ -235,7 +235,7 @@ class ApproxZipfDistribution
       const uint64_t bin_id) const  //
       -> double
   {
-    if (bin_id >= n_) {
+    if (bin_id >= n_) [[unlikely]] {
       throw std::out_of_range{"The bin ID must be less than the number of bins."};
     }
     if (bin_id < std::min<uint64_t>(n_, kExactBinNum)) return zipf_cdf_[bin_id];

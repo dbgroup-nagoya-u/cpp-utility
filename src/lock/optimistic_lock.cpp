@@ -112,7 +112,7 @@ OptimisticLock::OptGuard::TryLockS(  //
     const uint32_t mask)             //
     -> SGuard
 {
-  if (has_lock_) {
+  if (has_lock_) [[unlikely]] {
     has_lock_ = false;
     return SGuard{std::exchange(dest_, nullptr), ver_};
   }
@@ -141,7 +141,7 @@ OptimisticLock::OptGuard::TryLockSIX(  //
     const uint32_t mask)               //
     -> SIXGuard
 {
-  if (has_lock_) {
+  if (has_lock_) [[unlikely]] {
     dest_->LockWord().fetch_sub(kSLock, kRelease);
     has_lock_ = false;
   }
@@ -169,7 +169,7 @@ OptimisticLock::OptGuard::TryLockX(  //
     const uint32_t mask)             //
     -> XGuard
 {
-  if (has_lock_) {
+  if (has_lock_) [[unlikely]] {
     dest_->LockWord().fetch_sub(kSLock, kRelease);
     has_lock_ = false;
   }
