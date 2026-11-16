@@ -489,6 +489,8 @@ class OMCSLock
     DowngradeToSIX() noexcept  //
         -> SIXGuard
     {
+      if (!dest_) return SIXGuard{};
+
       const auto ver_xor = static_cast<uint64_t>(old_ver_ ^ new_ver_);
       dest_->LockWord().fetch_xor(kXLock | ver_xor, kRelease);
       return SIXGuard{std::exchange(dest_, nullptr), qid_, new_ver_};
