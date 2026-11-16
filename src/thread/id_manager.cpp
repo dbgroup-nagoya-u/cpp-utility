@@ -62,7 +62,7 @@ void
 IDManager::SetMaxThreadNum(  //
     const size_t thread_num)
 {
-  if (thread_num > kMaxThreadCapacity) {
+  if (thread_num > kMaxThreadCapacity) [[unlikely]] {
     throw std::out_of_range{"IDManager: The number of worker threads exceeded the upperbound."};
   }
   _max_thread_num.store(thread_num, kRelaxed);
@@ -96,7 +96,7 @@ IDManager::AssignID(  //
   auto id = std::hash<std::thread::id>{}(std::this_thread::get_id()) % n;
   auto loop_num = 0U;
   do {
-    if (++loop_num > retry_limit) {
+    if (++loop_num > retry_limit) [[unlikely]] {
       std::cerr << "[WARN] IDManager failed to assign a thread ID. To resolve "
                    "this issue, increase the thread pool capacity by calling "
                    "`IDManager::SetMaxThreadNum()` during process initialization.\n";

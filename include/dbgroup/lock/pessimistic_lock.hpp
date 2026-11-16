@@ -21,6 +21,7 @@
 #include <atomic>
 #include <cassert>
 #include <cstdint>
+#include <type_traits>
 #include <utility>
 
 // local sources
@@ -210,13 +211,15 @@ class PessimisticLock
     UpgradeToX()  //
         -> XGuard
     {
-      if (!dest_) return XGuard{};
+      if (!dest_) [[unlikely]] {
+        return XGuard{};
+      }
 
-      auto cur = dest_->lock_.fetch_xor(kXMask, kRelaxed);
+      auto cur = dest_->LockWord().fetch_xor(kXMask, kRelaxed);
       assert((cur & kXMask) == kSIXLock);
       while (cur & kSMask) {
         CPP_UTILITY_SPINLOCK_HINT
-        cur = dest_->lock_.load(kAcquire);
+        cur = dest_->LockWord().load(kAcquire);
       }
       return XGuard{std::exchange(dest_, nullptr)};
     }
@@ -315,9 +318,11 @@ class PessimisticLock
     DowngradeToSIX() noexcept  //
         -> SIXGuard
     {
-      if (!dest_) return SIXGuard{};
+      if (!dest_) [[unlikely]] {
+        return SIXGuard{};
+      }
 
-      [[maybe_unused]] const auto ret = dest_->lock_.fetch_xor(kXMask, kRelease);
+      [[maybe_unused]] const auto ret = dest_->LockWord().fetch_xor(kXMask, kRelease);
       assert((ret & kXMask) == kXLock);
       return SIXGuard{std::exchange(dest_, nullptr)};
     }
@@ -392,6 +397,18 @@ class PessimisticLock
    *##########################################################################*/
 
   /**
+   * @return An atomic reference to the lock state.
+   * @note All the accesses to the lock state must be done via this function.
+   */
+  [[nodiscard]]
+  auto
+  LockWord() const noexcept  //
+      -> std::atomic_ref<uint64_t>
+  {
+    return std::atomic_ref{lock_};
+  }
+
+  /**
    * @brief Release a shared lock.
    *
    * @note If a thread calls this function without acquiring an S lock, it will
@@ -400,7 +417,7 @@ class PessimisticLock
   void
   UnlockS() noexcept
   {
-    [[maybe_unused]] const auto ret = lock_.fetch_sub(kSLock, kRelease);
+    [[maybe_unused]] const auto ret = LockWord().fetch_sub(kSLock, kRelease);
     assert(ret & kSMask);
   }
 
@@ -413,7 +430,7 @@ class PessimisticLock
   void
   UnlockSIX() noexcept
   {
-    [[maybe_unused]] const auto ret = lock_.fetch_xor(kSIXLock, kRelease);
+    [[maybe_unused]] const auto ret = LockWord().fetch_xor(kSIXLock, kRelease);
     assert((ret & kXMask) == kSIXLock);
   }
 
@@ -426,7 +443,7 @@ class PessimisticLock
   void
   UnlockX() noexcept
   {
-    [[maybe_unused]] const auto ret = lock_.fetch_xor(kXLock, kRelease);
+    [[maybe_unused]] const auto ret = LockWord().fetch_xor(kXLock, kRelease);
     assert((ret & kXMask) == kXLock);
   }
 
@@ -453,11 +470,17 @@ class PessimisticLock
   static constexpr uint64_t kSMask = ~kXMask;
 
   /*##########################################################################*
+   * Static assertions
+   *##########################################################################*/
+
+  static_assert(std::atomic_ref<uint64_t>::is_always_lock_free);
+
+  /*##########################################################################*
    * Internal member variables
    *##########################################################################*/
 
-  /// @brief The current lock state.
-  std::atomic_uint64_t lock_{};
+  /// @brief The current lock state (accessed only via `LockWord`).
+  alignas(std::atomic_ref<uint64_t>::required_alignment) mutable uint64_t lock_;
 };
 
 /*############################################################################*
@@ -466,6 +489,8 @@ class PessimisticLock
 
 static_assert(Lockable<PessimisticLock>);
 static_assert(PessimisticallyLockable<PessimisticLock>);
+static_assert(std::is_trivially_default_constructible_v<PessimisticLock>);
+static_assert(std::is_trivially_destructible_v<PessimisticLock>);
 
 }  // namespace dbgroup::lock
 

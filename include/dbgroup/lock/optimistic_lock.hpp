@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <type_traits>
 #include <utility>
 
 // local sources
@@ -247,13 +248,15 @@ class OptimisticLock
     UpgradeToX()  //
         -> XGuard
     {
-      if (!dest_) return XGuard{};
+      if (!dest_) [[unlikely]] {
+        return XGuard{};
+      }
 
-      auto cur = dest_->lock_.fetch_xor(kXMask, kRelaxed);
+      auto cur = dest_->LockWord().fetch_xor(kXMask, kRelaxed);
       assert((cur & kXMask) == kSIXLock);
       while (cur & kSMask) {
         CPP_UTILITY_SPINLOCK_HINT
-        cur = dest_->lock_.load(kAcquire);
+        cur = dest_->LockWord().load(kAcquire);
       }
       std::atomic_thread_fence(kRelease);  // make the X bit visible before writes
       assert(static_cast<uint32_t>(cur) == ver_);
@@ -392,10 +395,12 @@ class OptimisticLock
     DowngradeToSIX() noexcept  //
         -> SIXGuard
     {
-      if (!dest_) return SIXGuard{};
+      if (!dest_) [[unlikely]] {
+        return SIXGuard{};
+      }
 
-      assert((dest_->lock_.load(kRelaxed) & kAllLockMask) == kXLock);
-      dest_->lock_.store(kSIXLock | new_ver_, kRelease);
+      assert((dest_->LockWord().load(kRelaxed) & kAllLockMask) == kXLock);
+      dest_->LockWord().store(kSIXLock | new_ver_, kRelease);
       return SIXGuard{std::exchange(dest_, nullptr), new_ver_};
     }
 
@@ -457,7 +462,7 @@ class OptimisticLock
         OptGuard&& rhs) noexcept  //
         -> OptGuard&
     {
-      if (dest_ && has_lock_) {
+      if (dest_ && has_lock_) [[unlikely]] {
         dest_->UnlockS();
       }
       dest_ = std::exchange(rhs.dest_, nullptr);
@@ -477,7 +482,7 @@ class OptimisticLock
      */
     ~OptGuard()
     {
-      if (dest_ && has_lock_) {
+      if (dest_ && has_lock_) [[unlikely]] {
         dest_->UnlockS();
       }
     }
@@ -526,7 +531,7 @@ class OptimisticLock
         const size_t max_retry = std::numeric_limits<size_t>::max()) noexcept  //
         -> bool
     {
-      if (has_lock_) {
+      if (has_lock_) [[unlikely]] {
         dest_->UnlockS();
         has_lock_ = false;
         return true;
@@ -536,12 +541,12 @@ class OptimisticLock
       uint64_t cur;
       const auto expected = ver_;
       SpinWithYield(
-          [](std::atomic_uint64_t* lock, uint64_t* cur) -> bool {
+          [](std::atomic_ref<uint64_t> lock, uint64_t* cur) -> bool {
             std::atomic_thread_fence(kAcquire);
-            *cur = lock->load(kAcquire);
+            *cur = lock.load(kAcquire);
             return (*cur & kXLock) == kNoLocks;
           },
-          &dest_->lock_, &cur);
+          dest_->LockWord(), &cur);
       ver_ = static_cast<uint32_t>(cur);
       if (((ver_ ^ expected) & mask) == 0) return true;
       if (++retry_num_ < max_retry) return false;  // continue with OCC
@@ -561,7 +566,7 @@ class OptimisticLock
         const uint32_t mask = kNoMask) noexcept  //
         -> bool
     {
-      if (has_lock_) {
+      if (has_lock_) [[unlikely]] {
         dest_->UnlockS();
         has_lock_ = false;
         return true;
@@ -570,7 +575,7 @@ class OptimisticLock
       // verify using the optimistic read procedure
       std::atomic_thread_fence(kAcquire);
       const auto expected = ver_;
-      const auto cur = dest_->lock_.load(kAcquire);
+      const auto cur = dest_->LockWord().load(kAcquire);
       ver_ = static_cast<uint32_t>(cur);
       return ((ver_ ^ expected) & mask) == 0 && (cur & kXLock) == kNoLocks;
     }
@@ -678,11 +683,11 @@ class OptimisticLock
   {
     uint64_t cur{};
     SpinWithYield(
-        [](std::atomic_uint64_t* lock, uint64_t* cur) -> bool {
-          *cur = lock->load(kAcquire);
+        [](std::atomic_ref<uint64_t> lock, uint64_t* cur) -> bool {
+          *cur = lock.load(kAcquire);
           return (*cur & kXLock) == kNoLocks;
         },
-        &lock_, &cur);
+        LockWord(), &cur);
     return OptGuard{this, static_cast<uint32_t>(cur)};
   }
 
@@ -729,6 +734,18 @@ class OptimisticLock
    *##########################################################################*/
 
   /**
+   * @return An atomic reference to the lock state.
+   * @note All the accesses to the lock state must be done via this function.
+   */
+  [[nodiscard]]
+  auto
+  LockWord() const noexcept  //
+      -> std::atomic_ref<uint64_t>
+  {
+    return std::atomic_ref{lock_};
+  }
+
+  /**
    * @brief Release a shared lock.
    *
    * @note If a thread calls this function without acquiring an S lock, it will
@@ -737,7 +754,7 @@ class OptimisticLock
   void
   UnlockS() noexcept
   {
-    [[maybe_unused]] const auto ret = lock_.fetch_sub(kSLock, kRelease);
+    [[maybe_unused]] const auto ret = LockWord().fetch_sub(kSLock, kRelease);
     assert(ret & kSMask);
   }
 
@@ -750,7 +767,7 @@ class OptimisticLock
   void
   UnlockSIX() noexcept
   {
-    [[maybe_unused]] const auto ret = lock_.fetch_xor(kSIXLock, kRelease);
+    [[maybe_unused]] const auto ret = LockWord().fetch_xor(kSIXLock, kRelease);
     assert((ret & kXMask) == kSIXLock);
   }
 
@@ -765,8 +782,8 @@ class OptimisticLock
   UnlockX(  //
       const uint64_t ver) noexcept
   {
-    assert((lock_.load(kRelaxed) & kAllLockMask) == kXLock);
-    lock_.store(ver, kRelease);
+    assert((LockWord().load(kRelaxed) & kAllLockMask) == kXLock);
+    LockWord().store(ver, kRelease);
   }
 
   /*##########################################################################*
@@ -798,11 +815,17 @@ class OptimisticLock
   static constexpr uint64_t kSMask = kAllLockMask ^ kXMask;
 
   /*##########################################################################*
+   * Static assertions
+   *##########################################################################*/
+
+  static_assert(std::atomic_ref<uint64_t>::is_always_lock_free);
+
+  /*##########################################################################*
    * Internal member variables
    *##########################################################################*/
 
-  /// @brief The current lock state.
-  std::atomic_uint64_t lock_{};
+  /// @brief The current lock state (accessed only via `LockWord`).
+  alignas(std::atomic_ref<uint64_t>::required_alignment) mutable uint64_t lock_;
 };
 
 /*############################################################################*
@@ -812,6 +835,9 @@ class OptimisticLock
 static_assert(Lockable<OptimisticLock>);
 static_assert(PessimisticallyLockable<OptimisticLock>);
 static_assert(OptimisticallyLockable<OptimisticLock>);
+static_assert(HybridLockable<OptimisticLock>);
+static_assert(std::is_trivially_default_constructible_v<OptimisticLock>);
+static_assert(std::is_trivially_destructible_v<OptimisticLock>);
 
 }  // namespace dbgroup::lock
 

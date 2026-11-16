@@ -52,6 +52,13 @@ struct QNode {
 using QNodeHolder = component::QueueNodeHolder<QNode, OptiQL::kQNodeNum>;
 
 /*############################################################################*
+ * Local constants
+ *############################################################################*/
+
+/// @brief A bitmask for skipping version verification.
+constexpr uint32_t kSkipVerify = 0U;
+
+/*############################################################################*
  * Static variables
  *############################################################################*/
 // NOLINTBEGIN
@@ -70,15 +77,35 @@ auto
 OptiQL::LockX()  //
     -> XGuard
 {
+  uint32_t ver{};
+  return AcquireX(ver, kSkipVerify);
+}
+
+/*############################################################################*
+ * Internal APIs
+ *############################################################################*/
+
+auto
+OptiQL::AcquireX(  //
+    uint32_t& ver,
+    const uint32_t mask)  //
+    -> XGuard
+{
   const auto qid = tls_holder.GetQID();
   auto* const qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto qid_bits = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
-  auto cur = lock_.load(kRelaxed);
+  auto cur = LockWord().load(kRelaxed);
   while (true) {
+    const auto cur_ver = static_cast<uint32_t>(cur & kVersionMask);
+    if ((ver ^ cur_ver) & mask) {
+      ver = cur_ver;
+      tls_holder.ReleaseQID(qid);
+      return XGuard{};
+    }
     // replace the tail and clear the opportunistic read flag, keeping the version
     const auto new_tail = (cur & kVersionMask) | qid_bits;
-    if (lock_.compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
+    if (LockWord().compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
 
@@ -90,16 +117,18 @@ OptiQL::LockX()  //
       std::this_thread::yield();
     }
     // disable opportunistic read (the flag may have been cleared by successors)
-    cur = lock_.fetch_and(~kOPReadFlag, kAcquire);
+    cur = LockWord().fetch_and(~kOPReadFlag, kAcquire);
   }
 
+  const auto cur_ver = static_cast<uint32_t>(cur & kVersionMask);
+  if ((ver ^ cur_ver) & mask) {
+    ver = cur_ver;
+    UnlockX(qid, cur_ver, cur_ver);  // release the lock without modifying the version
+    return XGuard{};
+  }
   std::atomic_thread_fence(kRelease);  // make the X bit visible before writes
-  return XGuard{this, qid, static_cast<uint32_t>(cur & kVersionMask)};
+  return XGuard{this, qid, cur_ver};
 }
-
-/*############################################################################*
- * Internal APIs
- *############################################################################*/
 
 void
 OptiQL::UnlockX(  //
@@ -111,9 +140,9 @@ OptiQL::UnlockX(  //
 
   auto* next_ptr = qnode->next.load(kAcquire);
   if (!next_ptr) {  // this is the tail node
-    auto cur = lock_.load(kRelaxed);
+    auto cur = LockWord().load(kRelaxed);
     while (((cur & kQIDMask) >> kQIDShift) == qid) {
-      if (lock_.compare_exchange_weak(cur, new_ver, kRelease, kRelaxed)) {
+      if (LockWord().compare_exchange_weak(cur, new_ver, kRelease, kRelaxed)) {
         tls_holder.ReleaseQID(qid);
         return;
       }
@@ -122,7 +151,7 @@ OptiQL::UnlockX(  //
   }
 
   // enable opportunistic read and replace the version (`old_ver` -> `new_ver`)
-  lock_.fetch_xor(kOPReadFlag | (old_ver ^ new_ver), kRelease);
+  LockWord().fetch_xor(kOPReadFlag | (old_ver ^ new_ver), kRelease);
   while (true) {  // wait until successor fills in its next field
     next_ptr = qnode->next.load(kAcquire);
     if (next_ptr) break;
@@ -156,6 +185,23 @@ OptiQL::XGuard::~XGuard()
   if (dest_) {
     dest_->UnlockX(qid_, old_ver_, new_ver_);
   }
+}
+
+/*############################################################################*
+ * Optimistic lock guards
+ *############################################################################*/
+
+auto
+OptiQL::OptGuard::TryLockX(  //
+    const uint32_t mask)     //
+    -> XGuard
+{
+  std::atomic_thread_fence(kAcquire);
+  auto guard = dest_->AcquireX(ver_, mask);
+  if (guard) {
+    dest_ = nullptr;
+  }
+  return guard;
 }
 
 }  // namespace dbgroup::lock

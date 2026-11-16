@@ -49,11 +49,11 @@ GetBinNum(  //
 {
   using UInt = std::make_unsigned_t<IntType>;
 
-  if (max < min) {
+  if (max < min) [[unlikely]] {
     throw std::runtime_error{"The maximum value must be greater than the minimum one."};
   }
   const auto range = static_cast<uint64_t>(static_cast<UInt>(max) - static_cast<UInt>(min));
-  if (range == std::numeric_limits<uint64_t>::max()) {
+  if (range == std::numeric_limits<uint64_t>::max()) [[unlikely]] {
     throw std::runtime_error{"The number of bins exceeds the range of uint64_t."};
   }
   return range + 1;

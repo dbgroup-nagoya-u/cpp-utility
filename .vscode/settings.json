@@ -32,6 +32,7 @@
     "**/CVS": true,
     "**/.DS_Store": true,
     "**/build": true,
+    "**/.cache": true,
   },
   "files.watcherExclude": {
     "**/.git/objects/**": true,

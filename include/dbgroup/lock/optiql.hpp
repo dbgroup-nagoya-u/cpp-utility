@@ -21,10 +21,12 @@
 #include <atomic>
 #include <cstdint>
 #include <thread>
+#include <type_traits>
 #include <utility>
 
 // local sources
 #include "dbgroup/constants.hpp"
+#include "dbgroup/lock/utility.hpp"
 
 namespace dbgroup::lock
 {
@@ -175,7 +177,7 @@ class OptiQL
      * @param ver The current version.
      */
     constexpr OptGuard(  //
-        const OptiQL* const dest,
+        OptiQL* const dest,
         const uint32_t ver) noexcept
         : dest_{dest}
         , ver_{ver}
@@ -224,26 +226,43 @@ class OptiQL
      *########################################################################*/
 
     /**
+     * @param mask A bitmask for representing bits to be verified.
      * @retval true if a target version does not change from an expected one.
      * @retval false otherwise.
      */
     [[nodiscard]]
     auto
-    VerifyVersion() noexcept  //
+    VerifyVersion(                               //
+        const uint32_t mask = kNoMask) noexcept  //
         -> bool
     {
       uint64_t cur{};
       while (true) {
         std::atomic_thread_fence(kAcquire);
-        cur = dest_->lock_.load(kRelaxed);
+        cur = dest_->LockWord().load(kRelaxed);
         if ((cur & kXAndOPReadMask) != kXLock) break;  // released or opportunistically readable
         std::this_thread::yield();
       }
 
       const auto expected = ver_;
       ver_ = static_cast<uint32_t>(cur & kVersionMask);
-      return ver_ == expected;
+      return ((ver_ ^ expected) & mask) == 0;
     }
+
+    /**
+     * @brief Get an X lock if a given version is the same as the current one.
+     *
+     * @param mask A bitmask for representing bits to be verified.
+     * @retval A guard instance if the lock is acquired.
+     * @retval An empty guard instance otherwise.
+     * @note This function verifies the version while entering the queue and
+     * after acquiring the lock. If the version has been changed after
+     * acquiring the lock, this function releases it without modifying the
+     * version.
+     */
+    [[nodiscard]]
+    auto TryLockX(  //
+        uint32_t mask = kNoMask) -> XGuard;
 
    private:
     /*########################################################################*
@@ -251,7 +270,7 @@ class OptiQL
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    const OptiQL* dest_{};
+    OptiQL* dest_{};
 
     /// @brief A version when creating this guard.
     uint32_t ver_{};
@@ -287,12 +306,12 @@ class OptiQL
    */
   [[nodiscard]]
   auto
-  GetVersion() const noexcept  //
+  GetVersion() noexcept  //
       -> OptGuard
   {
     uint64_t cur{};
     while (true) {
-      cur = lock_.load(kAcquire);
+      cur = LockWord().load(kAcquire);
       if ((cur & kXAndOPReadMask) != kXLock) break;  // released or opportunistically readable
       std::this_thread::yield();
     }
@@ -315,6 +334,34 @@ class OptiQL
   /*##########################################################################*
    * Internal APIs
    *##########################################################################*/
+
+  /**
+   * @return An atomic reference to the lock state.
+   * @note All the accesses to the lock state must be done via this function.
+   */
+  [[nodiscard]]
+  auto
+  LockWord() const noexcept  //
+      -> std::atomic_ref<uint64_t>
+  {
+    return std::atomic_ref{lock_};
+  }
+
+  /**
+   * @brief Get an X lock if a given version is the same as the current one.
+   *
+   * @param[in,out] ver An expected version. If acquiring the lock fails, this
+   * is updated to the current version.
+   * @param mask A bitmask for representing bits to be verified (zero for
+   * skipping verification, i.e., this function never fails).
+   * @retval A guard instance if the lock is acquired.
+   * @retval An empty guard instance otherwise.
+   */
+  [[nodiscard]]
+  auto AcquireX(  //
+      uint32_t& ver,
+      uint32_t mask)  //
+      -> XGuard;
 
   /**
    * @brief Release an exclusive lock.
@@ -359,12 +406,27 @@ class OptiQL
   static constexpr uint64_t kLockMask = ~(kVersionMask | kQIDMask);
 
   /*##########################################################################*
+   * Static assertions
+   *##########################################################################*/
+
+  static_assert(std::atomic_ref<uint64_t>::is_always_lock_free);
+
+  /*##########################################################################*
    * Internal member variables
    *##########################################################################*/
 
-  /// @brief The current lock state.
-  std::atomic_uint64_t lock_{};
+  /// @brief The current lock state (accessed only via `LockWord`).
+  alignas(std::atomic_ref<uint64_t>::required_alignment) mutable uint64_t lock_;
 };
+
+/*############################################################################*
+ * Static assertions
+ *############################################################################*/
+
+static_assert(Lockable<OptiQL>);
+static_assert(OptimisticallyLockable<OptiQL>);
+static_assert(std::is_trivially_default_constructible_v<OptiQL>);
+static_assert(std::is_trivially_destructible_v<OptiQL>);
 
 }  // namespace dbgroup::lock
 

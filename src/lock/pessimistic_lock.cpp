@@ -37,12 +37,12 @@ PessimisticLock::LockS()  //
     -> SGuard
 {
   SpinWithYield(
-      [](std::atomic_uint64_t* lock) -> bool {
-        auto cur = lock->load(kRelaxed);
+      [](std::atomic_ref<uint64_t> lock) -> bool {
+        auto cur = lock.load(kRelaxed);
         return (cur & kXLock) == kNoLocks
-               && lock->compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed);
+               && lock.compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed);
       },
-      &lock_);
+      LockWord());
   return SGuard{this};
 }
 
@@ -51,15 +51,15 @@ PessimisticLock::LockSIX()  //
     -> SIXGuard
 {
   SpinWithBackoff(
-      [](std::atomic_uint64_t* lock) -> bool {
+      [](std::atomic_ref<uint64_t> lock) -> bool {
         while (true) {
-          auto cur = lock->load(kRelaxed);
+          auto cur = lock.load(kRelaxed);
           if (cur & kXMask) return false;
-          if (lock->compare_exchange_weak(cur, cur | kSIXLock, kAcquire, kRelaxed)) return true;
+          if (lock.compare_exchange_weak(cur, cur | kSIXLock, kAcquire, kRelaxed)) return true;
           CPP_UTILITY_SPINLOCK_HINT
         }
       },
-      &lock_);
+      LockWord());
   return SIXGuard{this};
 }
 
@@ -69,16 +69,16 @@ PessimisticLock::LockX()  //
 {
   uint64_t cur{};
   SpinWithBackoff(
-      [](std::atomic_uint64_t* lock, uint64_t* cur) -> bool {
-        *cur = lock->load(kRelaxed);
+      [](std::atomic_ref<uint64_t> lock, uint64_t* cur) -> bool {
+        *cur = lock.load(kRelaxed);
         return (*cur & kXMask) == kNoLocks
-               && lock->compare_exchange_weak(*cur, *cur | kXLock, kAcquire, kRelaxed);
+               && lock.compare_exchange_weak(*cur, *cur | kXLock, kAcquire, kRelaxed);
       },
-      &lock_, &cur);
+      LockWord(), &cur);
 
   while (cur & kSMask) {
     CPP_UTILITY_SPINLOCK_HINT
-    cur = lock_.load(kAcquire);
+    cur = LockWord().load(kAcquire);
   }
   return XGuard{this};
 }
