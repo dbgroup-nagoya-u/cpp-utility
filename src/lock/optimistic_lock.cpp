@@ -74,7 +74,7 @@ OptimisticLock::GetVersion() noexcept  //
   SpinWithYield(
       [](std::atomic_uint64_t* lock, uint64_t* cur) -> bool {
         *cur = lock->load(kAcquire);
-        return (*cur & kXMask) == kNoLocks;
+        return (*cur & kXLock) == kNoLocks;
       },
       &lock_, &cur);
   return OptGuard{this, static_cast<uint32_t>(cur)};
