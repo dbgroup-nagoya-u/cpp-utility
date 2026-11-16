@@ -111,7 +111,7 @@ class OMCSLock
   {
     uint64_t cur{};
     while (true) {
-      cur = lock_.load(kAcquire);
+      cur = LockWord().load(kAcquire);
       if (cur & kSFlag) break;
       std::this_thread::yield();
     }
@@ -489,7 +489,7 @@ class OMCSLock
         -> SIXGuard
     {
       const auto ver_xor = static_cast<uint64_t>(old_ver_ ^ new_ver_);
-      dest_->lock_.fetch_xor(kSFlag | ver_xor, kRelease);
+      dest_->LockWord().fetch_xor(kSFlag | ver_xor, kRelease);
       return SIXGuard{std::exchange(dest_, nullptr), qid_, new_ver_};
     }
 
@@ -625,7 +625,7 @@ class OMCSLock
       std::atomic_thread_fence(kAcquire);
       uint64_t cur;
       while (true) {
-        cur = dest_->lock_.load(kRelaxed);
+        cur = dest_->LockWord().load(kRelaxed);
         if (cur & kSFlag) break;
         std::this_thread::yield();
       }
@@ -659,7 +659,7 @@ class OMCSLock
       // verify using the optimistic read procedure
       const auto expected = ver_;
       std::atomic_thread_fence(kAcquire);
-      const auto cur = dest_->lock_.load(kRelaxed);
+      const auto cur = dest_->LockWord().load(kRelaxed);
       ver_ = static_cast<uint32_t>(cur);
       return ((ver_ ^ expected) & mask) == 0 && (cur & kSFlag) > 0;
     }
@@ -745,6 +745,18 @@ class OMCSLock
    *##########################################################################*/
 
   /**
+   * @return An atomic reference to the lock state.
+   * @note All the accesses to the lock state must be done via this function.
+   */
+  [[nodiscard]]
+  auto
+  LockWord() const noexcept  //
+      -> std::atomic_ref<uint64_t>
+  {
+    return std::atomic_ref{lock_};
+  }
+
+  /**
    * @brief Release a shared lock.
    *
    * @param qid A queue node ID that holds the lock.
@@ -779,7 +791,7 @@ class OMCSLock
       uint64_t old_ver,
       uint64_t new_ver) noexcept
   {
-    lock_.fetch_xor(kSFlag | (old_ver ^ new_ver), kRelease);
+    LockWord().fetch_xor(kSFlag | (old_ver ^ new_ver), kRelease);
     UnlockSIX(qid);
   }
 
@@ -794,11 +806,17 @@ class OMCSLock
       -> uint64_t;
 
   /*##########################################################################*
+   * Static assertions
+   *##########################################################################*/
+
+  static_assert(std::atomic_ref<uint64_t>::is_always_lock_free);
+
+  /*##########################################################################*
    * Internal member variables
    *##########################################################################*/
 
-  /// @brief The current lock state.
-  std::atomic_uint64_t lock_{kSFlag};
+  /// @brief The current lock state (accessed only via `LockWord`).
+  alignas(std::atomic_ref<uint64_t>::required_alignment) mutable uint64_t lock_{kSFlag};
 };
 
 /*############################################################################*

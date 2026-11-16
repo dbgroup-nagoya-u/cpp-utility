@@ -19,6 +19,8 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <cstdint>
+#include <type_traits>
 #include <utility>
 
 // local sources
@@ -345,6 +347,18 @@ class MCSLock
    *##########################################################################*/
 
   /**
+   * @return An atomic reference to the lock state.
+   * @note All the accesses to the lock state must be done via this function.
+   */
+  [[nodiscard]]
+  auto
+  LockWord() const noexcept  //
+      -> std::atomic_ref<uint64_t>
+  {
+    return std::atomic_ref{lock_};
+  }
+
+  /**
    * @brief Release a shared lock.
    *
    * @param qnode The queue node corresponding to this lock.
@@ -375,11 +389,17 @@ class MCSLock
       MCSLock* qnode);
 
   /*##########################################################################*
+   * Static assertions
+   *##########################################################################*/
+
+  static_assert(std::atomic_ref<uint64_t>::is_always_lock_free);
+
+  /*##########################################################################*
    * Internal member variables
    *##########################################################################*/
 
-  /// @brief The current lock state.
-  std::atomic_uint64_t lock_{};
+  /// @brief The current lock state (accessed only via `LockWord`).
+  alignas(std::atomic_ref<uint64_t>::required_alignment) mutable uint64_t lock_;
 };
 
 /*############################################################################*
@@ -388,6 +408,8 @@ class MCSLock
 
 static_assert(Lockable<MCSLock>);
 static_assert(PessimisticallyLockable<MCSLock>);
+static_assert(std::is_trivially_default_constructible_v<MCSLock>);
+static_assert(std::is_trivially_destructible_v<MCSLock>);
 
 }  // namespace dbgroup::lock
 

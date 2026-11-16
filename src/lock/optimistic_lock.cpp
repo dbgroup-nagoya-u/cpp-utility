@@ -39,12 +39,12 @@ OptimisticLock::LockS()  //
 {
   uint64_t cur{};
   SpinWithYield(
-      [](std::atomic_uint64_t* lock, uint64_t* cur) -> bool {
-        *cur = lock->load(kRelaxed);
+      [](std::atomic_ref<uint64_t> lock, uint64_t* cur) -> bool {
+        *cur = lock.load(kRelaxed);
         return (*cur & kXLock) == kNoLocks
-               && lock->compare_exchange_weak(*cur, *cur + kSLock, kAcquire, kRelaxed);
+               && lock.compare_exchange_weak(*cur, *cur + kSLock, kAcquire, kRelaxed);
       },
-      &lock_, &cur);
+      LockWord(), &cur);
   return SGuard{this, static_cast<uint32_t>(cur)};
 }
 
@@ -54,12 +54,12 @@ OptimisticLock::LockSIX()  //
 {
   uint64_t cur{};
   SpinWithBackoff(
-      [](std::atomic_uint64_t* lock, uint64_t* cur) -> bool {
-        *cur = lock->load(kRelaxed);
+      [](std::atomic_ref<uint64_t> lock, uint64_t* cur) -> bool {
+        *cur = lock.load(kRelaxed);
         return (*cur & kXMask) == kNoLocks
-               && lock->compare_exchange_weak(*cur, *cur | kSIXLock, kAcquire, kRelaxed);
+               && lock.compare_exchange_weak(*cur, *cur | kSIXLock, kAcquire, kRelaxed);
       },
-      &lock_, &cur);
+      LockWord(), &cur);
   return SIXGuard{this, static_cast<uint32_t>(cur)};
 }
 
@@ -69,16 +69,16 @@ OptimisticLock::LockX()  //
 {
   uint64_t cur{};
   SpinWithBackoff(
-      [](std::atomic_uint64_t* lock, uint64_t* cur) -> bool {
-        *cur = lock->load(kRelaxed);
+      [](std::atomic_ref<uint64_t> lock, uint64_t* cur) -> bool {
+        *cur = lock.load(kRelaxed);
         return (*cur & kXMask) == kNoLocks
-               && lock->compare_exchange_weak(*cur, *cur | kXLock, kAcquire, kRelaxed);
+               && lock.compare_exchange_weak(*cur, *cur | kXLock, kAcquire, kRelaxed);
       },
-      &lock_, &cur);
+      LockWord(), &cur);
 
   while (cur & kSMask) {
     CPP_UTILITY_SPINLOCK_HINT
-    cur = lock_.load(kAcquire);
+    cur = LockWord().load(kAcquire);
   }
   std::atomic_thread_fence(kRelease);  // make the X bit visible before writes
   return XGuard{this, static_cast<uint32_t>(cur)};
@@ -93,16 +93,16 @@ OptimisticLock::OptGuard::FallBackToSLock() noexcept
 {
   uint64_t cur;
   SpinWithBackoff(
-      [](std::atomic_uint64_t* lock, uint64_t* cur, bool* has_lock) -> bool {
-        *cur = lock->load(kAcquire);
+      [](std::atomic_ref<uint64_t> lock, uint64_t* cur, bool* has_lock) -> bool {
+        *cur = lock.load(kAcquire);
         while ((*cur & kXLock) == kNoLocks) {
           if (*cur & kSMask) return true;  // another thread has fallen back
-          *has_lock = lock->compare_exchange_weak(*cur, *cur + kSLock, kAcquire, kAcquire);
+          *has_lock = lock.compare_exchange_weak(*cur, *cur + kSLock, kAcquire, kAcquire);
           if (*has_lock) return true;
         }
         return false;  // wait for the X lock to be released
       },
-      &(dest_->lock_), &cur, &has_lock_);
+      dest_->LockWord(), &cur, &has_lock_);
   ver_ = static_cast<uint32_t>(cur);
   retry_num_ = 0;
 }
@@ -119,15 +119,15 @@ OptimisticLock::OptGuard::TryLockS(  //
 
   uint32_t cur_ver;
   SpinWithBackoff(
-      [](std::atomic_uint64_t* lock, uint32_t* ver, uint32_t expected, uint32_t mask) -> bool {
+      [](std::atomic_ref<uint64_t> lock, uint32_t* ver, uint32_t expected, uint32_t mask) -> bool {
         std::atomic_thread_fence(kAcquire);
-        auto cur = lock->load(kAcquire);
+        auto cur = lock.load(kAcquire);
         *ver = static_cast<uint32_t>(cur);
         return ((*ver ^ expected) & mask)
                || ((cur & kXLock) == kNoLocks
-                   && lock->compare_exchange_weak(cur, cur + kSLock, kRelaxed, kRelaxed));
+                   && lock.compare_exchange_weak(cur, cur + kSLock, kRelaxed, kRelaxed));
       },
-      &(dest_->lock_), &cur_ver, ver_, mask);
+      dest_->LockWord(), &cur_ver, ver_, mask);
 
   if ((ver_ ^ cur_ver) & mask) {
     ver_ = cur_ver;
@@ -142,20 +142,20 @@ OptimisticLock::OptGuard::TryLockSIX(  //
     -> SIXGuard
 {
   if (has_lock_) {
-    dest_->lock_.fetch_sub(kSLock, kRelease);
+    dest_->LockWord().fetch_sub(kSLock, kRelease);
     has_lock_ = false;
   }
 
   uint32_t cur_ver;
   SpinWithBackoff(
-      [](std::atomic_uint64_t* lock, uint32_t* ver, uint32_t expected, uint32_t mask) -> bool {
-        auto cur = lock->load(kAcquire);
+      [](std::atomic_ref<uint64_t> lock, uint32_t* ver, uint32_t expected, uint32_t mask) -> bool {
+        auto cur = lock.load(kAcquire);
         *ver = static_cast<uint32_t>(cur);
         return ((*ver ^ expected) & mask)
                || ((cur & kXMask) == kNoLocks
-                   && lock->compare_exchange_weak(cur, cur | kSIXLock, kRelaxed, kRelaxed));
+                   && lock.compare_exchange_weak(cur, cur | kSIXLock, kRelaxed, kRelaxed));
       },
-      &(dest_->lock_), &cur_ver, ver_, mask);
+      dest_->LockWord(), &cur_ver, ver_, mask);
 
   if ((ver_ ^ cur_ver) & mask) {
     ver_ = cur_ver;
@@ -170,21 +170,21 @@ OptimisticLock::OptGuard::TryLockX(  //
     -> XGuard
 {
   if (has_lock_) {
-    dest_->lock_.fetch_sub(kSLock, kRelease);
+    dest_->LockWord().fetch_sub(kSLock, kRelease);
     has_lock_ = false;
   }
 
   uint64_t cur{};
   SpinWithBackoff(
-      [](std::atomic_uint64_t* lock, uint64_t* cur,  //
+      [](std::atomic_ref<uint64_t> lock, uint64_t* cur,  //
          const uint32_t expected, const uint32_t mask) -> bool {
         std::atomic_thread_fence(kAcquire);
-        *cur = lock->load(kAcquire);
+        *cur = lock.load(kAcquire);
         return ((static_cast<uint32_t>(*cur) ^ expected) & mask)
                || ((*cur & kXMask) == kNoLocks
-                   && lock->compare_exchange_weak(*cur, *cur | kXLock, kAcquire, kRelaxed));
+                   && lock.compare_exchange_weak(*cur, *cur | kXLock, kAcquire, kRelaxed));
       },
-      &(dest_->lock_), &cur, ver_, mask);
+      dest_->LockWord(), &cur, ver_, mask);
 
   const auto cur_ver = static_cast<uint32_t>(cur);
   if ((ver_ ^ cur_ver) & mask) {
@@ -193,7 +193,7 @@ OptimisticLock::OptGuard::TryLockX(  //
   }
   while (cur & kSMask) {
     CPP_UTILITY_SPINLOCK_HINT
-    cur = dest_->lock_.load(kAcquire);
+    cur = dest_->LockWord().load(kAcquire);
   }
   std::atomic_thread_fence(kRelease);  // make the X bit visible before writes
   return XGuard{std::exchange(dest_, nullptr), cur_ver};

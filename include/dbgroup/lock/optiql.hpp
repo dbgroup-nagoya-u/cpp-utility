@@ -21,6 +21,7 @@
 #include <atomic>
 #include <cstdint>
 #include <thread>
+#include <type_traits>
 #include <utility>
 
 // local sources
@@ -235,7 +236,7 @@ class OptiQL
       uint64_t cur{};
       while (true) {
         std::atomic_thread_fence(kAcquire);
-        cur = dest_->lock_.load(kRelaxed);
+        cur = dest_->LockWord().load(kRelaxed);
         if ((cur & kXAndOPReadMask) != kXLock) break;  // released or opportunistically readable
         std::this_thread::yield();
       }
@@ -292,7 +293,7 @@ class OptiQL
   {
     uint64_t cur{};
     while (true) {
-      cur = lock_.load(kAcquire);
+      cur = LockWord().load(kAcquire);
       if ((cur & kXAndOPReadMask) != kXLock) break;  // released or opportunistically readable
       std::this_thread::yield();
     }
@@ -315,6 +316,18 @@ class OptiQL
   /*##########################################################################*
    * Internal APIs
    *##########################################################################*/
+
+  /**
+   * @return An atomic reference to the lock state.
+   * @note All the accesses to the lock state must be done via this function.
+   */
+  [[nodiscard]]
+  auto
+  LockWord() const noexcept  //
+      -> std::atomic_ref<uint64_t>
+  {
+    return std::atomic_ref{lock_};
+  }
 
   /**
    * @brief Release an exclusive lock.
@@ -359,12 +372,25 @@ class OptiQL
   static constexpr uint64_t kLockMask = ~(kVersionMask | kQIDMask);
 
   /*##########################################################################*
+   * Static assertions
+   *##########################################################################*/
+
+  static_assert(std::atomic_ref<uint64_t>::is_always_lock_free);
+
+  /*##########################################################################*
    * Internal member variables
    *##########################################################################*/
 
-  /// @brief The current lock state.
-  std::atomic_uint64_t lock_{};
+  /// @brief The current lock state (accessed only via `LockWord`).
+  alignas(std::atomic_ref<uint64_t>::required_alignment) mutable uint64_t lock_;
 };
+
+/*############################################################################*
+ * Static assertions
+ *############################################################################*/
+
+static_assert(std::is_trivially_default_constructible_v<OptiQL>);
+static_assert(std::is_trivially_destructible_v<OptiQL>);
 
 }  // namespace dbgroup::lock
 

@@ -74,11 +74,11 @@ OptiQL::LockX()  //
   auto* const qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto qid_bits = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
-  auto cur = lock_.load(kRelaxed);
+  auto cur = LockWord().load(kRelaxed);
   while (true) {
     // replace the tail and clear the opportunistic read flag, keeping the version
     const auto new_tail = (cur & kVersionMask) | qid_bits;
-    if (lock_.compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
+    if (LockWord().compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
 
@@ -90,7 +90,7 @@ OptiQL::LockX()  //
       std::this_thread::yield();
     }
     // disable opportunistic read (the flag may have been cleared by successors)
-    cur = lock_.fetch_and(~kOPReadFlag, kAcquire);
+    cur = LockWord().fetch_and(~kOPReadFlag, kAcquire);
   }
 
   std::atomic_thread_fence(kRelease);  // make the X bit visible before writes
@@ -111,9 +111,9 @@ OptiQL::UnlockX(  //
 
   auto* next_ptr = qnode->next.load(kAcquire);
   if (!next_ptr) {  // this is the tail node
-    auto cur = lock_.load(kRelaxed);
+    auto cur = LockWord().load(kRelaxed);
     while (((cur & kQIDMask) >> kQIDShift) == qid) {
-      if (lock_.compare_exchange_weak(cur, new_ver, kRelease, kRelaxed)) {
+      if (LockWord().compare_exchange_weak(cur, new_ver, kRelease, kRelaxed)) {
         tls_holder.ReleaseQID(qid);
         return;
       }
@@ -122,7 +122,7 @@ OptiQL::UnlockX(  //
   }
 
   // enable opportunistic read and replace the version (`old_ver` -> `new_ver`)
-  lock_.fetch_xor(kOPReadFlag | (old_ver ^ new_ver), kRelease);
+  LockWord().fetch_xor(kOPReadFlag | (old_ver ^ new_ver), kRelease);
   while (true) {  // wait until successor fills in its next field
     next_ptr = qnode->next.load(kAcquire);
     if (next_ptr) break;
