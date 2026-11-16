@@ -827,6 +827,7 @@ class OMCSLock
 static_assert(Lockable<OMCSLock>);
 static_assert(PessimisticallyLockable<OMCSLock>);
 static_assert(OptimisticallyLockable<OMCSLock>);
+static_assert(HybridLockable<OMCSLock>);
 static_assert(std::is_trivially_default_constructible_v<OMCSLock>);
 static_assert(std::is_trivially_destructible_v<OMCSLock>);
 

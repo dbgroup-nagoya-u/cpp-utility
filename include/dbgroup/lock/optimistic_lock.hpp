@@ -831,6 +831,7 @@ class OptimisticLock
 static_assert(Lockable<OptimisticLock>);
 static_assert(PessimisticallyLockable<OptimisticLock>);
 static_assert(OptimisticallyLockable<OptimisticLock>);
+static_assert(HybridLockable<OptimisticLock>);
 static_assert(std::is_trivially_default_constructible_v<OptimisticLock>);
 static_assert(std::is_trivially_destructible_v<OptimisticLock>);
 

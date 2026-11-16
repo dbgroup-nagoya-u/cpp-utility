@@ -49,6 +49,42 @@ concept GuardClass = requires(T& x) {
 };
 
 /**
+ * @brief A concept for representing guard classes with version values.
+ *
+ * @tparam T A target class.
+ */
+template <class T>
+concept VersionedGuard = GuardClass<T> && requires(T& x) {
+  // public APIs
+  { x.GetVersion() } noexcept -> std::convertible_to<uint32_t>;
+};
+
+/**
+ * @brief A concept for representing guard classes of shared-with-intent-exclusive
+ * locks.
+ *
+ * @tparam T A target class.
+ * @tparam XGuard A corresponding exclusive guard class.
+ */
+template <class T, class XGuard>
+concept PessimisticSIXGuard = GuardClass<T> && requires(T& x) {
+  // public APIs
+  { x.UpgradeToX() } -> std::convertible_to<XGuard>;
+};
+
+/**
+ * @brief A concept for representing guard classes of exclusive locks.
+ *
+ * @tparam T A target class.
+ * @tparam SIXGuard A corresponding shared-with-intent-exclusive guard class.
+ */
+template <class T, class SIXGuard>
+concept PessimisticXGuard = GuardClass<T> && requires(T& x) {
+  // public APIs
+  { x.DowngradeToSIX() } -> std::convertible_to<SIXGuard>;
+};
+
+/**
  * @brief A concept for representing guard classes of exclusive locks in OCC.
  *
  * @tparam T A target class.
@@ -66,6 +102,8 @@ concept OptimisticXGuard = requires(T& x, uint32_t ver) {
  *
  * @tparam T A target class.
  * @tparam XGuard A corresponding exclusive guard class.
+ * @note `ImmediateVerify` (verification without waiting for exclusive locks to
+ * be released) is optional.
  */
 template <class T, class XGuard>
 concept OptimisticReadGuard = requires(T& x, uint32_t mask, size_t max_retry) {
@@ -81,6 +119,22 @@ concept OptimisticReadGuard = requires(T& x, uint32_t mask, size_t max_retry) {
 };
 
 /**
+ * @brief A concept for representing guard classes of OCC-based read procedures
+ * that can fall back to pessimistic locking.
+ *
+ * @tparam T A target class.
+ * @tparam SGuard A corresponding shared guard class.
+ * @tparam SIXGuard A corresponding shared-with-intent-exclusive guard class.
+ * @tparam XGuard A corresponding exclusive guard class.
+ */
+template <class T, class SGuard, class SIXGuard, class XGuard>
+concept HybridReadGuard = OptimisticReadGuard<T, XGuard> && requires(T& x, uint32_t mask) {
+  // public APIs
+  { x.TryLockS(mask) } -> std::convertible_to<SGuard>;
+  { x.TryLockSIX(mask) } -> std::convertible_to<SIXGuard>;
+};
+
+/**
  * @brief A concept for representing pessimistic locks.
  *
  * @tparam T A target class.
@@ -89,8 +143,8 @@ template <class T>
 concept PessimisticallyLockable = requires(T& x) {
   // public types
   requires GuardClass<typename T::SGuard>;
-  requires GuardClass<typename T::SIXGuard>;
-  requires GuardClass<typename T::XGuard>;
+  requires PessimisticSIXGuard<typename T::SIXGuard, typename T::XGuard>;
+  requires PessimisticXGuard<typename T::XGuard, typename T::SIXGuard>;
 
   // public APIs
   { x.LockS() } -> std::convertible_to<typename T::SGuard>;
@@ -112,6 +166,21 @@ concept OptimisticallyLockable = requires(T& x) {
   // public APIs
   { x.LockX() } -> std::convertible_to<typename T::XGuard>;
   { x.GetVersion() } noexcept -> std::convertible_to<typename T::OptGuard>;
+};
+
+/**
+ * @brief A concept for representing locks that support both pessimistic and
+ * optimistic locking and can switch between them.
+ *
+ * @tparam T A target class.
+ */
+template <class T>
+concept HybridLockable = PessimisticallyLockable<T> && OptimisticallyLockable<T> && requires {
+  // public types
+  requires VersionedGuard<typename T::SGuard>;
+  requires VersionedGuard<typename T::SIXGuard>;
+  requires HybridReadGuard<typename T::OptGuard, typename T::SGuard, typename T::SIXGuard,
+                           typename T::XGuard>;
 };
 
 /**
