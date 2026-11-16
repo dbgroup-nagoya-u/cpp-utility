@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// corresponding header
+// the corresponding header
 #include "dbgroup/lock/optiql.hpp"
 
 // C++ standard libraries
@@ -113,7 +113,7 @@ OptiQL::LockX()  //
     -> XGuard
 {
   const auto qid = tls_holder.GetQID();
-  auto* qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
+  auto* const qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto qid_bits = (static_cast<uint64_t>(qid) << kQIDShift) | kXLock;
 
   auto cur = lock_.load(kRelaxed);
@@ -126,7 +126,7 @@ OptiQL::LockX()  //
 
   if ((cur & kLockMask) != kNoLocks) {
     // wait until predecessor gives up the lock
-    auto* pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
+    auto* const pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
     pred_qnode->next.store(qnode, kRelease);
     while (!qnode->hold_lock.load(kAcquire)) {
       std::this_thread::yield();
@@ -149,10 +149,10 @@ OptiQL::UnlockX(  //
     const uint64_t old_ver,
     const uint64_t new_ver)
 {
-  auto* qnode = QNodeHolder::GetQNode(qid);
+  auto* const qnode = QNodeHolder::GetQNode(qid);
 
   auto* next_ptr = qnode->next.load(kAcquire);
-  if (next_ptr == nullptr) {  // this is the tail node
+  if (!next_ptr) {  // this is the tail node
     auto cur = lock_.load(kRelaxed);
     while (((cur & kQIDMask) >> kQIDShift) == qid) {
       if (lock_.compare_exchange_weak(cur, new_ver, kRelease, kRelaxed)) {

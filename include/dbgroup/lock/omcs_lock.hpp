@@ -161,7 +161,7 @@ class OMCSLock
      * @param ver The current version.
      */
     constexpr SGuard(  //
-        OMCSLock* dest,
+        OMCSLock* const dest,
         const uint64_t qid,
         const uint32_t ver) noexcept
         : dest_{dest}
@@ -262,7 +262,7 @@ class OMCSLock
      * @param ver The current version.
      */
     constexpr SIXGuard(  //
-        OMCSLock* dest,
+        OMCSLock* const dest,
         const uint64_t qid,
         const uint32_t ver) noexcept
         : dest_{dest}
@@ -374,7 +374,7 @@ class OMCSLock
      * @param ver The current version.
      */
     constexpr XGuard(  //
-        OMCSLock* dest,
+        OMCSLock* const dest,
         const uint64_t qid,
         const uint32_t ver) noexcept
         : dest_{dest}
@@ -511,7 +511,7 @@ class OMCSLock
      * @param ver The current version.
      */
     constexpr OptGuard(  //
-        OMCSLock* dest,
+        OMCSLock* const dest,
         const uint32_t ver) noexcept
         : dest_{dest}
         , ver_{ver}

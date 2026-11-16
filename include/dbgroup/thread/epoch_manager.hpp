@@ -135,6 +135,7 @@ class EpochManager
   /**
    * @brief Advance a global epoch while running.
    *
+   * @param get_new_epoch Callback function for updating the global epoch value.
    */
   void AdvanceEpochWorker(  //
       const std::function<Serial(void)>& get_new_epoch);

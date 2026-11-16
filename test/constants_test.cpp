@@ -26,7 +26,7 @@
 #include <utility>
 
 // external libraries
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 namespace dbgroup::test
 {

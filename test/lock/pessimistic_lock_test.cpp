@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+// the corresponding header
 #include "dbgroup/lock/pessimistic_lock.hpp"
 
 // C++ standard libraries

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+// the corresponding header
 #include "dbgroup/benchmark/stop_watch.hpp"
 
 // C++ standard libraries
@@ -22,7 +23,7 @@
 #include <thread>
 
 // external libraries
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 namespace dbgroup::benchmark::test
 {

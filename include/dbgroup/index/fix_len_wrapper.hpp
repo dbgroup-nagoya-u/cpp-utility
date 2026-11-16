@@ -210,7 +210,7 @@ class FixLenWrapper
   }
 
   /**
-   * @brief Update a record using a given kay/payload pair.
+   * @brief Update a record using a given key/payload pair.
    *
    * @tparam T A class of a given payload or delta.
    * @param key A target key.
@@ -240,7 +240,7 @@ class FixLenWrapper
   }
 
   /**
-   * @brief Delete a record using a given kay.
+   * @brief Delete a record using a given key.
    *
    * @param key A target key.
    * @param key_len The length of a target key.
@@ -264,7 +264,7 @@ class FixLenWrapper
    *##########################################################################*/
 
   /**
-   * @brief Bulkload specified kay/payload pairs.
+   * @brief Bulkload specified key/payload pairs.
    *
    * @tparam Entry A container for a key/payload pair.
    * @param entries All entries for bulkload.

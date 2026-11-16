@@ -28,7 +28,7 @@
 #include <tuple>
 #include <type_traits>
 
-// external system libraries
+// external libraries
 #ifdef CPP_UTILITY_HAS_BYTESWAP
 #include <byteswap.h>
 #endif
@@ -56,8 +56,8 @@ struct CompareAsCString {
       const void* const rhs) const noexcept  //
       -> bool
   {
-    if (lhs == nullptr) return false;
-    if (rhs == nullptr) return true;
+    if (!lhs) return false;
+    if (!rhs) return true;
     return std::strcmp(static_cast<const char*>(lhs), static_cast<const char*>(rhs)) < 0;
   }
 };
@@ -265,8 +265,8 @@ VerIncrement(  //
 
 /**
  * @tparam kMask A bitmask for extracting a target version.
- * @tparam VerGuard1 A class for representing an versioned guard.
- * @tparam VerGuard2 A class for representing an versioned guard.
+ * @tparam VerGuard1 A class for representing a versioned guard.
+ * @tparam VerGuard2 A class for representing a versioned guard.
  * @param rhs A versioned guard.
  * @param lhs A versioned guard.
  * @retval true if the given guards have different version bits in the mask.
@@ -521,7 +521,7 @@ struct PayloadBuf {  // NOLINT(cppcoreguidelines-pro-type-member-init,hicpp-memb
   Get() const noexcept  //
       -> Payload
   {
-    auto* addr = std::bit_cast<void*>(&data[0]);
+    auto* const addr = std::bit_cast<void*>(&data[0]);
     if constexpr (IsVarLenData<Payload>()) {
       return std::bit_cast<Payload>(addr);
     } else {

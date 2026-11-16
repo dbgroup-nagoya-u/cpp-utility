@@ -57,6 +57,7 @@ class OptimisticLock
 
     /**
      * @param dest The address of a target lock.
+     * @param ver The current version.
      */
     constexpr explicit SGuard(  //
         OptimisticLock* const dest,
@@ -143,6 +144,7 @@ class OptimisticLock
 
     /**
      * @param dest The address of a target lock.
+     * @param ver The current version.
      */
     constexpr explicit SIXGuard(  //
         OptimisticLock* const dest,

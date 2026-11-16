@@ -32,7 +32,7 @@
 #include <vector>
 
 // external libraries
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 // local sources
 #include "common.hpp"
@@ -116,6 +116,8 @@ class ZipfDistributionFixture : public ::testing::Test
    *##########################################################################*/
 
   /**
+   * @param val A target value.
+   * @param min The minimum value.
    * @return The ID of a value in [`min`, `min + n`).
    */
   static auto
@@ -128,6 +130,8 @@ class ZipfDistributionFixture : public ::testing::Test
   }
 
   /**
+   * @param id A target ID.
+   * @param min The minimum value.
    * @return The value of an ID in [`min`, `min + n`).
    */
   static auto

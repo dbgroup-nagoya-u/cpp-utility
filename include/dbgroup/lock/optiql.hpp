@@ -57,6 +57,7 @@ class OptiQL
 
     /**
      * @param dest The address of a target lock.
+     * @param qid A queue node ID to be held.
      * @param ver The current version.
      */
     constexpr XGuard(  //

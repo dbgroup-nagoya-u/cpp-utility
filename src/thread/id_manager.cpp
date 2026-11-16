@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// corresponding header
+// the corresponding header
 #include "dbgroup/thread/id_manager.hpp"
 
 // C++ standard libraries

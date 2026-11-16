@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// corresponding header
+// the corresponding header
 #include "dbgroup/lock/optimistic_lock.hpp"
 
 // C++ standard libraries
@@ -213,7 +213,7 @@ auto
 OptimisticLock::SIXGuard::UpgradeToX()  //
     -> XGuard
 {
-  if (dest_ == nullptr) return XGuard{};
+  if (!dest_) return XGuard{};
 
   auto cur = dest_->lock_.fetch_xor(kXMask, kRelaxed);
   assert((cur & kXMask) == kSIXLock);
@@ -255,7 +255,7 @@ auto
 OptimisticLock::XGuard::DowngradeToSIX() noexcept  //
     -> SIXGuard
 {
-  if (dest_ == nullptr) return SIXGuard{};
+  if (!dest_) return SIXGuard{};
 
   assert((dest_->lock_.load(kRelaxed) & kAllLockMask) == kXLock);
   dest_->lock_.store(kSIXLock | new_ver_, kRelease);
