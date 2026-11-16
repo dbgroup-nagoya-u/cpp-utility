@@ -1,5 +1,3 @@
-ADD_DBGROUP_TEST("pessimistic_lock_test")
-ADD_DBGROUP_TEST("optimistic_lock_test")
-ADD_DBGROUP_TEST("optiql_test")
-ADD_DBGROUP_TEST("mcs_lock_test")
-ADD_DBGROUP_TEST("omcs_lock_test")
+ADD_DBGROUP_TEST("pessimistically_lockable_test")
+ADD_DBGROUP_TEST("optimistically_lockable_test")
+ADD_DBGROUP_TEST("hybrid_lockable_test")
