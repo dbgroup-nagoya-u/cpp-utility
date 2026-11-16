@@ -35,6 +35,7 @@
 // local sources
 #include "common.hpp"
 #include "dbgroup/constants.hpp"
+#include "dbgroup/lock/utility.hpp"
 #include "dbgroup/thread/id_manager.hpp"
 
 namespace dbgroup::lock::test
@@ -280,6 +281,92 @@ TEST_F(  //
     LockXAfterXLockNeedWait)
 {
   VerifyLockXWith(kXLock, kExpectFail);
+}
+
+/*----------------------------------------------------------------------------*
+ * Optimistic lock tests
+ *----------------------------------------------------------------------------*/
+
+TEST_F(  //
+    OptiQLFixture,
+    VerifyVersionWithMaskIgnoreMaskedBits)
+{
+  auto&& masked_guard = lock_.GetVersion();
+  auto&& unmasked_guard = lock_.GetVersion();
+  const auto ver = masked_guard.GetVersion();
+  {
+    auto&& x_guard = lock_.LockX();
+    x_guard.SetVersion(ver ^ 0b10U);
+  }
+
+  EXPECT_TRUE(masked_guard.VerifyVersion(~0b10U));
+  EXPECT_FALSE(unmasked_guard.VerifyVersion(kNoMask));
+  EXPECT_TRUE(unmasked_guard.VerifyVersion(kNoMask));  // the version was updated
+}
+
+TEST_F(  //
+    OptiQLFixture,
+    TryLockXWithoutVersionChangesSucceed)
+{
+  auto&& opt_guard = lock_.GetVersion();
+  const auto ver = opt_guard.GetVersion();
+  {
+    auto&& x_guard = opt_guard.TryLockX();
+    ASSERT_TRUE(x_guard);
+    EXPECT_EQ(x_guard.GetVersion(), ver);
+  }
+
+  EXPECT_EQ(lock_.GetVersion().GetVersion(), ver + 1U);
+}
+
+TEST_F(  //
+    OptiQLFixture,
+    TryLockXAfterVersionChangesFail)
+{
+  auto&& opt_guard = lock_.GetVersion();
+  const auto ver = opt_guard.GetVersion();
+  {
+    [[maybe_unused]] auto&& x_guard = lock_.LockX();
+  }
+
+  EXPECT_FALSE(opt_guard.TryLockX());
+  EXPECT_EQ(opt_guard.GetVersion(), ver + 1U);
+  EXPECT_EQ(lock_.GetVersion().GetVersion(), ver + 1U);  // the version is not modified
+}
+
+TEST_F(  //
+    OptiQLFixture,
+    TryLockXWithMaskIgnoreMaskedBits)
+{
+  auto&& opt_guard = lock_.GetVersion();
+  const auto ver = opt_guard.GetVersion();
+  {
+    auto&& x_guard = lock_.LockX();
+    x_guard.SetVersion(ver ^ 0b10U);
+  }
+
+  auto&& x_guard = opt_guard.TryLockX(~0b10U);
+  EXPECT_TRUE(x_guard);
+}
+
+TEST_F(  //
+    OptiQLFixture,
+    TryLockXAfterXLockNeedWait)
+{
+  auto&& opt_guard = lock_.GetVersion();
+  {
+    [[maybe_unused]] auto&& x_guard = lock_.LockX();
+
+    std::promise<void> p{};
+    auto&& f = p.get_future();
+    t_ = std::thread{[&opt_guard](std::promise<void> p) {
+                       [[maybe_unused]] auto&& guard = opt_guard.TryLockX();
+                       p.set_value();
+                     },
+                     std::move(p)};
+    EXPECT_EQ(f.wait_for(kWaitTimeMill), std::future_status::timeout);
+  }
+  t_.join();
 }
 
 /*----------------------------------------------------------------------------*

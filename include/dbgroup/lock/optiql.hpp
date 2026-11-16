@@ -26,6 +26,7 @@
 
 // local sources
 #include "dbgroup/constants.hpp"
+#include "dbgroup/lock/utility.hpp"
 
 namespace dbgroup::lock
 {
@@ -176,7 +177,7 @@ class OptiQL
      * @param ver The current version.
      */
     constexpr OptGuard(  //
-        const OptiQL* const dest,
+        OptiQL* const dest,
         const uint32_t ver) noexcept
         : dest_{dest}
         , ver_{ver}
@@ -225,12 +226,14 @@ class OptiQL
      *########################################################################*/
 
     /**
+     * @param mask A bitmask for representing bits to be verified.
      * @retval true if a target version does not change from an expected one.
      * @retval false otherwise.
      */
     [[nodiscard]]
     auto
-    VerifyVersion() noexcept  //
+    VerifyVersion(                               //
+        const uint32_t mask = kNoMask) noexcept  //
         -> bool
     {
       uint64_t cur{};
@@ -243,8 +246,23 @@ class OptiQL
 
       const auto expected = ver_;
       ver_ = static_cast<uint32_t>(cur & kVersionMask);
-      return ver_ == expected;
+      return ((ver_ ^ expected) & mask) == 0;
     }
+
+    /**
+     * @brief Get an X lock if a given version is the same as the current one.
+     *
+     * @param mask A bitmask for representing bits to be verified.
+     * @retval A guard instance if the lock is acquired.
+     * @retval An empty guard instance otherwise.
+     * @note This function verifies the version while entering the queue and
+     * after acquiring the lock. If the version has been changed after
+     * acquiring the lock, this function releases it without modifying the
+     * version.
+     */
+    [[nodiscard]]
+    auto TryLockX(  //
+        uint32_t mask = kNoMask) -> XGuard;
 
    private:
     /*########################################################################*
@@ -252,7 +270,7 @@ class OptiQL
      *########################################################################*/
 
     /// @brief The address of a target lock.
-    const OptiQL* dest_{};
+    OptiQL* dest_{};
 
     /// @brief A version when creating this guard.
     uint32_t ver_{};
@@ -288,7 +306,7 @@ class OptiQL
    */
   [[nodiscard]]
   auto
-  GetVersion() const noexcept  //
+  GetVersion() noexcept  //
       -> OptGuard
   {
     uint64_t cur{};
@@ -328,6 +346,22 @@ class OptiQL
   {
     return std::atomic_ref{lock_};
   }
+
+  /**
+   * @brief Get an X lock if a given version is the same as the current one.
+   *
+   * @param[in,out] ver An expected version. If acquiring the lock fails, this
+   * is updated to the current version.
+   * @param mask A bitmask for representing bits to be verified (zero for
+   * skipping verification, i.e., this function never fails).
+   * @retval A guard instance if the lock is acquired.
+   * @retval An empty guard instance otherwise.
+   */
+  [[nodiscard]]
+  auto AcquireX(  //
+      uint32_t& ver,
+      uint32_t mask)  //
+      -> XGuard;
 
   /**
    * @brief Release an exclusive lock.
@@ -389,6 +423,8 @@ class OptiQL
  * Static assertions
  *############################################################################*/
 
+static_assert(Lockable<OptiQL>);
+static_assert(OptimisticallyLockable<OptiQL>);
 static_assert(std::is_trivially_default_constructible_v<OptiQL>);
 static_assert(std::is_trivially_destructible_v<OptiQL>);
 

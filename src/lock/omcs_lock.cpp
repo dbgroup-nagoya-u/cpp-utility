@@ -82,6 +82,9 @@ constexpr uint64_t kSMask = kLockMask ^ kIXLock;
 /// @brief A bit mask for extracting an X-lock state and a version value.
 constexpr uint64_t kXAndVersionMask = kXLock | kVersionMask;
 
+/// @brief A bitmask for skipping version verification.
+constexpr uint32_t kSkipVerify = 0U;
+
 /*############################################################################*
  * Static variables
  *############################################################################*/
@@ -101,12 +104,40 @@ auto
 OMCSLock::LockS() noexcept  //
     -> SGuard
 {
+  uint32_t ver{};
+  return AcquireS(ver, kSkipVerify);
+}
+
+auto
+OMCSLock::LockSIX() noexcept  //
+    -> SIXGuard
+{
+  uint32_t ver{};
+  return AcquireSIX(ver, kSkipVerify);
+}
+
+/*############################################################################*
+ * Internal APIs
+ *############################################################################*/
+
+auto
+OMCSLock::AcquireS(  //
+    uint32_t& ver,
+    const uint32_t mask) noexcept  //
+    -> SGuard
+{
   auto qid = tls_holder.GetQID();
   new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto ebd_id = (static_cast<uint64_t>(qid) << kQIDShift) | kSLock;
 
   auto cur = LockWord().load(kRelaxed);
   while (true) {
+    const auto cur_ver = static_cast<uint32_t>(cur);
+    if ((ver ^ cur_ver) & mask) {
+      ver = cur_ver;
+      tls_holder.ReleaseQID(qid);
+      return SGuard{};
+    }
     if (cur & kLockMask) {  // there is the predecessor
       if (LockWord().compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) {
         tls_holder.ReleaseQID(qid);
@@ -120,11 +151,19 @@ OMCSLock::LockS() noexcept  //
     CPP_UTILITY_SPINLOCK_HINT
   }
 
-  return SGuard{this, qid, static_cast<uint32_t>(cur)};
+  const auto cur_ver = static_cast<uint32_t>(cur);
+  if ((ver ^ cur_ver) & mask) {
+    ver = cur_ver;
+    UnlockS(qid);
+    return SGuard{};
+  }
+  return SGuard{this, qid, cur_ver};
 }
 
 auto
-OMCSLock::LockSIX() noexcept  //
+OMCSLock::AcquireSIX(  //
+    uint32_t& ver,
+    const uint32_t mask) noexcept  //
     -> SIXGuard
 {
   const auto qid = tls_holder.GetQID();
@@ -133,6 +172,12 @@ OMCSLock::LockSIX() noexcept  //
 
   auto cur = LockWord().load(kRelaxed);
   while (true) {
+    const auto cur_ver = static_cast<uint32_t>(cur);
+    if ((ver ^ cur_ver) & mask) {
+      ver = cur_ver;
+      tls_holder.ReleaseQID(qid);
+      return SIXGuard{};
+    }
     qnode->lock_state.store(cur & kLockMask, kRelaxed);
     const auto new_tail = ebd_id | (cur & kXAndVersionMask);
     if (LockWord().compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
@@ -150,12 +195,14 @@ OMCSLock::LockSIX() noexcept  //
     cur = LockWord().load(kAcquire);
   }
 
-  return SIXGuard{this, qid, static_cast<uint32_t>(cur)};
+  const auto cur_ver = static_cast<uint32_t>(cur);
+  if ((ver ^ cur_ver) & mask) {
+    ver = cur_ver;
+    UnlockSIX(qid);
+    return SIXGuard{};
+  }
+  return SIXGuard{this, qid, cur_ver};
 }
-
-/*############################################################################*
- * Internal APIs
- *############################################################################*/
 
 void
 OMCSLock::UnlockS(  //
@@ -296,39 +343,12 @@ OMCSLock::OptGuard::TryLockS(      //
     const uint32_t mask) noexcept  //
     -> SGuard
 {
-  auto qid = tls_holder.GetQID();
-  new (QNodeHolder::GetQNode(qid)) QNode{};
-  const auto ebd_id = (static_cast<uint64_t>(qid) << kQIDShift) | kSLock;
-
   std::atomic_thread_fence(kAcquire);
-  auto cur = dest_->LockWord().load(kRelaxed);
-  while (true) {
-    const auto cur_ver = static_cast<uint32_t>(cur);
-    if ((ver_ ^ cur_ver) & mask) {
-      ver_ = cur_ver;
-      tls_holder.ReleaseQID(qid);
-      return SGuard{};
-    }
-    if (cur & kLockMask) {  // there is the predecessor
-      if (dest_->LockWord().compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) {
-        tls_holder.ReleaseQID(qid);
-        qid = dest_->WaitSLock(cur);
-        break;
-      }
-    } else {  // the initial shared lock
-      const auto new_tail = ebd_id | (cur & kVersionMask);
-      if (dest_->LockWord().compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
-    }
-    CPP_UTILITY_SPINLOCK_HINT
+  auto guard = dest_->AcquireS(ver_, mask);
+  if (guard) {
+    dest_ = nullptr;
   }
-
-  const auto cur_ver = static_cast<uint32_t>(cur);
-  if ((ver_ ^ cur_ver) & mask) {
-    ver_ = cur_ver;
-    dest_->UnlockS(qid);
-    return SGuard{};
-  }
-  return SGuard{std::exchange(dest_, nullptr), qid, cur_ver};
+  return guard;
 }
 
 auto
@@ -336,43 +356,12 @@ OMCSLock::OptGuard::TryLockSIX(    //
     const uint32_t mask) noexcept  //
     -> SIXGuard
 {
-  const auto qid = tls_holder.GetQID();
-  auto* const qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
-  const auto ebd_id = (static_cast<uint64_t>(qid) << kQIDShift) | kIXLock;
-
   std::atomic_thread_fence(kAcquire);
-  auto cur = dest_->LockWord().load(kRelaxed);
-  while (true) {
-    const auto cur_ver = static_cast<uint32_t>(cur);
-    if ((ver_ ^ cur_ver) & mask) {
-      ver_ = cur_ver;
-      tls_holder.ReleaseQID(qid);
-      return SIXGuard{};
-    }
-    qnode->lock_state.store(cur & kLockMask, kRelaxed);
-    const auto new_tail = ebd_id | (cur & kXAndVersionMask);
-    if (dest_->LockWord().compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
-    CPP_UTILITY_SPINLOCK_HINT
+  auto guard = dest_->AcquireSIX(ver_, mask);
+  if (guard) {
+    dest_ = nullptr;
   }
-
-  if (cur & kLockMask) {
-    // wait until predecessor gives up the lock
-    auto* const pred_qnode = QNodeHolder::GetQNode((cur & kQIDMask) >> kQIDShift);
-    pred_qnode->next.store(qnode, kRelease);
-    // the acquire load also makes the following load read the latest version
-    while (qnode->lock_state.load(kAcquire) & kIXLock) {
-      std::this_thread::yield();
-    }
-    cur = dest_->LockWord().load(kAcquire);
-  }
-
-  const auto cur_ver = static_cast<uint32_t>(cur);
-  if ((ver_ ^ cur_ver) & mask) {
-    ver_ = cur_ver;
-    dest_->UnlockSIX(qid);
-    return SIXGuard{};
-  }
-  return SIXGuard{std::exchange(dest_, nullptr), qid, cur_ver};
+  return guard;
 }
 
 }  // namespace dbgroup::lock

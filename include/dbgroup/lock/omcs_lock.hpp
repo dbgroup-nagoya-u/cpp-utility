@@ -758,6 +758,38 @@ class OMCSLock
   }
 
   /**
+   * @brief Get a shared lock if a given version is the same as the current one.
+   *
+   * @param[in,out] ver An expected version. If acquiring the lock fails, this
+   * is updated to the current version.
+   * @param mask A bitmask for representing bits to be verified (zero for
+   * skipping verification, i.e., this function never fails).
+   * @retval A guard instance if the lock is acquired.
+   * @retval An empty guard instance otherwise.
+   */
+  [[nodiscard]]
+  auto AcquireS(  //
+      uint32_t& ver,
+      uint32_t mask) noexcept  //
+      -> SGuard;
+
+  /**
+   * @brief Get an SIX lock if a given version is the same as the current one.
+   *
+   * @param[in,out] ver An expected version. If acquiring the lock fails, this
+   * is updated to the current version.
+   * @param mask A bitmask for representing bits to be verified (zero for
+   * skipping verification, i.e., this function never fails).
+   * @retval A guard instance if the lock is acquired.
+   * @retval An empty guard instance otherwise.
+   */
+  [[nodiscard]]
+  auto AcquireSIX(  //
+      uint32_t& ver,
+      uint32_t mask) noexcept  //
+      -> SIXGuard;
+
+  /**
    * @brief Release a shared lock.
    *
    * @param qid A queue node ID that holds the lock.
