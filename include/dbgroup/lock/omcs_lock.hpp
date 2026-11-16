@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <limits>
 #include <thread>
+#include <type_traits>
 #include <utility>
 
 // local sources
@@ -73,8 +74,8 @@ class OMCSLock
   /// @brief The maximum number of queue nodes.
   static constexpr uint64_t kQNodeNum = 1UL << 16UL;
 
-  /// @brief A lock state representing an opportunistic lock.
-  static constexpr uint64_t kSFlag = 1UL << 63UL;
+  /// @brief A lock state representing an exclusive lock.
+  static constexpr uint64_t kXLock = 1UL << 63UL;
 
   /*##########################################################################*
    * Public constructors and assignment operators
@@ -112,7 +113,7 @@ class OMCSLock
     uint64_t cur{};
     while (true) {
       cur = LockWord().load(kAcquire);
-      if (cur & kSFlag) break;
+      if ((cur & kXLock) == 0) break;
       std::this_thread::yield();
     }
 
@@ -489,7 +490,7 @@ class OMCSLock
         -> SIXGuard
     {
       const auto ver_xor = static_cast<uint64_t>(old_ver_ ^ new_ver_);
-      dest_->LockWord().fetch_xor(kSFlag | ver_xor, kRelease);
+      dest_->LockWord().fetch_xor(kXLock | ver_xor, kRelease);
       return SIXGuard{std::exchange(dest_, nullptr), qid_, new_ver_};
     }
 
@@ -626,7 +627,7 @@ class OMCSLock
       uint64_t cur;
       while (true) {
         cur = dest_->LockWord().load(kRelaxed);
-        if (cur & kSFlag) break;
+        if ((cur & kXLock) == 0) break;
         std::this_thread::yield();
       }
 
@@ -661,7 +662,7 @@ class OMCSLock
       std::atomic_thread_fence(kAcquire);
       const auto cur = dest_->LockWord().load(kRelaxed);
       ver_ = static_cast<uint32_t>(cur);
-      return ((ver_ ^ expected) & mask) == 0 && (cur & kSFlag) > 0;
+      return ((ver_ ^ expected) & mask) == 0 && (cur & kXLock) == 0;
     }
 
     /**
@@ -791,7 +792,7 @@ class OMCSLock
       uint64_t old_ver,
       uint64_t new_ver) noexcept
   {
-    LockWord().fetch_xor(kSFlag | (old_ver ^ new_ver), kRelease);
+    LockWord().fetch_xor(kXLock | (old_ver ^ new_ver), kRelease);
     UnlockSIX(qid);
   }
 
@@ -816,7 +817,7 @@ class OMCSLock
    *##########################################################################*/
 
   /// @brief The current lock state (accessed only via `LockWord`).
-  alignas(std::atomic_ref<uint64_t>::required_alignment) mutable uint64_t lock_{kSFlag};
+  alignas(std::atomic_ref<uint64_t>::required_alignment) mutable uint64_t lock_;
 };
 
 /*############################################################################*
@@ -826,6 +827,8 @@ class OMCSLock
 static_assert(Lockable<OMCSLock>);
 static_assert(PessimisticallyLockable<OMCSLock>);
 static_assert(OptimisticallyLockable<OMCSLock>);
+static_assert(std::is_trivially_default_constructible_v<OMCSLock>);
+static_assert(std::is_trivially_destructible_v<OMCSLock>);
 
 }  // namespace dbgroup::lock
 
