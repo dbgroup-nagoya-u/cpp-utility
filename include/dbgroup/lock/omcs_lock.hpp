@@ -130,8 +130,13 @@ class OMCSLock
    * spinlock and back-off.
    */
   [[nodiscard]]
-  auto LockS() noexcept  //
-      -> SGuard;
+  auto
+  LockS() noexcept  //
+      -> SGuard
+  {
+    uint32_t ver{};
+    return AcquireS(ver, kSkipVerify);
+  }
 
   /**
    * @brief Get a shared-with-intent-exclusive lock.
@@ -141,8 +146,13 @@ class OMCSLock
    * spinlock and back-off.
    */
   [[nodiscard]]
-  auto LockSIX() noexcept  //
-      -> SIXGuard;
+  auto
+  LockSIX() noexcept  //
+      -> SIXGuard
+  {
+    uint32_t ver{};
+    return AcquireSIX(ver, kSkipVerify);
+  }
 
   /**
    * @brief Get an exclusive lock.
@@ -358,8 +368,24 @@ class OMCSLock
      * ownership.
      */
     [[nodiscard]]
-    auto UpgradeToX() noexcept  //
-        -> XGuard;
+    auto
+    UpgradeToX() noexcept  //
+        -> XGuard
+    {
+      if (!dest_) [[unlikely]] {
+        return XGuard{};
+      }
+
+      auto* const qnode = QNodeHolder::GetQNode(qid_);
+      while (qnode->lock_state.load(kAcquire) & kSMask) {
+        // wait for shared lock holders to release their locks
+        CPP_UTILITY_SPINLOCK_HINT
+      }
+      dest_->LockWord().fetch_xor(kXLock, kAcquire);
+      std::atomic_thread_fence(kRelease);  // make the X bit visible before writes
+
+      return XGuard{std::exchange(dest_, nullptr), qid_, ver_};
+    }
 
    private:
     /*########################################################################*
@@ -681,9 +707,18 @@ class OMCSLock
      * spinlock and back-off.
      */
     [[nodiscard]]
-    auto TryLockS(                         //
-        uint32_t mask = kNoMask) noexcept  //
-        -> SGuard;
+    auto
+    TryLockS(                                    //
+        const uint32_t mask = kNoMask) noexcept  //
+        -> SGuard
+    {
+      std::atomic_thread_fence(kAcquire);
+      auto guard = dest_->AcquireS(ver_, mask);
+      if (guard) {
+        dest_ = nullptr;
+      }
+      return guard;
+    }
 
     /**
      * @brief Get an SIX lock if a given version is the same as the current one.
@@ -693,9 +728,18 @@ class OMCSLock
      * @retval An empty guard instance otherwise.
      */
     [[nodiscard]]
-    auto TryLockSIX(                       //
-        uint32_t mask = kNoMask) noexcept  //
-        -> SIXGuard;
+    auto
+    TryLockSIX(                                  //
+        const uint32_t mask = kNoMask) noexcept  //
+        -> SIXGuard
+    {
+      std::atomic_thread_fence(kAcquire);
+      auto guard = dest_->AcquireSIX(ver_, mask);
+      if (guard) {
+        dest_ = nullptr;
+      }
+      return guard;
+    }
 
     /**
      * @brief Get an X lock if a given version is the same as the current one.
@@ -915,6 +959,9 @@ class OMCSLock
 
   /// @brief A flag in queue nodes for indicating that their owners hold locks.
   static constexpr uint64_t kOwned = 1UL << 63UL;
+
+  /// @brief A bitmask for skipping version verification.
+  static constexpr uint32_t kSkipVerify = 0U;
 
   /*##########################################################################*
    * Static assertions

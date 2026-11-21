@@ -90,9 +90,20 @@ class OptiQL
 
     auto operator=(const XGuard&) -> XGuard& = delete;
 
-    auto operator=(             //
+    auto
+    operator=(                  //
         XGuard&& rhs) noexcept  //
-        -> XGuard&;
+        -> XGuard&
+    {
+      if (dest_) {
+        dest_->UnlockX(qid_, old_ver_, new_ver_);
+      }
+      dest_ = std::exchange(rhs.dest_, nullptr);
+      qid_ = rhs.qid_;
+      old_ver_ = rhs.old_ver_;
+      new_ver_ = rhs.new_ver_;
+      return *this;
+    }
 
     /*########################################################################*
      * Public destructors
@@ -102,7 +113,12 @@ class OptiQL
      * @brief Destroy this instance and release a lock if holding.
      *
      */
-    ~XGuard();
+    ~XGuard()
+    {
+      if (dest_) {
+        dest_->UnlockX(qid_, old_ver_, new_ver_);
+      }
+    }
 
     /*########################################################################*
      * Public APIs
@@ -261,8 +277,18 @@ class OptiQL
      * version.
      */
     [[nodiscard]]
-    auto TryLockX(  //
-        uint32_t mask = kNoMask) -> XGuard;
+    auto
+    TryLockX(                           //
+        const uint32_t mask = kNoMask)  //
+        -> XGuard
+    {
+      std::atomic_thread_fence(kAcquire);
+      auto guard = dest_->AcquireX(ver_, mask);
+      if (guard) {
+        dest_ = nullptr;
+      }
+      return guard;
+    }
 
    private:
     /*########################################################################*
@@ -327,8 +353,13 @@ class OptiQL
    * spinlock and back-off.
    */
   [[nodiscard]]
-  auto LockX()  //
-      -> XGuard;
+  auto
+  LockX()  //
+      -> XGuard
+  {
+    uint32_t ver{};
+    return AcquireX(ver, kSkipVerify);
+  }
 
  private:
   /*##########################################################################*
@@ -404,6 +435,9 @@ class OptiQL
 
   /// @brief A bit mask for extracting a lock state.
   static constexpr uint64_t kLockMask = ~(kVersionMask | kQIDMask);
+
+  /// @brief A bitmask for skipping version verification.
+  static constexpr uint32_t kSkipVerify = 0U;
 
   /*##########################################################################*
    * Static assertions

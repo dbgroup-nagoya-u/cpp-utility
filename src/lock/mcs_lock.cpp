@@ -23,7 +23,6 @@
 #include <cassert>
 #include <cstdint>
 #include <thread>
-#include <utility>
 
 // local sources
 #include "dbgroup/constants.hpp"
@@ -180,95 +179,6 @@ MCSLock::PassLock(  //
   auto* const next = std::bit_cast<MCSLock*>(next_ptr);
   if ((next->LockWord().fetch_xor(kXLock, kRelease) & kWaitMask) == kXLock) {
     _tls.reset(qnode);
-  }
-}
-
-/*############################################################################*
- * Shared lock guards
- *############################################################################*/
-
-auto
-MCSLock::SGuard::operator=(  //
-    SGuard&& rhs) noexcept   //
-    -> SGuard&
-{
-  if (dest_) {
-    dest_->UnlockS(qnode_);
-  }
-  dest_ = std::exchange(rhs.dest_, nullptr);
-  qnode_ = rhs.qnode_;
-  return *this;
-}
-
-MCSLock::SGuard::~SGuard()
-{
-  if (dest_) {
-    dest_->UnlockS(qnode_);
-  }
-}
-
-/*############################################################################*
- * Shared-with-intent-exclusive lock guards
- *############################################################################*/
-
-auto
-MCSLock::SIXGuard::operator=(  //
-    SIXGuard&& rhs) noexcept   //
-    -> SIXGuard&
-{
-  if (dest_) {
-    dest_->UnlockSIX(qnode_);
-  }
-  dest_ = std::exchange(rhs.dest_, nullptr);
-  qnode_ = rhs.qnode_;
-  return *this;
-}
-
-MCSLock::SIXGuard::~SIXGuard()
-{
-  if (dest_) {
-    dest_->UnlockSIX(qnode_);
-  }
-}
-
-auto
-MCSLock::SIXGuard::UpgradeToX()  //
-    -> XGuard
-{
-  if (!dest_) [[unlikely]] {
-    return XGuard{};
-  }
-
-  uint64_t next_ptr;
-  while (true) {  // wait for shared lock holders to release their locks
-    next_ptr = qnode_->LockWord().load(kAcquire);
-    if ((next_ptr & kSMask) == kNoLocks) break;
-    std::this_thread::yield();
-  }
-  return XGuard{std::exchange(dest_, nullptr), qnode_};
-}
-
-/*############################################################################*
- * Exclusive lock guards
- *############################################################################*/
-
-auto
-MCSLock::XGuard::operator=(  //
-    XGuard&& rhs) noexcept   //
-    -> XGuard&
-{
-  if (dest_) {
-    dest_->UnlockX(qnode_);
-  }
-  dest_ = std::exchange(rhs.dest_, nullptr);
-  qnode_ = rhs.qnode_;
-  return *this;
-}
-
-MCSLock::XGuard::~XGuard()
-{
-  if (dest_) {
-    dest_->UnlockX(qnode_);
   }
 }
 

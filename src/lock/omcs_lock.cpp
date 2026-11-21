@@ -21,7 +21,6 @@
 #include <atomic>
 #include <cstdint>
 #include <thread>
-#include <utility>
 
 // local sources
 #include "dbgroup/constants.hpp"
@@ -29,42 +28,11 @@
 
 namespace dbgroup::lock
 {
-namespace
-{
-/*############################################################################*
- * Local constants
- *############################################################################*/
-
-/// @brief A bitmask for skipping version verification.
-constexpr uint32_t kSkipVerify = 0U;
-
-}  // namespace
-
 /*############################################################################*
  * Static variables
  *############################################################################*/
 
 thread_local OMCSLock::QNodeHolder OMCSLock::tls_holder_{};  // NOLINT
-
-/*############################################################################*
- * Public APIs
- *############################################################################*/
-
-auto
-OMCSLock::LockS() noexcept  //
-    -> SGuard
-{
-  uint32_t ver{};
-  return AcquireS(ver, kSkipVerify);
-}
-
-auto
-OMCSLock::LockSIX() noexcept  //
-    -> SIXGuard
-{
-  uint32_t ver{};
-  return AcquireSIX(ver, kSkipVerify);
-}
 
 /*############################################################################*
  * Internal APIs
@@ -254,29 +222,6 @@ OMCSLock::WaitSLock(         //
 }
 
 /*############################################################################*
- * Shared-with-intent-exclusive lock guards
- *############################################################################*/
-
-auto
-OMCSLock::SIXGuard::UpgradeToX() noexcept  //
-    -> XGuard
-{
-  if (!dest_) [[unlikely]] {
-    return XGuard{};
-  }
-
-  auto* const qnode = QNodeHolder::GetQNode(qid_);
-  while (qnode->lock_state.load(kAcquire) & kSMask) {
-    // wait for shared lock holders to release their locks
-    CPP_UTILITY_SPINLOCK_HINT
-  }
-  dest_->LockWord().fetch_xor(kXLock, kAcquire);
-  std::atomic_thread_fence(kRelease);  // make the X bit visible before writes
-
-  return XGuard{std::exchange(dest_, nullptr), qid_, ver_};
-}
-
-/*############################################################################*
  * Optimistic lock guards
  *############################################################################*/
 
@@ -294,32 +239,6 @@ OMCSLock::OptGuard::FallBackToSLock(  //
     CPP_UTILITY_SPINLOCK_HINT
   }
   ver_ = static_cast<uint32_t>(cur);
-}
-
-auto
-OMCSLock::OptGuard::TryLockS(      //
-    const uint32_t mask) noexcept  //
-    -> SGuard
-{
-  std::atomic_thread_fence(kAcquire);
-  auto guard = dest_->AcquireS(ver_, mask);
-  if (guard) {
-    dest_ = nullptr;
-  }
-  return guard;
-}
-
-auto
-OMCSLock::OptGuard::TryLockSIX(    //
-    const uint32_t mask) noexcept  //
-    -> SIXGuard
-{
-  std::atomic_thread_fence(kAcquire);
-  auto guard = dest_->AcquireSIX(ver_, mask);
-  if (guard) {
-    dest_ = nullptr;
-  }
-  return guard;
 }
 
 }  // namespace dbgroup::lock

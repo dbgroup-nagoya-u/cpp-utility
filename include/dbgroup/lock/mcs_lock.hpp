@@ -21,6 +21,7 @@
 #include <atomic>
 #include <cassert>
 #include <cstdint>
+#include <thread>
 #include <type_traits>
 #include <utility>
 
@@ -80,15 +81,33 @@ class MCSLock
 
     auto operator=(const SGuard&) -> SGuard& = delete;
 
-    auto operator=(             //
+    auto
+    operator=(                  //
         SGuard&& rhs) noexcept  //
-        -> SGuard&;
+        -> SGuard&
+    {
+      if (dest_) {
+        dest_->UnlockS(qnode_);
+      }
+      dest_ = std::exchange(rhs.dest_, nullptr);
+      qnode_ = rhs.qnode_;
+      return *this;
+    }
 
     /*########################################################################*
      * Public destructors
      *########################################################################*/
 
-    ~SGuard();
+    /**
+     * @brief Destroy this instance and release a lock if holding.
+     *
+     */
+    ~SGuard()
+    {
+      if (dest_) {
+        dest_->UnlockS(qnode_);
+      }
+    }
 
     /*########################################################################*
      * Public APIs
@@ -152,15 +171,33 @@ class MCSLock
 
     auto operator=(const SIXGuard&) -> SIXGuard& = delete;
 
-    auto operator=(               //
+    auto
+    operator=(                    //
         SIXGuard&& rhs) noexcept  //
-        -> SIXGuard&;
+        -> SIXGuard&
+    {
+      if (dest_) {
+        dest_->UnlockSIX(qnode_);
+      }
+      dest_ = std::exchange(rhs.dest_, nullptr);
+      qnode_ = rhs.qnode_;
+      return *this;
+    }
 
     /*########################################################################*
      * Public destructors
      *########################################################################*/
 
-    ~SIXGuard();
+    /**
+     * @brief Destroy this instance and release a lock if holding.
+     *
+     */
+    ~SIXGuard()
+    {
+      if (dest_) {
+        dest_->UnlockSIX(qnode_);
+      }
+    }
 
     /*########################################################################*
      * Public APIs
@@ -184,8 +221,20 @@ class MCSLock
      * ownership.
      */
     [[nodiscard]]
-    auto UpgradeToX()  //
-        -> XGuard;
+    auto
+    UpgradeToX()  //
+        -> XGuard
+    {
+      if (!dest_) [[unlikely]] {
+        return XGuard{};
+      }
+
+      while (qnode_->LockWord().load(kAcquire) & kSMask) {
+        // wait for shared lock holders to release their locks
+        std::this_thread::yield();
+      }
+      return XGuard{std::exchange(dest_, nullptr), qnode_};
+    }
 
    private:
     /*########################################################################*
@@ -235,15 +284,33 @@ class MCSLock
 
     auto operator=(const XGuard&) -> XGuard& = delete;
 
-    auto operator=(             //
+    auto
+    operator=(                  //
         XGuard&& rhs) noexcept  //
-        -> XGuard&;
+        -> XGuard&
+    {
+      if (dest_) {
+        dest_->UnlockX(qnode_);
+      }
+      dest_ = std::exchange(rhs.dest_, nullptr);
+      qnode_ = rhs.qnode_;
+      return *this;
+    }
 
     /*########################################################################*
      * Public destructors
      *########################################################################*/
 
-    ~XGuard();
+    /**
+     * @brief Destroy this instance and release a lock if holding.
+     *
+     */
+    ~XGuard()
+    {
+      if (dest_) {
+        dest_->UnlockX(qnode_);
+      }
+    }
 
     /*########################################################################*
      * Public APIs

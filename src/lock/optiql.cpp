@@ -21,7 +21,6 @@
 #include <atomic>
 #include <cstdint>
 #include <thread>
-#include <utility>
 
 // local sources
 #include "dbgroup/constants.hpp"
@@ -52,13 +51,6 @@ struct QNode {
 using QNodeHolder = component::QueueNodeHolder<QNode, OptiQL::kQNodeNum>;
 
 /*############################################################################*
- * Local constants
- *############################################################################*/
-
-/// @brief A bitmask for skipping version verification.
-constexpr uint32_t kSkipVerify = 0U;
-
-/*############################################################################*
  * Static variables
  *############################################################################*/
 // NOLINTBEGIN
@@ -68,18 +60,6 @@ thread_local QNodeHolder tls_holder{};
 
 // NOLINTEND
 }  // namespace
-
-/*############################################################################*
- * Public APIs
- *############################################################################*/
-
-auto
-OptiQL::LockX()  //
-    -> XGuard
-{
-  uint32_t ver{};
-  return AcquireX(ver, kSkipVerify);
-}
 
 /*############################################################################*
  * Internal APIs
@@ -159,49 +139,6 @@ OptiQL::UnlockX(  //
   }
   next_ptr->hold_lock.store(true, kRelease);
   tls_holder.ReleaseQID(qid);
-}
-
-/*############################################################################*
- * Exclusive lock guards
- *############################################################################*/
-
-auto
-OptiQL::XGuard::operator=(  //
-    XGuard&& rhs) noexcept  //
-    -> XGuard&
-{
-  if (dest_) {
-    dest_->UnlockX(qid_, old_ver_, new_ver_);
-  }
-  dest_ = std::exchange(rhs.dest_, nullptr);
-  qid_ = rhs.qid_;
-  old_ver_ = rhs.old_ver_;
-  new_ver_ = rhs.new_ver_;
-  return *this;
-}
-
-OptiQL::XGuard::~XGuard()
-{
-  if (dest_) {
-    dest_->UnlockX(qid_, old_ver_, new_ver_);
-  }
-}
-
-/*############################################################################*
- * Optimistic lock guards
- *############################################################################*/
-
-auto
-OptiQL::OptGuard::TryLockX(  //
-    const uint32_t mask)     //
-    -> XGuard
-{
-  std::atomic_thread_fence(kAcquire);
-  auto guard = dest_->AcquireX(ver_, mask);
-  if (guard) {
-    dest_ = nullptr;
-  }
-  return guard;
 }
 
 }  // namespace dbgroup::lock
