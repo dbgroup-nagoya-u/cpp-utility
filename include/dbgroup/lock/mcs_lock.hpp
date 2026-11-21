@@ -508,7 +508,7 @@ class MCSLock
   {
     // X locks have waited for the predecessor's shared lock holders, so no one
     // refers to the owner flag of this node
-    assert((qnode->LockWord().load(kRelaxed) & kWaitMask) == kNoLocks);
+    assert((qnode->LockWord().load(kRelaxed) & kLockMask) == kNoLocks);
     PassLock(qnode);
   }
 
@@ -525,23 +525,20 @@ class MCSLock
   /// @brief A lock state representing a shared lock.
   static constexpr uint64_t kSLock = 1UL << 47UL;
 
-  /// @brief A flag in queue nodes for indicating that their owners hold locks.
-  static constexpr uint64_t kOwned = 1UL << 62UL;
+  /// @brief A lock state representing an intent-exclusive lock.
+  static constexpr uint64_t kIXLock = 1UL << 62UL;
 
-  /// @brief A lock state representing an exclusive lock.
-  static constexpr uint64_t kXLock = 1UL << 63UL;
+  /// @brief A flag in queue nodes for indicating that their owners hold locks.
+  static constexpr uint64_t kOwned = 1UL << 63UL;
 
   /// @brief A bit mask for extracting a node pointer.
   static constexpr uint64_t kPtrMask = kSLock - 1UL;
 
   /// @brief A bit mask for extracting a lock state.
-  static constexpr uint64_t kLockMask = ~kPtrMask;
+  static constexpr uint64_t kLockMask = ~(kPtrMask | kOwned);
 
   /// @brief A bit mask for extracting a sharedlock state.
-  static constexpr uint64_t kSMask = kLockMask ^ kXLock ^ kOwned;
-
-  /// @brief A bit mask for extracting lock states except for the owner flag.
-  static constexpr uint64_t kWaitMask = kSMask | kXLock;
+  static constexpr uint64_t kSMask = kLockMask ^ kIXLock;
 
   /*##########################################################################*
    * Static assertions
