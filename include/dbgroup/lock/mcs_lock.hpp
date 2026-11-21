@@ -19,11 +19,13 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <cassert>
 #include <cstdint>
 #include <type_traits>
 #include <utility>
 
 // local sources
+#include "dbgroup/constants.hpp"
 #include "dbgroup/lock/utility.hpp"
 
 namespace dbgroup::lock
@@ -379,8 +381,15 @@ class MCSLock
    * @note If a thread calls this function without acquiring an SIX lock, it
    * will corrupt an internal lock state.
    */
-  void UnlockSIX(  //
-      MCSLock* qnode);
+  void
+  UnlockSIX(  //
+      MCSLock* const qnode)
+  {
+    if (qnode->LockWord().fetch_xor(kOwned, kAcqRel) & kSMask) {
+      return;  // the predecessor's last shared lock holder will pass the lock
+    }
+    PassLock(qnode);
+  }
 
   /**
    * @brief Pass a lock to the successor and release a given queue node.
@@ -400,8 +409,46 @@ class MCSLock
    * @note If a thread calls this function without acquiring an X lock, it will
    * corrupt an internal lock state.
    */
-  void UnlockX(  //
-      MCSLock* qnode);
+  void
+  UnlockX(  //
+      MCSLock* const qnode)
+  {
+    // X locks have waited for the predecessor's shared lock holders, so no one
+    // refers to the owner flag of this node
+    assert((qnode->LockWord().load(kRelaxed) & kWaitMask) == kNoLocks);
+    PassLock(qnode);
+  }
+
+  /*##########################################################################*
+   * Internal constants
+   *##########################################################################*/
+
+  /// @brief The `uintptr_t` of nullptr.
+  static constexpr uint64_t kNull = 0;
+
+  /// @brief A lock state representing no locks.
+  static constexpr uint64_t kNoLocks = 0b000;
+
+  /// @brief A lock state representing a shared lock.
+  static constexpr uint64_t kSLock = 1UL << 47UL;
+
+  /// @brief A flag in queue nodes for indicating that their owners hold locks.
+  static constexpr uint64_t kOwned = 1UL << 62UL;
+
+  /// @brief A lock state representing an exclusive lock.
+  static constexpr uint64_t kXLock = 1UL << 63UL;
+
+  /// @brief A bit mask for extracting a node pointer.
+  static constexpr uint64_t kPtrMask = kSLock - 1UL;
+
+  /// @brief A bit mask for extracting a lock state.
+  static constexpr uint64_t kLockMask = ~kPtrMask;
+
+  /// @brief A bit mask for extracting a sharedlock state.
+  static constexpr uint64_t kSMask = kLockMask ^ kXLock ^ kOwned;
+
+  /// @brief A bit mask for extracting lock states except for the owner flag.
+  static constexpr uint64_t kWaitMask = kSMask | kXLock;
 
   /*##########################################################################*
    * Static assertions

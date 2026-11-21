@@ -25,7 +25,6 @@
 
 // local sources
 #include "dbgroup/constants.hpp"
-#include "dbgroup/lock/component/queue_node_holder.hpp"
 #include "dbgroup/lock/utility.hpp"
 
 namespace dbgroup::lock
@@ -33,71 +32,19 @@ namespace dbgroup::lock
 namespace
 {
 /*############################################################################*
- * Local types
- *############################################################################*/
-
-/**
- * @brief A class for representing nodes in queue locks.
- *
- */
-struct QNode {
-  /// @brief The next queue node if exist.
-  std::atomic<QNode*> next;
-
-  /// @brief The state of this node (an owner flag, lock states, and this node's ID).
-  std::atomic<uint64_t> lock_state;
-};
-
-/// @brief A class for managing thread local queue nodes.
-using QNodeHolder = component::QueueNodeHolder<QNode, OMCSLock::kQNodeNum>;
-
-/*############################################################################*
  * Local constants
  *############################################################################*/
-
-/// @brief A lock state representing an exclusive lock.
-constexpr uint64_t kXLock = OMCSLock::kXLock;
-
-/// @brief A lock state representing an intent-exclusive lock.
-constexpr uint64_t kIXLock = 1UL << 62UL;
-
-/// @brief A lock state representing a shared lock.
-constexpr uint64_t kSLock = 1UL << 48UL;
-
-/// @brief A bit shift for QNode.
-constexpr uint64_t kQIDShift = 32UL;
-
-/// @brief A bit mask for extracting a version value.
-constexpr uint64_t kVersionMask = ~(~0UL << kQIDShift);
-
-/// @brief A bit mask for extracting a node pointer.
-constexpr uint64_t kQIDMask = (kSLock - 1UL) ^ kVersionMask;
-
-/// @brief A bit mask for extracting a lock state.
-constexpr uint64_t kLockMask = ~(kVersionMask | kQIDMask | kXLock);
-
-/// @brief A bit mask for extracting a sharedlock state.
-constexpr uint64_t kSMask = kLockMask ^ kIXLock;
-
-/// @brief A bit mask for extracting an X-lock state and a version value.
-constexpr uint64_t kXAndVersionMask = kXLock | kVersionMask;
 
 /// @brief A bitmask for skipping version verification.
 constexpr uint32_t kSkipVerify = 0U;
 
-/// @brief A flag in queue nodes for indicating that their owners hold locks.
-constexpr uint64_t kOwned = 1UL << 63UL;
+}  // namespace
 
 /*############################################################################*
  * Static variables
  *############################################################################*/
-// NOLINTBEGIN
 
-/// @brief A thread local queue node container.
-thread_local QNodeHolder tls_holder{};
-
-// NOLINTEND
-}  // namespace
+thread_local OMCSLock::QNodeHolder OMCSLock::tls_holder_{};  // NOLINT
 
 /*############################################################################*
  * Public APIs
@@ -129,7 +76,7 @@ OMCSLock::AcquireS(  //
     const uint32_t mask) noexcept  //
     -> SGuard
 {
-  auto qid = tls_holder.GetQID();
+  auto qid = tls_holder_.GetQID();
   const auto qid_bits = static_cast<uint64_t>(qid) << kQIDShift;
   new (QNodeHolder::GetQNode(qid)) QNode{nullptr, qid_bits};
   const auto ebd_id = qid_bits | kSLock;
@@ -139,12 +86,12 @@ OMCSLock::AcquireS(  //
     const auto cur_ver = static_cast<uint32_t>(cur);
     if ((ver ^ cur_ver) & mask) {
       ver = cur_ver;
-      tls_holder.ReleaseQID(qid);
+      tls_holder_.ReleaseQID(qid);
       return SGuard{};
     }
     if (cur & kLockMask) {  // there is the predecessor
       if (LockWord().compare_exchange_weak(cur, cur + kSLock, kAcquire, kRelaxed)) {
-        tls_holder.ReleaseQID(qid);
+        tls_holder_.ReleaseQID(qid);
         qid = WaitSLock(cur);
         break;
       }
@@ -170,7 +117,7 @@ OMCSLock::AcquireSIX(  //
     const uint32_t mask) noexcept  //
     -> SIXGuard
 {
-  const auto qid = tls_holder.GetQID();
+  const auto qid = tls_holder_.GetQID();
   const auto qid_bits = static_cast<uint64_t>(qid) << kQIDShift;
   auto* const qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
   const auto ebd_id = qid_bits | kIXLock;
@@ -180,7 +127,7 @@ OMCSLock::AcquireSIX(  //
     const auto cur_ver = static_cast<uint32_t>(cur);
     if ((ver ^ cur_ver) & mask) {
       ver = cur_ver;
-      tls_holder.ReleaseQID(qid);
+      tls_holder_.ReleaseQID(qid);
       return SIXGuard{};
     }
     qnode->lock_state.store((cur & kLockMask) | kOwned | qid_bits, kRelaxed);
@@ -223,7 +170,7 @@ OMCSLock::UnlockS(  //
       if (unlock & kLockMask) {
         if (LockWord().compare_exchange_weak(cur, unlock, kRelease, kRelaxed)) return;
       } else if (LockWord().compare_exchange_weak(cur, cur & kVersionMask, kAcqRel, kRelaxed)) {
-        tls_holder.ReleaseQID(qid);
+        tls_holder_.ReleaseQID(qid);
         return;
       }
       CPP_UTILITY_SPINLOCK_HINT
@@ -238,22 +185,11 @@ OMCSLock::UnlockS(  //
 
   const auto old = next_node->lock_state.fetch_sub(kSLock, kAcqRel);
   if ((old & kLockMask) == kSLock) {
-    tls_holder.ReleaseQID(qid);
+    tls_holder_.ReleaseQID(qid);
   }
   if ((old & (kOwned | kLockMask)) == kSLock) {  // the successor's owner has released the lock
     PassLock((old & kQIDMask) >> kQIDShift);
   }
-}
-
-void
-OMCSLock::UnlockSIX(  //
-    const uint64_t qid) noexcept
-{
-  auto* const qnode = QNodeHolder::GetQNode(qid);
-  if (qnode->lock_state.fetch_xor(kOwned, kAcqRel) & kSMask) {
-    return;  // the predecessor's last shared lock holder will pass the lock
-  }
-  PassLock(qid);
 }
 
 void
@@ -270,7 +206,7 @@ OMCSLock::PassLock(  //
         if (LockWord().compare_exchange_weak(cur, cur ^ kIXLock, kRelease, kRelaxed)) return;
       } else if (LockWord().compare_exchange_weak(cur, cur & kXAndVersionMask, kRelease,
                                                   kRelaxed)) {
-        tls_holder.ReleaseQID(qid);
+        tls_holder_.ReleaseQID(qid);
         return;
       }
       CPP_UTILITY_SPINLOCK_HINT
@@ -284,7 +220,7 @@ OMCSLock::PassLock(  //
   }
 
   if ((next_ptr->lock_state.fetch_xor(kIXLock, kRelease) & kLockMask) == kIXLock) {
-    tls_holder.ReleaseQID(qid);
+    tls_holder_.ReleaseQID(qid);
   }
 }
 

@@ -28,6 +28,7 @@
 
 // local sources
 #include "dbgroup/constants.hpp"
+#include "dbgroup/lock/component/queue_node_holder.hpp"
 #include "dbgroup/lock/utility.hpp"
 
 namespace dbgroup::lock
@@ -746,6 +747,25 @@ class OMCSLock
 
  private:
   /*##########################################################################*
+   * Internal types
+   *##########################################################################*/
+
+  /**
+   * @brief A class for representing nodes in queue locks.
+   *
+   */
+  struct QNode {
+    /// @brief The next queue node if exist.
+    std::atomic<QNode*> next;
+
+    /// @brief The state of this node (an owner flag, lock states, and this node's ID).
+    std::atomic<uint64_t> lock_state;
+  };
+
+  /// @brief A class for managing thread local queue nodes.
+  using QNodeHolder = component::QueueNodeHolder<QNode, kQNodeNum>;
+
+  /*##########################################################################*
    * Internal APIs
    *##########################################################################*/
 
@@ -810,8 +830,16 @@ class OMCSLock
    * @note If a thread calls this function without acquiring an SIX lock, it
    * will corrupt an internal lock state.
    */
-  void UnlockSIX(  //
-      uint64_t qid) noexcept;
+  void
+  UnlockSIX(  //
+      const uint64_t qid) noexcept
+  {
+    auto* const qnode = QNodeHolder::GetQNode(qid);
+    if (qnode->lock_state.fetch_xor(kOwned, kAcqRel) & kSMask) {
+      return;  // the predecessor's last shared lock holder will pass the lock
+    }
+    PassLock(qid);
+  }
 
   /**
    * @brief Pass a lock to the successor and release a given queue node.
@@ -854,6 +882,37 @@ class OMCSLock
       -> uint64_t;
 
   /*##########################################################################*
+   * Internal constants
+   *##########################################################################*/
+
+  /// @brief A lock state representing an intent-exclusive lock.
+  static constexpr uint64_t kIXLock = 1UL << 62UL;
+
+  /// @brief A lock state representing a shared lock.
+  static constexpr uint64_t kSLock = 1UL << 48UL;
+
+  /// @brief A bit shift for QNode.
+  static constexpr uint64_t kQIDShift = 32UL;
+
+  /// @brief A bit mask for extracting a version value.
+  static constexpr uint64_t kVersionMask = ~(~0UL << kQIDShift);
+
+  /// @brief A bit mask for extracting a node pointer.
+  static constexpr uint64_t kQIDMask = (kSLock - 1UL) ^ kVersionMask;
+
+  /// @brief A bit mask for extracting a lock state.
+  static constexpr uint64_t kLockMask = ~(kVersionMask | kQIDMask | kXLock);
+
+  /// @brief A bit mask for extracting a sharedlock state.
+  static constexpr uint64_t kSMask = kLockMask ^ kIXLock;
+
+  /// @brief A bit mask for extracting an X-lock state and a version value.
+  static constexpr uint64_t kXAndVersionMask = kXLock | kVersionMask;
+
+  /// @brief A flag in queue nodes for indicating that their owners hold locks.
+  static constexpr uint64_t kOwned = 1UL << 63UL;
+
+  /*##########################################################################*
    * Static assertions
    *##########################################################################*/
 
@@ -865,6 +924,13 @@ class OMCSLock
 
   /// @brief The current lock state (accessed only via `LockWord`).
   alignas(std::atomic_ref<uint64_t>::required_alignment) mutable uint64_t lock_;
+
+  /*##########################################################################*
+   * Static variables
+   *##########################################################################*/
+
+  /// @brief A thread local queue node container.
+  static thread_local QNodeHolder tls_holder_;  // NOLINT
 };
 
 /*############################################################################*

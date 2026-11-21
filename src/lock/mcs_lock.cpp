@@ -34,35 +34,8 @@ namespace dbgroup::lock
 namespace
 {
 /*############################################################################*
- * Local constants
+ * Static variables
  *############################################################################*/
-
-/// @brief The `uintptr_t` of nullptr.
-constexpr uint64_t kNull = 0;
-
-/// @brief A lock state representing no locks.
-constexpr uint64_t kNoLocks = 0b000;
-
-/// @brief A lock state representing a shared lock.
-constexpr uint64_t kSLock = 1UL << 47UL;
-
-/// @brief A flag in queue nodes for indicating that their owners hold locks.
-constexpr uint64_t kOwned = 1UL << 62UL;
-
-/// @brief A lock state representing an exclusive lock.
-constexpr uint64_t kXLock = 1UL << 63UL;
-
-/// @brief A bit mask for extracting a node pointer.
-constexpr uint64_t kPtrMask = kSLock - 1UL;
-
-/// @brief A bit mask for extracting a lock state.
-constexpr uint64_t kLockMask = ~kPtrMask;
-
-/// @brief A bit mask for extracting a sharedlock state.
-constexpr uint64_t kSMask = kLockMask ^ kXLock ^ kOwned;
-
-/// @brief A bit mask for extracting lock states except for the owner flag.
-constexpr uint64_t kWaitMask = kSMask | kXLock;
 
 /// @brief A thread local queue node container.
 thread_local std::unique_ptr<MCSLock> _tls{};  // NOLINT
@@ -177,26 +150,6 @@ MCSLock::UnlockS(  //
   if ((old & (kOwned | kWaitMask)) == kSLock) {  // the successor's owner has released the lock
     PassLock(next);
   }
-}
-
-void
-MCSLock::UnlockSIX(  //
-    MCSLock* const qnode)
-{
-  if (qnode->LockWord().fetch_xor(kOwned, kAcqRel) & kSMask) {
-    return;  // the predecessor's last shared lock holder will pass the lock
-  }
-  PassLock(qnode);
-}
-
-void
-MCSLock::UnlockX(  //
-    MCSLock* const qnode)
-{
-  // X locks have waited for the predecessor's shared lock holders, so no one
-  // refers to the owner flag of this node
-  assert((qnode->LockWord().load(kRelaxed) & kWaitMask) == kNoLocks);
-  PassLock(qnode);
 }
 
 void
