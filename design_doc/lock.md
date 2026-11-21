@@ -46,11 +46,17 @@ This lock uses *back-off* to schedule threads requesting lock acquisition, so ge
 
 ### class MCSLock
 
-We have implemented the MCS queue lock [^1] with shared and shared-with-intent-exclusive locks. We maintain the internal lock state according to the following table. The last and second-to-last bits represent exclusive and shared-with-intent-exclusive locks, respectively. The following 15 bits preserve the number of threads that have acquired shared locks. The remaining bits contain the pointer of an MCS queue node.
+We have implemented the MCS queue lock [^1] with shared and shared-with-intent-exclusive locks. We maintain the internal lock state according to the following table. The second-to-last bit is an intent-exclusive (IX) lock flag, which represents that the owner of the tail queue node holds (or waits for) an SIX or X lock. Our MCS lock does not distinguish these locks in the lock state because an X lock is an SIX lock that has waited for the preceding shared lock holders. The following 15 bits preserve the number of threads that hold (or wait for) shared locks after the tail queue node. The remaining bits contain the pointer of the tail queue node, and the last bit is unused.
 
-|       63       |        62        |         61-47         |         46-0         |
-| :------------: | :--------------: | :-------------------: | :------------------: |
-| an X lock flag | an SIX lock flag | a shared lock counter | a queue node pointer |
+|   63   |       62        |         61-47         |        46-0         |
+| :----: | :-------------: | :-------------------: | :-----------------: |
+| unused | an IX lock flag | a shared lock counter | a tail node pointer |
+
+Each queue node has a lock state with the same layout except for the last bit. Its IX lock flag represents that the node's owner waits for the predecessor to pass the lock, and its shared lock counter preserves the number of shared lock holders that have entered after the predecessor. The last bit is an owner flag, which represents that the node's owner has not released its lock yet. If the owner of an SIX lock releases (or downgrades) it while the predecessor's shared lock holders remain, the last one of them passes the lock to the successor instead of the owner.
+
+|      63       |       62        |         61-47         |        46-0         |
+| :-----------: | :-------------: | :-------------------: | :-----------------: |
+| an owner flag | an IX lock flag | a shared lock counter | a next node pointer |
 
 Our MCS lock allows shared and shared-with-intent-exclusive locks, but note that *a queue orders their lock acquisitions*. For example, assume that five threads request locks to our MCS lock in the following order.
 
