@@ -46,6 +46,9 @@ constexpr uint64_t kNoLocks = 0b000;
 /// @brief A lock state representing a shared lock.
 constexpr uint64_t kSLock = 1UL << 47UL;
 
+/// @brief A flag in queue nodes for indicating that their owners hold locks.
+constexpr uint64_t kOwned = 1UL << 62UL;
+
 /// @brief A lock state representing an exclusive lock.
 constexpr uint64_t kXLock = 1UL << 63UL;
 
@@ -56,7 +59,10 @@ constexpr uint64_t kPtrMask = kSLock - 1UL;
 constexpr uint64_t kLockMask = ~kPtrMask;
 
 /// @brief A bit mask for extracting a sharedlock state.
-constexpr uint64_t kSMask = kLockMask ^ kXLock;
+constexpr uint64_t kSMask = kLockMask ^ kXLock ^ kOwned;
+
+/// @brief A bit mask for extracting lock states except for the owner flag.
+constexpr uint64_t kWaitMask = kSMask | kXLock;
 
 /// @brief A thread local queue node container.
 thread_local std::unique_ptr<MCSLock> _tls{};  // NOLINT
@@ -118,7 +124,7 @@ MCSLock::LockSIX()  //
 
   auto cur = LockWord().load(kRelaxed);
   while (true) {
-    qnode->LockWord().store(cur & kLockMask, kRelaxed);
+    qnode->LockWord().store((cur & kLockMask) | kOwned, kRelaxed);
     if (LockWord().compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
   }
@@ -131,30 +137,6 @@ MCSLock::LockSIX()  //
     }
   }
   return SIXGuard{this, qnode};
-}
-
-auto
-MCSLock::LockX()  //
-    -> XGuard
-{
-  auto* const qnode = _tls ? _tls.release() : new MCSLock{};
-  const auto new_tail = std::bit_cast<uint64_t>(qnode) | kXLock;
-
-  auto cur = LockWord().load(kRelaxed);
-  while (true) {
-    qnode->LockWord().store(cur & kLockMask, kRelaxed);
-    if (LockWord().compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
-    CPP_UTILITY_SPINLOCK_HINT
-  }
-
-  auto* const tail = std::bit_cast<MCSLock*>(cur & kPtrMask);
-  if (tail) {  // wait for the predecessor to release the lock
-    tail->LockWord().fetch_add(new_tail & kPtrMask, kRelease);
-    while (qnode->LockWord().load(kAcquire) & kLockMask) {
-      std::this_thread::yield();
-    }
-  }
-  return XGuard{this, qnode};
 }
 
 /*############################################################################*
@@ -188,8 +170,12 @@ MCSLock::UnlockS(  //
   }
 
   auto* const next = std::bit_cast<MCSLock*>(next_ptr);
-  if ((next->LockWord().fetch_sub(kSLock, kAcqRel) & kLockMask) == kSLock) {
+  const auto old = next->LockWord().fetch_sub(kSLock, kAcqRel);
+  if ((old & kWaitMask) == kSLock) {
     _tls.reset(qnode);
+  }
+  if ((old & (kOwned | kWaitMask)) == kSLock) {  // the successor's owner has released the lock
+    PassLock(next);
   }
 }
 
@@ -197,52 +183,32 @@ void
 MCSLock::UnlockSIX(  //
     MCSLock* const qnode)
 {
-  // wait for shared lock holders to release their locks
-  uint64_t next_ptr{};
-  SpinWithBackoff(
-      [](std::atomic_ref<uint64_t> lock, uint64_t* next_ptr) -> bool {
-        *next_ptr = lock.load(kAcquire);
-        return (*next_ptr & kSMask) == kNoLocks;
-      },
-      qnode->LockWord(), &next_ptr);
-
-  const auto this_ptr = std::bit_cast<uint64_t>(qnode);
-  if (next_ptr == kNull) {  // this is the tail node
-    auto cur = LockWord().load(kRelaxed);
-    while ((cur & kPtrMask) == this_ptr) {
-      if (cur & kSMask) {
-        if (LockWord().compare_exchange_weak(cur, cur ^ kXLock, kRelease, kRelaxed)) return;
-      } else if (LockWord().compare_exchange_weak(cur, kNull, kRelease, kRelaxed)) {
-        _tls.reset(qnode);
-        return;
-      }
-      CPP_UTILITY_SPINLOCK_HINT
-    }
-
-    while (true) {  // wait until successor fills in its next field
-      next_ptr = qnode->LockWord().load(kAcquire) & kPtrMask;
-      if (next_ptr) break;
-      CPP_UTILITY_SPINLOCK_HINT
-    }
+  if (qnode->LockWord().fetch_xor(kOwned, kAcqRel) & kSMask) {
+    return;  // the predecessor's last shared lock holder will pass the lock
   }
-
-  auto* const next = std::bit_cast<MCSLock*>(next_ptr);
-  if ((next->LockWord().fetch_xor(kXLock, kRelease) & kLockMask) == kXLock) {
-    _tls.reset(qnode);
-  }
+  PassLock(qnode);
 }
 
 void
 MCSLock::UnlockX(  //
     MCSLock* const qnode)
 {
+  // X locks have waited for the predecessor's shared lock holders, so no one
+  // refers to the owner flag of this node
+  assert((qnode->LockWord().load(kRelaxed) & kWaitMask) == kNoLocks);
+  PassLock(qnode);
+}
+
+void
+MCSLock::PassLock(  //
+    MCSLock* const qnode)
+{
   const auto this_ptr = std::bit_cast<uint64_t>(qnode);
-  auto next_ptr = qnode->LockWord().load(kAcquire);
-  assert((next_ptr & kLockMask) == kNoLocks);
+  auto next_ptr = qnode->LockWord().load(kAcquire) & kPtrMask;
   if (next_ptr == kNull) {  // this is the tail node
     auto cur = LockWord().load(kRelaxed);
     while ((cur & kPtrMask) == this_ptr) {
-      if (cur & kSMask) {
+      if (cur & kSMask) {  // the shared lock holders take over this node
         if (LockWord().compare_exchange_weak(cur, cur ^ kXLock, kRelease, kRelaxed)) return;
       } else if (LockWord().compare_exchange_weak(cur, kNull, kRelease, kRelaxed)) {
         _tls.reset(qnode);
@@ -259,7 +225,7 @@ MCSLock::UnlockX(  //
   }
 
   auto* const next = std::bit_cast<MCSLock*>(next_ptr);
-  if ((next->LockWord().fetch_xor(kXLock, kRelease) & kLockMask) == kXLock) {
+  if ((next->LockWord().fetch_xor(kXLock, kRelease) & kWaitMask) == kXLock) {
     _tls.reset(qnode);
   }
 }

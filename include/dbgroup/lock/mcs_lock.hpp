@@ -338,8 +338,12 @@ class MCSLock
    * spinlock and back-off.
    */
   [[nodiscard]]
-  auto LockX()  //
-      -> XGuard;
+  auto
+  LockX()  //
+      -> XGuard
+  {
+    return LockSIX().UpgradeToX();
+  }
 
  private:
   /*##########################################################################*
@@ -376,6 +380,17 @@ class MCSLock
    * will corrupt an internal lock state.
    */
   void UnlockSIX(  //
+      MCSLock* qnode);
+
+  /**
+   * @brief Pass a lock to the successor and release a given queue node.
+   *
+   * @param qnode The queue node corresponding to this lock.
+   * @note This function must be called by the last thread that releases the
+   * lock, i.e., after both the owner of the queue node and the predecessor's
+   * shared lock holders have released the lock.
+   */
+  void PassLock(  //
       MCSLock* qnode);
 
   /**
