@@ -44,7 +44,7 @@ struct QNode {
   /// @brief The next queue node if exist.
   std::atomic<QNode*> next;
 
-  /// @brief A flag for indicating this node's owner holds a lock.
+  /// @brief The state of this node (an owner flag, lock states, and this node's ID).
   std::atomic<uint64_t> lock_state;
 };
 
@@ -84,6 +84,9 @@ constexpr uint64_t kXAndVersionMask = kXLock | kVersionMask;
 
 /// @brief A bitmask for skipping version verification.
 constexpr uint32_t kSkipVerify = 0U;
+
+/// @brief A flag in queue nodes for indicating that their owners hold locks.
+constexpr uint64_t kOwned = 1UL << 63UL;
 
 /*############################################################################*
  * Static variables
@@ -127,8 +130,9 @@ OMCSLock::AcquireS(  //
     -> SGuard
 {
   auto qid = tls_holder.GetQID();
-  new (QNodeHolder::GetQNode(qid)) QNode{};
-  const auto ebd_id = (static_cast<uint64_t>(qid) << kQIDShift) | kSLock;
+  const auto qid_bits = static_cast<uint64_t>(qid) << kQIDShift;
+  new (QNodeHolder::GetQNode(qid)) QNode{nullptr, qid_bits};
+  const auto ebd_id = qid_bits | kSLock;
 
   auto cur = LockWord().load(kRelaxed);
   while (true) {
@@ -167,8 +171,9 @@ OMCSLock::AcquireSIX(  //
     -> SIXGuard
 {
   const auto qid = tls_holder.GetQID();
+  const auto qid_bits = static_cast<uint64_t>(qid) << kQIDShift;
   auto* const qnode = new (QNodeHolder::GetQNode(qid)) QNode{};
-  const auto ebd_id = (static_cast<uint64_t>(qid) << kQIDShift) | kIXLock;
+  const auto ebd_id = qid_bits | kIXLock;
 
   auto cur = LockWord().load(kRelaxed);
   while (true) {
@@ -178,7 +183,7 @@ OMCSLock::AcquireSIX(  //
       tls_holder.ReleaseQID(qid);
       return SIXGuard{};
     }
-    qnode->lock_state.store(cur & kLockMask, kRelaxed);
+    qnode->lock_state.store((cur & kLockMask) | kOwned | qid_bits, kRelaxed);
     const auto new_tail = ebd_id | (cur & kXAndVersionMask);
     if (LockWord().compare_exchange_weak(cur, new_tail, kAcqRel, kRelaxed)) break;
     CPP_UTILITY_SPINLOCK_HINT
@@ -231,13 +236,28 @@ OMCSLock::UnlockS(  //
     }
   }
 
-  if ((next_node->lock_state.fetch_sub(kSLock, kAcqRel) & kLockMask) == kSLock) {
+  const auto old = next_node->lock_state.fetch_sub(kSLock, kAcqRel);
+  if ((old & kLockMask) == kSLock) {
     tls_holder.ReleaseQID(qid);
+  }
+  if ((old & (kOwned | kLockMask)) == kSLock) {  // the successor's owner has released the lock
+    PassLock((old & kQIDMask) >> kQIDShift);
   }
 }
 
 void
 OMCSLock::UnlockSIX(  //
+    const uint64_t qid) noexcept
+{
+  auto* const qnode = QNodeHolder::GetQNode(qid);
+  if (qnode->lock_state.fetch_xor(kOwned, kAcqRel) & kSMask) {
+    return;  // the predecessor's last shared lock holder will pass the lock
+  }
+  PassLock(qid);
+}
+
+void
+OMCSLock::PassLock(  //
     const uint64_t qid) noexcept
 {
   auto* const qnode = QNodeHolder::GetQNode(qid);

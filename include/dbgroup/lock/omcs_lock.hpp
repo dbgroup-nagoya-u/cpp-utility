@@ -814,6 +814,17 @@ class OMCSLock
       uint64_t qid) noexcept;
 
   /**
+   * @brief Pass a lock to the successor and release a given queue node.
+   *
+   * @param qid A queue node ID that holds the lock.
+   * @note This function must be called by the last thread that releases the
+   * lock, i.e., after both the owner of the queue node and the predecessor's
+   * shared lock holders have released the lock.
+   */
+  void PassLock(  //
+      uint64_t qid) noexcept;
+
+  /**
    * @brief Release an exclusive lock.
    *
    * @param qid A queue node ID that holds the lock.
