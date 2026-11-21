@@ -23,6 +23,7 @@
 #include <cassert>
 #include <cstdint>
 #include <thread>
+#include <utility>
 
 // local sources
 #include "dbgroup/constants.hpp"
@@ -180,6 +181,46 @@ MCSLock::PassLock(  //
   if ((next->LockWord().fetch_xor(kXLock, kRelease) & kWaitMask) == kXLock) {
     _tls.reset(qnode);
   }
+}
+
+/*############################################################################*
+ * Shared-with-intent-exclusive lock guards
+ *############################################################################*/
+
+auto
+MCSLock::SIXGuard::DowngradeToS()  //
+    -> SGuard
+{
+  if (!dest_) [[unlikely]] {
+    return SGuard{};
+  }
+
+  // join the shared lock holders that take over this node, and then release
+  // the SIX lock as usual (i.e., the predecessor's last shared lock holder
+  // may pass this node instead of this thread)
+  auto* const lock = std::exchange(dest_, nullptr);
+  const auto this_ptr = std::bit_cast<uint64_t>(qnode_);
+  auto next_ptr = qnode_->LockWord().load(kAcquire) & kPtrMask;
+  if (next_ptr == kNull) {  // this is the tail node
+    auto cur = lock->LockWord().load(kRelaxed);
+    while ((cur & kPtrMask) == this_ptr) {
+      if (lock->LockWord().compare_exchange_weak(cur, cur + kSLock, kRelaxed, kRelaxed)) {
+        lock->UnlockSIX(qnode_);
+        return SGuard{lock, qnode_};
+      }
+      CPP_UTILITY_SPINLOCK_HINT
+    }
+
+    while (true) {  // wait until successor fills in its next field
+      next_ptr = qnode_->LockWord().load(kAcquire) & kPtrMask;
+      if (next_ptr) break;
+      CPP_UTILITY_SPINLOCK_HINT
+    }
+  }
+
+  std::bit_cast<MCSLock*>(next_ptr)->LockWord().fetch_add(kSLock, kRelaxed);
+  lock->UnlockSIX(qnode_);
+  return SGuard{lock, qnode_};
 }
 
 }  // namespace dbgroup::lock

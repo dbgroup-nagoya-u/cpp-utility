@@ -28,8 +28,10 @@ stateDiagram-v2
     SGuard --> [*] : Destructor
     XGuard --> [*] : Destructor
     XGuard --> SIXGuard : DowngradeToSIX
+    XGuard --> SGuard : DowngradeToS
     SIXGuard --> [*] : Destructor
     SIXGuard --> XGuard : UpgradeToX
+    SIXGuard --> SGuard : DowngradeToS
 ```
 
 ### class PessimisticLock
@@ -123,7 +125,7 @@ main(  //
 
 We use a *version-check* functionality for optimistic locking. You can get a version value with `GetVersion` and check its validity with `VerifyVersion`. Our optimistic lock implementation has the same locks as pessimistic locking, and so you can use shared/exclusive/shared-with-intent-exclusive locks with version-based concurrency controls. We also prepare `TryLock` functions to acquire locks with the version check.
 
-The following state diagram shows how our lock guards and functions work. Note that each function directly modifies the version state in `OptGuard` if the version verification fails. `XGuard`'s destructor and `DowngradeToSIX` function modify the version of a target lock. Our implementation increments a version by one as default, but you can set a desired version value using `XGuard::SetVersion` function.
+The following state diagram shows how our lock guards and functions work. Note that each function directly modifies the version state in `OptGuard` if the version verification fails. `XGuard`'s destructor and its `DowngradeToSIX` and `DowngradeToS` functions modify the version of a target lock. Our implementation increments a version by one as default, but you can set a desired version value using `XGuard::SetVersion` function.
 
 ```mermaid
 stateDiagram-v2

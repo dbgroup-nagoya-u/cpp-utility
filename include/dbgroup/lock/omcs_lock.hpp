@@ -387,6 +387,17 @@ class OMCSLock
       return XGuard{std::exchange(dest_, nullptr), qid_, ver_};
     }
 
+    /**
+     * @brief Downgrade this lock to an S lock.
+     *
+     * @return The lock guard for an S lock.
+     * @note After calling the function, this lock guard abandons the lock's
+     * ownership.
+     */
+    [[nodiscard]]
+    auto DowngradeToS() noexcept  //
+        -> SGuard;
+
    private:
     /*########################################################################*
      * Internal member variables
@@ -524,6 +535,21 @@ class OMCSLock
       const auto ver_xor = static_cast<uint64_t>(old_ver_ ^ new_ver_);
       dest_->LockWord().fetch_xor(kXLock | ver_xor, kRelease);
       return SIXGuard{std::exchange(dest_, nullptr), qid_, new_ver_};
+    }
+
+    /**
+     * @brief Downgrade this lock to an S lock.
+     *
+     * @return The lock guard for an S lock.
+     * @note After calling the function, this lock guard abandons the lock's
+     * ownership.
+     */
+    [[nodiscard]]
+    auto
+    DowngradeToS() noexcept  //
+        -> SGuard
+    {
+      return DowngradeToSIX().DowngradeToS();
     }
 
    private:

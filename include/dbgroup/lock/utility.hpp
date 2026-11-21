@@ -64,24 +64,28 @@ concept VersionedGuard = GuardClass<T> && requires(T& x) {
  * locks.
  *
  * @tparam T A target class.
+ * @tparam SGuard A corresponding shared guard class.
  * @tparam XGuard A corresponding exclusive guard class.
  */
-template <class T, class XGuard>
+template <class T, class SGuard, class XGuard>
 concept PessimisticSIXGuard = GuardClass<T> && requires(T& x) {
   // public APIs
   { x.UpgradeToX() } -> std::convertible_to<XGuard>;
+  { x.DowngradeToS() } -> std::convertible_to<SGuard>;
 };
 
 /**
  * @brief A concept for representing guard classes of exclusive locks.
  *
  * @tparam T A target class.
+ * @tparam SGuard A corresponding shared guard class.
  * @tparam SIXGuard A corresponding shared-with-intent-exclusive guard class.
  */
-template <class T, class SIXGuard>
+template <class T, class SGuard, class SIXGuard>
 concept PessimisticXGuard = GuardClass<T> && requires(T& x) {
   // public APIs
   { x.DowngradeToSIX() } -> std::convertible_to<SIXGuard>;
+  { x.DowngradeToS() } -> std::convertible_to<SGuard>;
 };
 
 /**
@@ -143,8 +147,8 @@ template <class T>
 concept PessimisticallyLockable = requires(T& x) {
   // public types
   requires GuardClass<typename T::SGuard>;
-  requires PessimisticSIXGuard<typename T::SIXGuard, typename T::XGuard>;
-  requires PessimisticXGuard<typename T::XGuard, typename T::SIXGuard>;
+  requires PessimisticSIXGuard<typename T::SIXGuard, typename T::SGuard, typename T::XGuard>;
+  requires PessimisticXGuard<typename T::XGuard, typename T::SGuard, typename T::SIXGuard>;
 
   // public APIs
   { x.LockS() } -> std::convertible_to<typename T::SGuard>;

@@ -236,6 +236,17 @@ class MCSLock
       return XGuard{std::exchange(dest_, nullptr), qnode_};
     }
 
+    /**
+     * @brief Downgrade this lock to an S lock.
+     *
+     * @return The lock guard for an S lock.
+     * @note After calling the function, this lock guard abandons the lock's
+     * ownership.
+     */
+    [[nodiscard]]
+    auto DowngradeToS()  //
+        -> SGuard;
+
    private:
     /*########################################################################*
      * Internal member variables
@@ -341,6 +352,21 @@ class MCSLock
         -> SIXGuard
     {
       return SIXGuard{std::exchange(dest_, nullptr), qnode_};
+    }
+
+    /**
+     * @brief Downgrade this lock to an S lock.
+     *
+     * @return The lock guard for an S lock.
+     * @note After calling the function, this lock guard abandons the lock's
+     * ownership.
+     */
+    [[nodiscard]]
+    auto
+    DowngradeToS()  //
+        -> SGuard
+    {
+      return DowngradeToSIX().DowngradeToS();
     }
 
    private:

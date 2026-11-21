@@ -281,4 +281,38 @@ TYPED_TEST(  //
   EXPECT_EQ(this->lock_.GetVersion().GetVersion(), new_ver);
 }
 
+// downgrading publishes a new version while keeping the S lock
+TYPED_TEST(  //
+    HybridLockFixture,
+    DowngradeXToSWithSetVersionPublishVersion)
+{
+  const auto new_ver = this->lock_.GetVersion().GetVersion() + 10;
+  {
+    auto&& x_guard = this->lock_.LockX();
+    x_guard.SetVersion(new_ver);
+    auto&& s_guard = x_guard.DowngradeToS();
+    ASSERT_TRUE(s_guard);
+    EXPECT_EQ(s_guard.GetVersion(), new_ver);
+
+    // optimistic reads do not wait for S locks
+    this->RunInAnotherThread([this] { return this->lock_.GetVersion(); }, kExpectSucceed);
+    this->t_.join();
+    EXPECT_EQ(this->lock_.GetVersion().GetVersion(), new_ver);
+  }
+  EXPECT_EQ(this->lock_.GetVersion().GetVersion(), new_ver);
+}
+
+TYPED_TEST(  //
+    HybridLockFixture,
+    DowngradeSIXToSKeepVersion)
+{
+  const auto ver = this->lock_.GetVersion().GetVersion();
+  {
+    auto&& s_guard = this->lock_.LockSIX().DowngradeToS();
+    ASSERT_TRUE(s_guard);
+    EXPECT_EQ(s_guard.GetVersion(), ver);
+  }
+  EXPECT_EQ(this->lock_.GetVersion().GetVersion(), ver);
+}
+
 }  // namespace dbgroup::lock::test

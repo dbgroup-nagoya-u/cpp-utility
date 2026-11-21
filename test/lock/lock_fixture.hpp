@@ -275,6 +275,62 @@ class LockFixture : public ::testing::Test
   }
 
   /**
+   * @brief Try to get a lock while an S lock downgraded from another lock is held.
+   *
+   * @param lock_type A lock type to be acquired.
+   * @param from_lock_type A lock type to be downgraded (an SIX or X lock).
+   * @param expect_success true if the lock must be acquired without waiting.
+   */
+  void
+  VerifyLockWithDowngradedSLock(  //
+      const LockType lock_type,
+      const LockType from_lock_type,
+      const bool expect_success)
+    requires PessimisticallyLockable<Lock>
+  {
+    ASSERT_TRUE(from_lock_type == kSIXLock || from_lock_type == kXLock);
+    auto&& opt_guard = GetOptGuardIfExist();
+    {
+      [[maybe_unused]] const auto& s_guard = (from_lock_type == kXLock)
+                                                 ? lock_.LockX().DowngradeToS()
+                                                 : lock_.LockSIX().DowngradeToS();
+      EXPECT_TRUE(s_guard);
+      RunInAnotherThread([this, lock_type] { return GetLock(lock_type); }, expect_success);
+    }
+    t_.join();
+
+    if constexpr (OptimisticallyLockable<Lock>) {
+      // X locks modify the version even if they are downgraded
+      EXPECT_EQ(opt_guard.VerifyVersion(), from_lock_type != kXLock && lock_type != kXLock);
+    }
+  }
+
+  /**
+   * @brief Try to downgrade an SIX lock to an S lock while another lock is held.
+   *
+   * @param with_lock_type A lock type held beforehand.
+   * @param expect_success true if the lock must be downgraded without waiting.
+   */
+  void
+  VerifyDowngradeToS(  //
+      const LockType with_lock_type,
+      const bool expect_success)
+    requires PessimisticallyLockable<Lock>
+  {
+    {
+      [[maybe_unused]] const auto& guard = GetLock(with_lock_type);
+      RunInAnotherThread(
+          [six_guard = lock_.LockSIX()]() mutable { return six_guard.DowngradeToS(); },
+          expect_success);
+    }
+    t_.join();
+
+    // check the lock is released correctly
+    RunInAnotherThread([this] { return lock_.LockX(); }, kExpectSucceed);
+    t_.join();
+  }
+
+  /**
    * @brief Try to upgrade an SIX lock to an X lock while another lock is held.
    *
    * @param with_lock_type A lock type held beforehand.
@@ -398,6 +454,52 @@ class LockFixture : public ::testing::Test
     }
 
     EXPECT_EQ(counter_, kThreadNum * kWriteNumPerThread);
+  }
+
+  /**
+   * @brief Verify that S locks downgraded from SIX/X locks prevent other
+   * writers from modifying a shared counter.
+   *
+   */
+  void
+  VerifyDowngradeToSWithMultiThread()
+    requires PessimisticallyLockable<Lock>
+  {
+    std::atomic_size_t inconsistent{0};
+
+    std::vector<std::thread> threads{};
+    threads.reserve(kThreadNum);
+    for (size_t i = 0; i < kThreadNum; ++i) {
+      threads.emplace_back([&]() {
+        for (size_t j = 0; j < kWriteNumPerThread; ++j) {
+          if (j % 2 == 0) {
+            auto&& x_guard = lock_.LockX();
+            const auto val = ++counter_;
+            [[maybe_unused]] auto&& s_guard = x_guard.DowngradeToS();
+            if (counter_ != val) {
+              inconsistent.fetch_add(1, kRelaxed);
+            }
+          } else {
+            auto&& six_guard = lock_.LockSIX();
+            const auto val = counter_;
+            [[maybe_unused]] auto&& s_guard = six_guard.DowngradeToS();
+            if (counter_ != val) {
+              inconsistent.fetch_add(1, kRelaxed);
+            }
+          }
+        }
+      });
+    }
+    for (auto&& t : threads) {
+      t.join();
+    }
+
+    EXPECT_EQ(inconsistent.load(), 0);
+    EXPECT_EQ(counter_, kThreadNum * ((kWriteNumPerThread + 1) / 2));
+
+    // check the counter of shared locks is correctly managed
+    RunInAnotherThread([this] { return lock_.LockX(); }, kExpectSucceed);
+    t_.join();
   }
 
   /**

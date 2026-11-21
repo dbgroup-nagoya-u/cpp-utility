@@ -190,6 +190,74 @@ TYPED_TEST(  //
   this->t_.join();
 }
 
+TYPED_TEST(  //
+    PessimisticLockFixture,
+    LockSWithSLockDowngradedFromSIXSucceed)
+{
+  this->VerifyLockWithDowngradedSLock(kSLock, kSIXLock, kExpectSucceed);
+}
+
+TYPED_TEST(  //
+    PessimisticLockFixture,
+    LockSIXWithSLockDowngradedFromSIXSucceed)
+{
+  this->VerifyLockWithDowngradedSLock(kSIXLock, kSIXLock, kExpectSucceed);
+}
+
+TYPED_TEST(  //
+    PessimisticLockFixture,
+    LockXWithSLockDowngradedFromSIXNeedWait)
+{
+  this->VerifyLockWithDowngradedSLock(kXLock, kSIXLock, kExpectFail);
+}
+
+TYPED_TEST(  //
+    PessimisticLockFixture,
+    LockSWithSLockDowngradedFromXSucceed)
+{
+  this->VerifyLockWithDowngradedSLock(kSLock, kXLock, kExpectSucceed);
+}
+
+TYPED_TEST(  //
+    PessimisticLockFixture,
+    LockSIXWithSLockDowngradedFromXSucceed)
+{
+  this->VerifyLockWithDowngradedSLock(kSIXLock, kXLock, kExpectSucceed);
+}
+
+TYPED_TEST(  //
+    PessimisticLockFixture,
+    LockXWithSLockDowngradedFromXNeedWait)
+{
+  this->VerifyLockWithDowngradedSLock(kXLock, kXLock, kExpectFail);
+}
+
+TYPED_TEST(  //
+    PessimisticLockFixture,
+    DowngradeToSWithoutLocksSucceed)
+{
+  this->VerifyDowngradeToS(kFree, kExpectSucceed);
+}
+
+TYPED_TEST(  //
+    PessimisticLockFixture,
+    DowngradeToSWithSLockSucceed)
+{
+  this->VerifyDowngradeToS(kSLock, kExpectSucceed);
+}
+
+TYPED_TEST(  //
+    PessimisticLockFixture,
+    DowngradeToSWithDowngradedSIXLockHoldSLock)
+{
+  {
+    auto&& s_guard = this->lock_.LockX().DowngradeToSIX().DowngradeToS();
+    ASSERT_TRUE(s_guard);
+    this->RunInAnotherThread([this] { return this->lock_.LockX(); }, kExpectFail);
+  }
+  this->t_.join();
+}
+
 /*----------------------------------------------------------------------------*
  * Guard tests
  *----------------------------------------------------------------------------*/
@@ -210,6 +278,24 @@ TYPED_TEST(  //
   typename TypeParam::XGuard x_guard{};
   EXPECT_FALSE(x_guard);
   EXPECT_FALSE(x_guard.DowngradeToSIX());
+}
+
+TYPED_TEST(  //
+    PessimisticLockFixture,
+    DowngradeSIXToSWithEmptyGuardReturnEmptyGuard)
+{
+  typename TypeParam::SIXGuard six_guard{};
+  EXPECT_FALSE(six_guard);
+  EXPECT_FALSE(six_guard.DowngradeToS());
+}
+
+TYPED_TEST(  //
+    PessimisticLockFixture,
+    DowngradeXToSWithEmptyGuardReturnEmptyGuard)
+{
+  typename TypeParam::XGuard x_guard{};
+  EXPECT_FALSE(x_guard);
+  EXPECT_FALSE(x_guard.DowngradeToS());
 }
 
 TYPED_TEST(  //
@@ -271,6 +357,13 @@ TYPED_TEST(  //
     UpgradeToXWithMultiThreadKeepConsistentCounter)
 {
   this->VerifyUpgradeToXWithMultiThread();
+}
+
+TYPED_TEST(  //
+    PessimisticLockFixture,
+    DowngradeToSWithMultiThreadKeepConsistentCounter)
+{
+  this->VerifyDowngradeToSWithMultiThread();
 }
 
 TYPED_TEST(  //

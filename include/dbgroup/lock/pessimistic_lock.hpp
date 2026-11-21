@@ -224,6 +224,28 @@ class PessimisticLock
       return XGuard{std::exchange(dest_, nullptr)};
     }
 
+    /**
+     * @brief Downgrade this lock to an S lock.
+     *
+     * @return The lock guard for an S lock.
+     * @note After calling the function, this lock guard abandons the lock's
+     * ownership.
+     */
+    [[nodiscard]]
+    auto
+    DowngradeToS() noexcept  //
+        -> SGuard
+    {
+      if (!dest_) [[unlikely]] {
+        return SGuard{};
+      }
+
+      // SIX locks do not modify data, so this does not need to publish anything
+      [[maybe_unused]] const auto ret = dest_->LockWord().fetch_sub(kSIXLock - kSLock, kRelaxed);
+      assert((ret & kXMask) == kSIXLock);
+      return SGuard{std::exchange(dest_, nullptr)};
+    }
+
    private:
     /*########################################################################*
      * Internal member variables
@@ -325,6 +347,28 @@ class PessimisticLock
       [[maybe_unused]] const auto ret = dest_->LockWord().fetch_xor(kXMask, kRelease);
       assert((ret & kXMask) == kXLock);
       return SIXGuard{std::exchange(dest_, nullptr)};
+    }
+
+    /**
+     * @brief Downgrade this lock to an S lock.
+     *
+     * @return The lock guard for an S lock.
+     * @note After calling the function, this lock guard abandons the lock's
+     * ownership.
+     */
+    [[nodiscard]]
+    auto
+    DowngradeToS() noexcept  //
+        -> SGuard
+    {
+      if (!dest_) [[unlikely]] {
+        return SGuard{};
+      }
+
+      // X locks have waited for all the shared lock holders to release their locks
+      [[maybe_unused]] const auto ret = dest_->LockWord().fetch_sub(kXLock - kSLock, kRelease);
+      assert(ret == kXLock);
+      return SGuard{std::exchange(dest_, nullptr)};
     }
 
    private:

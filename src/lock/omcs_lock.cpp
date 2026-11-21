@@ -21,6 +21,7 @@
 #include <atomic>
 #include <cstdint>
 #include <thread>
+#include <utility>
 
 // local sources
 #include "dbgroup/constants.hpp"
@@ -219,6 +220,46 @@ OMCSLock::WaitSLock(         //
     }
   }
   return qid;
+}
+
+/*############################################################################*
+ * Shared-with-intent-exclusive lock guards
+ *############################################################################*/
+
+auto
+OMCSLock::SIXGuard::DowngradeToS() noexcept  //
+    -> SGuard
+{
+  if (!dest_) [[unlikely]] {
+    return SGuard{};
+  }
+
+  // join the shared lock holders that take over this node, and then release
+  // the SIX lock as usual (i.e., the predecessor's last shared lock holder
+  // may pass this node instead of this thread)
+  auto* const lock = std::exchange(dest_, nullptr);
+  auto* const qnode = QNodeHolder::GetQNode(qid_);
+  auto* next_node = qnode->next.load(kAcquire);
+  if (!next_node) {  // this is the tail node
+    auto cur = lock->LockWord().load(kRelaxed);
+    while (((cur & kQIDMask) >> kQIDShift) == qid_) {
+      if (lock->LockWord().compare_exchange_weak(cur, cur + kSLock, kRelaxed, kRelaxed)) {
+        lock->UnlockSIX(qid_);
+        return SGuard{lock, qid_, ver_};
+      }
+      CPP_UTILITY_SPINLOCK_HINT
+    }
+
+    while (true) {  // wait until successor fills in its next field
+      next_node = qnode->next.load(kAcquire);
+      if (next_node) break;
+      CPP_UTILITY_SPINLOCK_HINT
+    }
+  }
+
+  next_node->lock_state.fetch_add(kSLock, kRelaxed);
+  lock->UnlockSIX(qid_);
+  return SGuard{lock, qid_, ver_};
 }
 
 /*############################################################################*
