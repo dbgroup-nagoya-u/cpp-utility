@@ -6,6 +6,7 @@
     - [Example of Usages](#example-of-usages)
 - [Optimistic Locking](#optimistic-locking)
     - [class OptimisticLock](#class-optimisticlock)
+    - [class OMCSLock](#class-omcslock)
     - [Example of Usages](#example-of-usages-1)
 
 ## Pessimistic Locking
@@ -146,7 +147,7 @@ stateDiagram-v2
     XGuard --> Pessimistic
 ```
 
-We have implemented an optimistic/shared composite lock guard as one variant of optimistic locking. `PrepareRead` function first tries reading a valid version value for optimistic locking. If another thread holds an exclusive lock, `PrepareRead` switches to acquire a shared lock to avoid repeated fails of version verification. We emphasize that only a single thread will obtain a shared lock if multiple threads perform `PrepareRead`. The other threads can use the version-based optimistic read while the thread holds the shared lock.
+If version verification fails repeatedly, `VerifyVersion` with the `max_retry` argument falls back to a shared lock to avoid starving readers. We emphasize that only a single thread acquires a shared lock even if multiple threads fall back; the other threads continue with version-based optimistic reads while that thread holds the shared lock. The next call of `VerifyVersion` releases the shared lock and returns `true`.
 
 ### class OptimisticLock
 
@@ -158,14 +159,24 @@ We maintain the internal lock state according to the following table. The last a
 
 This lock uses *back-off* to schedule threads requesting lock acquisition, so getting a lock is unfair. While back-off scheduling will significantly reduce CPU usage, some threads may have to wait a long time for other threads.
 
+### class OMCSLock
+
+We have also implemented an optimistic MCS (OMCS) lock, which extends OptiQL [^2] to support shared and shared-with-intent-exclusive locks. Like `MCSLock`, this lock orders lock acquisitions with a queue. As in `OptimisticLock`, optimistic readers wait only while a thread holds an X lock, that is, after `UpgradeToX` has waited for the preceding shared lock holders; SIX locks do not block optimistic reads.
+
+We maintain the internal lock state according to the following table. The last bit represents an X lock, and the second-to-last bit is an IX lock flag, which represents that the owner of the tail queue node holds (or waits for) an SIX or X lock as in `MCSLock`. The following 14 bits preserve the number of threads that hold (or wait for) shared locks after the tail queue node, and the next 16 bits contain the ID of the tail queue node. The remaining bits contain the current version value.
+
+|       63       |       62        |         61-48         |     47-32      |      31-0       |
+| :------------: | :-------------: | :-------------------: | :------------: | :-------------: |
+| an X lock flag | an IX lock flag | a shared lock counter | a tail node ID | a version value |
+
+Queue nodes are preallocated in a global array and identified by 16-bit IDs, and each thread caches some of them for reuse. Since the lock state embeds a node ID instead of a pointer, it can hold a version value in the same 64-bit word. Each queue node has an owner flag, an IX lock flag, and a shared lock counter as in `MCSLock`, and the lock is passed to the successor in the same manner.
+
 ### Example of Usages
 
 #### Optimistic Read Procedure
 
 ```cpp
 for (auto &&opt_guard = opt_lock.GetVersion();;) {  // keep a version-based guard
-  // you can use `PrepareRead` to use an optimistic/shared composite lock guard
-
   // ...some codes for reading a shared region...
 
   if (opt_guard.VerifyVersion()) break;
@@ -206,3 +217,4 @@ for (auto &&opt_guard = opt_lock.GetVersion();;) {  // keep a version-based guar
 ```
 
 [^1]: M. Herlihy et al., “The art of multiprocessor programming,” chapter 7, Morgan Kaufmann, 2nd edition, 2021.
+[^2]: G. Shi et al., "OptiQL: Robust Optimistic Locking for Memory-Optimized Indexes," PACMMOD, vol. 1, no. 3, article 216, 2023.

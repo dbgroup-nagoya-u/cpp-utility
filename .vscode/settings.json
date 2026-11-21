@@ -107,6 +107,7 @@
     "NOLINTNEXTLINE",
     "omcs",
     "optiql",
+    "PACMMOD",
     "pthread",
     "PVLDB",
     "qnode",
