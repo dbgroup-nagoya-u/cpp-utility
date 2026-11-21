@@ -21,7 +21,6 @@
 #include <atomic>
 #include <cassert>
 #include <cstdint>
-#include <thread>
 #include <type_traits>
 #include <utility>
 
@@ -231,7 +230,7 @@ class MCSLock
 
       while (qnode_->LockWord().load(kAcquire) & kSMask) {
         // wait for shared lock holders to release their locks
-        std::this_thread::yield();
+        CPP_UTILITY_SPINLOCK_HINT
       }
       return XGuard{std::exchange(dest_, nullptr), qnode_};
     }
