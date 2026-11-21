@@ -19,6 +19,7 @@
 
 // C++ standard libraries
 #include <atomic>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -867,8 +868,11 @@ class OMCSLock
       uint64_t old_ver,
       uint64_t new_ver) noexcept
   {
+    // X locks have waited for the predecessor's shared lock holders, so no one
+    // refers to the owner flag of this node
+    assert((QNodeHolder::GetQNode(qid)->lock_state.load(kRelaxed) & kSMask) == 0);
     LockWord().fetch_xor(kXLock | (old_ver ^ new_ver), kRelease);
-    UnlockSIX(qid);
+    PassLock(qid);
   }
 
   /**
